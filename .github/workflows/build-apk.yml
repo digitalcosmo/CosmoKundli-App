@@ -23,21 +23,32 @@ jobs:
       - name: Create Flutter project scaffolding
         run: flutter create --project-name cosmo_kundli .
 
-      - name: Fix Android Gradle Plugin version
+      - name: Fix Android build configuration
         run: |
-          # Update AGP to 8.5.2+ for Kotlin compatibility
-          sed -i "s/id \"com.android.application\" version \"[^\"]*\"/id \"com.android.application\" version \"9.1.1\"/" android/settings.gradle
-          sed -i "s/id \"org.jetbrains.kotlin.android\" version \"[^\"]*\"/id \"org.jetbrains.kotlin.android\" version \"2.1.0\"/" android/settings.gradle
-          # Also update build.gradle if it has classpath reference
-          sed -i 's/com.android.tools.build:gradle:[0-9.]*/com.android.tools.build:gradle:9.1.1/' android/build.gradle 2>/dev/null || true
-          sed -i 's/com.android.tools.build:gradle:[0-9.]*/com.android.tools.build:gradle:9.1.1/' android/app/build.gradle 2>/dev/null || true
-          # Update gradle wrapper properties directly
-          sed -i 's|gradle-[0-9.]*-all.zip|gradle-9.3.1-all.zip|' android/gradle/wrapper/gradle-wrapper.properties
-          sed -i 's|gradle-[0-9.]*-bin.zip|gradle-9.3.1-bin.zip|' android/gradle/wrapper/gradle-wrapper.properties
-          # Set compileSdk and targetSdk to 35
-          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 35/' android/app/build.gradle
-          sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 35/' android/app/build.gradle
-          sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 35/' android/app/build.gradle
+          echo "=== settings.gradle before ==="
+          cat android/settings.gradle
+          echo "=== build.gradle before ==="
+          cat android/app/build.gradle
+          echo "=== gradle-wrapper.properties before ==="
+          cat android/gradle/wrapper/gradle-wrapper.properties
+          # Update all version references in settings.gradle
+          sed -i -E 's/(id\s+"com\.android\.application"\s+version\s+")[^"]+/\19.1.1/' android/settings.gradle
+          sed -i -E 's/(id\s+"org\.jetbrains\.kotlin\.android"\s+version\s+")[^"]+/\12.4.10/' android/settings.gradle
+          # Also handle single-quote versions
+          sed -i -E "s/(id 'com\.android\.application' version ')[^']+/\19.1.1/" android/settings.gradle
+          sed -i -E "s/(id 'org\.jetbrains\.kotlin\.android' version ')[^']+/\12.4.10/" android/settings.gradle
+          # Update ext.kotlin_version if present in build.gradle
+          sed -i -E "s/ext\.kotlin_version\s*=\s*'[^']+'/ext.kotlin_version = '2.4.10'/" android/build.gradle 2>/dev/null || true
+          # Update classpath references
+          sed -i -E 's/com\.android\.tools\.build:gradle:[0-9.]+/com.android.tools.build:gradle:9.1.1/' android/build.gradle 2>/dev/null || true
+          sed -i -E "s/org\.jetbrains\.kotlin:kotlin-gradle-plugin:[0-9.]+/org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.10/" android/build.gradle 2>/dev/null || true
+          # Update gradle wrapper
+          sed -i -E 's|gradle-[0-9.]+-all\.zip|gradle-9.3.1-all.zip|' android/gradle/wrapper/gradle-wrapper.properties
+          sed -i -E 's|gradle-[0-9.]+-bin\.zip|gradle-9.3.1-bin.zip|' android/gradle/wrapper/gradle-wrapper.properties
+          echo "=== settings.gradle after ==="
+          cat android/settings.gradle
+          echo "=== gradle-wrapper.properties after ==="
+          cat android/gradle/wrapper/gradle-wrapper.properties
 
       - name: Get dependencies
         run: flutter pub get
