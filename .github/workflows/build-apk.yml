@@ -14,7 +14,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - uses: subosito/flutter-action@v2
         with:
@@ -26,11 +26,11 @@ jobs:
       - name: Fix Android Gradle Plugin version
         run: |
           # Update AGP to 8.5.2+ for Kotlin compatibility
-          sed -i "s/id \"com.android.application\" version \"[^\"]*\"/id \"com.android.application\" version \"8.9.0\"/" android/settings.gradle
+          sed -i "s/id \"com.android.application\" version \"[^\"]*\"/id \"com.android.application\" version \"9.1.1\"/" android/settings.gradle
           sed -i "s/id \"org.jetbrains.kotlin.android\" version \"[^\"]*\"/id \"org.jetbrains.kotlin.android\" version \"2.1.0\"/" android/settings.gradle
           # Also update build.gradle if it has classpath reference
-          sed -i 's/com.android.tools.build:gradle:[0-9.]*/com.android.tools.build:gradle:8.9.0/' android/build.gradle 2>/dev/null || true
-          sed -i 's/com.android.tools.build:gradle:[0-9.]*/com.android.tools.build:gradle:8.9.0/' android/app/build.gradle 2>/dev/null || true
+          sed -i 's/com.android.tools.build:gradle:[0-9.]*/com.android.tools.build:gradle:9.1.1/' android/build.gradle 2>/dev/null || true
+          sed -i 's/com.android.tools.build:gradle:[0-9.]*/com.android.tools.build:gradle:9.1.1/' android/app/build.gradle 2>/dev/null || true
           # Update gradle wrapper properties directly
           sed -i 's|gradle-[0-9.]*-all.zip|gradle-9.3.1-all.zip|' android/gradle/wrapper/gradle-wrapper.properties
           sed -i 's|gradle-[0-9.]*-bin.zip|gradle-9.3.1-bin.zip|' android/gradle/wrapper/gradle-wrapper.properties
