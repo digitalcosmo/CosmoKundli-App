@@ -31,9 +31,9 @@ jobs:
           # Also update build.gradle if it has classpath reference
           sed -i 's/com.android.tools.build:gradle:[0-9.]*/com.android.tools.build:gradle:8.7.0/' android/build.gradle 2>/dev/null || true
           sed -i 's/com.android.tools.build:gradle:[0-9.]*/com.android.tools.build:gradle:8.7.0/' android/app/build.gradle 2>/dev/null || true
-          # Update gradle wrapper
-          cd android && ./gradlew wrapper --gradle-version 8.9 2>/dev/null || true
-          cd ..
+          # Update gradle wrapper properties directly
+          sed -i 's|gradle-[0-9.]*-all.zip|gradle-8.9-all.zip|' android/gradle/wrapper/gradle-wrapper.properties
+          sed -i 's|gradle-[0-9.]*-bin.zip|gradle-8.9-bin.zip|' android/gradle/wrapper/gradle-wrapper.properties
           # Set compileSdk and targetSdk to 35
           sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 35/' android/app/build.gradle
           sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 35/' android/app/build.gradle
