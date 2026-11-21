@@ -25,10 +25,22 @@ jobs:
 
       - name: Fix Android build configuration
         run: |
-          sed -i -E 's/(id "com\.android\.application" version ")[^"]+/\19.1.1/' android/settings.gradle
-          sed -i -E 's/(id "org\.jetbrains\.kotlin\.android" version ")[^"]+/\12.4.20/' android/settings.gradle
-          sed -i -E 's|gradle-[0-9.]+-all\.zip|gradle-9.3.1-all.zip|' android/gradle/wrapper/gradle-wrapper.properties
-          sed -i -E 's|gradle-[0-9.]+-bin\.zip|gradle-9.3.1-bin.zip|' android/gradle/wrapper/gradle-wrapper.properties
+          # Fix settings.gradle or settings.gradle.kts
+          for f in android/settings.gradle android/settings.gradle.kts; do
+            [ -f "$f" ] && {
+              sed -i -E 's/(id\("com\.android\.application"\) version ")[^"]+/\19.1.1/' "$f"
+              sed -i -E 's/(id "com\.android\.application" version ")[^"]+/\19.1.1/' "$f"
+              sed -i -E 's/(id\("org\.jetbrains\.kotlin\.android"\) version ")[^"]+/\12.4.20/' "$f"
+              sed -i -E 's/(id "org\.jetbrains\.kotlin\.android" version ")[^"]+/\12.4.20/' "$f"
+            }
+          done
+          # Fix gradle wrapper
+          for f in android/gradle/wrapper/gradle-wrapper.properties; do
+            [ -f "$f" ] && {
+              sed -i -E 's|gradle-[0-9.]+-all\.zip|gradle-9.3.1-all.zip|' "$f"
+              sed -i -E 's|gradle-[0-9.]+-bin\.zip|gradle-9.3.1-bin.zip|' "$f"
+            }
+          done
 
       - name: Get dependencies
         run: flutter pub get
