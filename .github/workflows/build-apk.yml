@@ -26,6 +26,10 @@ jobs:
       - name: Ensure correct build config
         run: |
           rm -f android/settings.gradle
+          # Bump compileSdk to 37 (dependencies require >=36)
+          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 37/' android/app/build.gradle.kts
+          sed -i 's/compileSdk = [0-9]*/compileSdk = 37/' android/app/build.gradle.kts
+          cat android/app/build.gradle.kts | grep -i compileSdk
           cat android/settings.gradle.kts
           cat android/gradle/wrapper/gradle-wrapper.properties
 
