@@ -65,7 +65,7 @@ class HomeScreen extends StatelessWidget {
             ),
             child: BottomNavigationBar(
               currentIndex: controller.currentPageIndex.value,
-              onTap: controller.setPageIndex,
+              onPressed: controller.setPageIndex,
               backgroundColor: Colors.transparent,
               elevation: 0,
               selectedItemColor: AppTheme.accent,
@@ -144,7 +144,7 @@ class HomeScreen extends StatelessWidget {
             ),
             // All Clients button
             GestureDetector(
-              onTap: () => Get.toNamed(AppRoutes.clientList),
+              onPressed: () => Get.toNamed(AppRoutes.clientList),
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 0.8.h),
                 decoration: AppTheme.glassPill,

@@ -71,7 +71,7 @@ class PeriodicMonthlyScreen extends StatelessWidget {
             onPressed: () => controller.previousMonth(),
           ),
           GestureDetector(
-            onTap: () => _showMonthYearPicker(context),
+            onPressed: () => _showMonthYearPicker(context),
             child: Obx(() => Text(
                   controller.monthLabel.value,
                   style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.w600),

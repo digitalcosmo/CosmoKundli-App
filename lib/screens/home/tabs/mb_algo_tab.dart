@@ -59,7 +59,7 @@ class MbAlgoTab extends StatelessWidget {
               return Padding(
                 padding: EdgeInsets.only(bottom: 1.5.h),
                 child: GlassCard(
-                  onTap: () => Get.toNamed(item.route),
+                  onPressed: () => Get.toNamed(item.route),
                   padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
                   child: Row(
                     children: [

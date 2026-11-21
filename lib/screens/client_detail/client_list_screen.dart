@@ -106,7 +106,7 @@ class ClientListScreen extends StatelessWidget {
                             child: const Icon(Icons.delete_outline, color: AppTheme.error),
                           ),
                           child: GlassCard(
-                            onTap: () => _selectMember(member),
+                            onPressed: () => _selectMember(member),
                             padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.8.h),
                             child: Row(
                               children: [

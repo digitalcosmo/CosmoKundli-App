@@ -42,7 +42,7 @@ class OthersTab extends StatelessWidget {
             SizedBox(height: 3.h),
 
             GlassCard(
-              onTap: () => Get.toNamed(AppRoutes.melapak),
+              onPressed: () => Get.toNamed(AppRoutes.melapak),
               padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.5.h),
               child: Row(
                 children: [

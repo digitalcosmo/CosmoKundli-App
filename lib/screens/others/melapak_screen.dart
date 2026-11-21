@@ -72,7 +72,7 @@ class MelapakScreen extends StatelessWidget {
                       return GlassCard(
                         margin: EdgeInsets.only(bottom: 1.5.h),
                         padding: EdgeInsets.all(4.w),
-                        onTap: () {
+                        onPressed: () {
                           controller.matchWithExistingUser(
                             context,
                             memberId: member['oID']?.toString() ?? '',

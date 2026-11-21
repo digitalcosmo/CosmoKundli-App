@@ -115,7 +115,7 @@ class _BirthKundliScreenState extends State<BirthKundliScreen> {
       runSpacing: 1.h,
       children: navItems.map((item) {
         return GestureDetector(
-          onTap: () => Get.toNamed(item['route'] as String),
+          onPressed: () => Get.toNamed(item['route'] as String),
           child: Container(
             padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
             decoration: AppTheme.glassPill,

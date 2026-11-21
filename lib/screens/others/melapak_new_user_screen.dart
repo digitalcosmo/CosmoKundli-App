@@ -137,7 +137,7 @@ class _MelapakNewUserScreenState extends State<MelapakNewUserScreen> {
 
                       // Date of Birth
                       GestureDetector(
-                        onTap: () => _pickDate(context),
+                        onPressed: () => _pickDate(context),
                         child: AbsorbPointer(
                           child: GlassTextField(
                             controller: controller.dobController,
@@ -211,7 +211,7 @@ class _MelapakNewUserScreenState extends State<MelapakNewUserScreen> {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     leading: const Icon(Icons.place, color: AppTheme.textMuted, size: 18),
-                                    onTap: () => _selectPlace(place),
+                                    onPressed: () => _selectPlace(place),
                                   );
                                 }).toList(),
                               ),

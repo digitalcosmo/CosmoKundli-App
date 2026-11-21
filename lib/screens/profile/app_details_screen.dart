@@ -8,137 +8,98 @@ import 'package:cosmo_kundli/values/get_tags.dart';
 import 'package:cosmo_kundli/widgets/glass_card.dart';
 import 'package:cosmo_kundli/widgets/glass_text_field.dart';
 import 'package:cosmo_kundli/widgets/glass_button.dart';
+import 'package:cosmo_kundli/widgets/app_bar_widget.dart';
 import 'package:cosmo_kundli/widgets/loading_widget.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
-class AppDetailsScreen extends StatelessWidget {
-  AppDetailsScreen({super.key});
+class AppDetailsScreen extends StatefulWidget {
+  const AppDetailsScreen({super.key});
+  @override
+  State<AppDetailsScreen> createState() => _AppDetailsScreenState();
+}
 
-  final controller = Get.find<ProfileController>(tag: GetTags.profileTag);
+class _AppDetailsScreenState extends State<AppDetailsScreen> {
+  final ProfileController _ctrl = Get.find(tag: GetTags.profileTag);
+
+  @override
+  void initState() { super.initState(); _ctrl.fetchAppDetails(); }
+
+  Widget _imageSection(String title, String type, RxString imageUrl) {
+    return GlassCard(
+      padding: EdgeInsets.all(3.w),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: AppTheme.labelMedium),
+          SizedBox(height: 1.h),
+          Obx(() => imageUrl.value.isNotEmpty
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+                  child: Image.network(imageUrl.value, height: 15.h, width: double.infinity, fit: BoxFit.cover),
+                )
+              : Container(
+                  height: 15.h, width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: AppTheme.gmBg, borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+                    border: Border.all(color: AppTheme.gmBorder),
+                  ),
+                  child: const Center(child: Icon(Icons.image_outlined, color: Colors.white38, size: 40)),
+                ),
+          ),
+          SizedBox(height: 1.h),
+          GlassButton(text: 'Upload $title', onPressed: () => _ctrl.uploadImage(type)),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    controller.fetchAppDetails();
-
     return Scaffold(
       body: Container(
-        width: double.infinity,
-        height: double.infinity,
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppTheme.bgPrimary, AppTheme.bgSecondary],
-          ),
+          gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [AppTheme.bgPrimary, AppTheme.bgSecondary]),
         ),
         child: SafeArea(
-          child: Obx(() {
-            if (controller.isLoading.value) return const LoadingWidget();
-
-            return Column(
-              children: [
-                // Header
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Get.back(),
-                        icon: const Icon(Icons.arrow_back_ios, color: AppTheme.textPrimary, size: 20),
-                      ),
-                      Expanded(child: Text('App Details', style: AppTheme.headingLarge)),
-                    ],
-                  ),
-                ).animate().fadeIn(duration: 300.ms),
-
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(horizontal: 4.w),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(height: 1.h),
-
-                        // App Icon preview
-                        if (controller.selectedAppImage.value.isNotEmpty)
-                          Center(
-                            child: GlassCard(
-                              padding: EdgeInsets.all(4.w),
-                              child: Column(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(14),
-                                    child: CachedNetworkImage(
-                                      imageUrl: controller.selectedAppImage.value,
-                                      width: 80,
-                                      height: 80,
-                                      fit: BoxFit.cover,
-                                      errorWidget: (_, __, ___) =>
-                                          const Icon(Icons.apps, color: AppTheme.textMuted, size: 40),
-                                    ),
-                                  ),
-                                  SizedBox(height: 1.h),
-                                  GlassButton(
-                                    text: 'Change Icon',
-                                    onPressed: () async {
-                                      await controller.pickFile('app');
-                                      if (controller.selectedAppFile.value != null) {
-                                        controller.updateAppImage(context);
-                                      }
-                                    },
-                                    isOutlined: true,
-                                  ),
-                                ],
-                              ),
+          child: Column(
+            children: [
+              const CustomAppBar(title: 'App Details'),
+              Expanded(
+                child: Obx(() {
+                  if (_ctrl.isLoading.value) return const LoadingWidget();
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.all(4.w),
+                    child: Form(
+                      key: _ctrl.appDetailsFormKey,
+                      child: Column(
+                        children: [
+                          GlassCard(
+                            padding: EdgeInsets.all(4.w),
+                            child: Column(
+                              children: [
+                                GlassTextField(controller: _ctrl.appName, label: 'App Name'),
+                                SizedBox(height: 1.5.h),
+                                GlassTextField(controller: _ctrl.appCode, label: 'App Code'),
+                                SizedBox(height: 1.5.h),
+                                GlassTextField(controller: _ctrl.appDesc, label: 'Description', maxLines: 3),
+                                SizedBox(height: 2.h),
+                                GlassButton(text: 'Update', onPressed: () => _ctrl.updateAppDetails()),
+                              ],
                             ),
-                          ).animate(delay: 100.ms).fadeIn(duration: 400.ms),
-
-                        SizedBox(height: 2.h),
-
-                        // App Name
-                        GlassTextField(
-                          controller: controller.appNameController,
-                          label: 'App Name',
-                          hint: 'Enter app name',
-                          prefix: const Icon(Icons.apps_outlined, color: AppTheme.textMuted, size: 20),
-                        ),
-                        SizedBox(height: 1.5.h),
-
-                        // App Code
-                        GlassTextField(
-                          controller: controller.appCodeController,
-                          label: 'App Code',
-                          hint: 'Enter app code',
-                          prefix: const Icon(Icons.code, color: AppTheme.textMuted, size: 20),
-                        ),
-                        SizedBox(height: 1.5.h),
-
-                        // Description
-                        GlassTextField(
-                          controller: controller.appDescController,
-                          label: 'Description',
-                          hint: 'Enter description',
-                          prefix: const Icon(Icons.description_outlined, color: AppTheme.textMuted, size: 20),
-                          maxLines: 4,
-                        ),
-                        SizedBox(height: 3.h),
-
-                        // Update button
-                        GlassButton(
-                          text: 'Update App Details',
-                          icon: Icons.save_outlined,
-                          onPressed: () => controller.updateAppDetail(context),
-                          isLoading: controller.isLoading.value,
-                        ),
-
-                        SizedBox(height: 4.h),
-                      ],
+                          ).animate().fadeIn(duration: 500.ms),
+                          SizedBox(height: 2.h),
+                          _imageSection('Front Image', 'front', _ctrl.selectedFrontImage).animate(delay: 200.ms).fadeIn(duration: 400.ms),
+                          SizedBox(height: 1.5.h),
+                          _imageSection('Back Image', 'back', _ctrl.selectedBackImage).animate(delay: 300.ms).fadeIn(duration: 400.ms),
+                          SizedBox(height: 1.5.h),
+                          _imageSection('App Image', 'app', _ctrl.selectedAppImage).animate(delay: 400.ms).fadeIn(duration: 400.ms),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-              ],
-            );
-          }),
+                  );
+                }),
+              ),
+            ],
+          ),
         ),
       ),
     );

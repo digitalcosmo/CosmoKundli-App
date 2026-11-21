@@ -47,7 +47,7 @@ class KundaliTab extends StatelessWidget {
               return Padding(
                 padding: EdgeInsets.only(bottom: 1.2.h),
                 child: GlassCard(
-                  onTap: () => Get.toNamed(item['route'] as String),
+                  onPressed: () => Get.toNamed(item['route'] as String),
                   padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.8.h),
                   child: Row(
                     children: [

@@ -39,7 +39,7 @@ class ProfileTab extends StatelessWidget {
             return Padding(
               padding: EdgeInsets.only(bottom: 1.2.h),
               child: GlassCard(
-                onTap: () => Get.toNamed(item.route),
+                onPressed: () => Get.toNamed(item.route),
                 padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
                 child: Row(
                   children: [
@@ -59,7 +59,7 @@ class ProfileTab extends StatelessWidget {
 
           // Deactivate Account
           GlassCard(
-            onTap: () => _showDeactivateDialog(context),
+            onPressed: () => _showDeactivateDialog(context),
             padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
             child: Row(
               children: [
@@ -75,7 +75,7 @@ class ProfileTab extends StatelessWidget {
 
           // Logout
           GlassCard(
-            onTap: () => _showLogoutDialog(context),
+            onPressed: () => _showLogoutDialog(context),
             padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
             child: Row(
               children: [

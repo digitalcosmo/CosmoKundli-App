@@ -86,7 +86,7 @@ class AddClientScreen extends StatelessWidget {
 
                       // Date of Birth
                       GestureDetector(
-                        onTap: () => _pickDate(context),
+                        onPressed: () => _pickDate(context),
                         child: AbsorbPointer(
                           child: GlassTextField(
                             controller: controller.dobController,
@@ -99,7 +99,7 @@ class AddClientScreen extends StatelessWidget {
 
                       // Birth Time
                       GestureDetector(
-                        onTap: () => _pickTime(context),
+                        onPressed: () => _pickTime(context),
                         child: AbsorbPointer(
                           child: GlassTextField(
                             controller: controller.birthTimeController,
@@ -135,7 +135,7 @@ class AddClientScreen extends StatelessWidget {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     leading: const Icon(Icons.place, color: AppTheme.textMuted, size: 18),
-                                    onTap: () => controller.selectPlace(place),
+                                    onPressed: () => controller.selectPlace(place),
                                   );
                                 }).toList(),
                               ),

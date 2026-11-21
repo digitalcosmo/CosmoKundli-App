@@ -64,7 +64,7 @@ class GocharPrabhavScreen extends StatelessWidget {
     return GlassCard(
       padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.5.h),
       child: GestureDetector(
-        onTap: () async {
+        onPressed: () async {
           final date = await showDatePicker(
             context: context,
             initialDate: DateTime.now(),

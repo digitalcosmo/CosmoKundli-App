@@ -99,7 +99,7 @@ class GocharTableScreen extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               GestureDetector(
-                onTap: ctrl['inc'] as VoidCallback,
+                onPressed: ctrl['inc'] as VoidCallback,
                 child: Container(
                   padding: EdgeInsets.all(1.w),
                   decoration: BoxDecoration(
@@ -113,7 +113,7 @@ class GocharTableScreen extends StatelessWidget {
               Text(ctrl['label'] as String, style: AppTheme.labelSmall.copyWith(fontSize: 10)),
               SizedBox(height: 0.5.h),
               GestureDetector(
-                onTap: ctrl['dec'] as VoidCallback,
+                onPressed: ctrl['dec'] as VoidCallback,
                 child: Container(
                   padding: EdgeInsets.all(1.w),
                   decoration: BoxDecoration(

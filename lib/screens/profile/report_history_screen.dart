@@ -6,113 +6,66 @@ import 'package:cosmo_kundli/controllers/profile_controller.dart';
 import 'package:cosmo_kundli/theme/app_theme.dart';
 import 'package:cosmo_kundli/values/get_tags.dart';
 import 'package:cosmo_kundli/widgets/glass_card.dart';
+import 'package:cosmo_kundli/widgets/app_bar_widget.dart';
 import 'package:cosmo_kundli/widgets/loading_widget.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-class ReportHistoryScreen extends StatelessWidget {
-  ReportHistoryScreen({super.key});
+class ReportHistoryScreen extends StatefulWidget {
+  const ReportHistoryScreen({super.key});
+  @override
+  State<ReportHistoryScreen> createState() => _ReportHistoryScreenState();
+}
 
-  final controller = Get.find<ProfileController>(tag: GetTags.profileTag);
+class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
+  final ProfileController _ctrl = Get.find(tag: GetTags.profileTag);
+
+  @override
+  void initState() { super.initState(); _ctrl.fetchReportHistory(); }
 
   @override
   Widget build(BuildContext context) {
-    controller.fetchReportHistory();
-
     return Scaffold(
       body: Container(
-        width: double.infinity,
-        height: double.infinity,
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppTheme.bgPrimary, AppTheme.bgSecondary],
-          ),
+          gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [AppTheme.bgPrimary, AppTheme.bgSecondary]),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Get.back(),
-                      icon: const Icon(Icons.arrow_back_ios, color: AppTheme.textPrimary, size: 20),
-                    ),
-                    Text('Report History', style: AppTheme.headingLarge),
-                  ],
-                ),
-              ).animate().fadeIn(duration: 300.ms),
-
+              const CustomAppBar(title: 'Report History'),
               Expanded(
                 child: Obx(() {
-                  if (controller.isLoading.value) return const LoadingWidget();
-
-                  final reports = controller.reportHistory;
-                  if (reports.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.history_outlined, size: 64, color: AppTheme.textMuted.withOpacity(0.3)),
-                          SizedBox(height: 2.h),
-                          Text('No reports generated yet', style: AppTheme.bodyMedium.copyWith(color: AppTheme.textMuted)),
-                        ],
-                      ),
-                    );
+                  if (_ctrl.isLoading.value) return const LoadingWidget();
+                  if (_ctrl.reportList.isEmpty) {
+                    return Center(child: Text('No reports', style: AppTheme.bodyMedium));
                   }
-
                   return ListView.builder(
-                    padding: EdgeInsets.symmetric(horizontal: 4.w),
-                    itemCount: reports.length,
-                    itemBuilder: (context, index) {
-                      final report = reports[index];
+                    padding: EdgeInsets.all(4.w),
+                    itemCount: _ctrl.reportList.length,
+                    itemBuilder: (_, i) {
+                      final item = _ctrl.reportList[i];
                       return Padding(
                         padding: EdgeInsets.only(bottom: 1.h),
                         child: GlassCard(
-                          onTap: () {
-                            final url = report['reportUrl'] ?? report['url'] ?? '';
-                            if (url.toString().isNotEmpty) {
-                              launchUrl(Uri.parse(url.toString()));
-                            }
-                          },
-                          padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.5.h),
+                          padding: EdgeInsets.all(3.w),
                           child: Row(
                             children: [
-                              Container(
-                                width: 40, height: 40,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: AppTheme.accent.withOpacity(0.15),
-                                ),
-                                child: const Icon(Icons.description_outlined, color: AppTheme.accent, size: 20),
-                              ),
+                              const Icon(Icons.description_outlined, color: AppTheme.accent),
                               SizedBox(width: 3.w),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      report['reportName'] ?? report['name'] ?? 'Report',
-                                      style: AppTheme.bodyMedium,
-                                      maxLines: 1, overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      '${report['memberName'] ?? ''} · ${report['date'] ?? report['createdDate'] ?? ''}',
-                                      style: AppTheme.labelSmall,
-                                      maxLines: 1,
-                                    ),
+                                    Text(item['ReportName'] ?? '', style: AppTheme.bodyMedium),
+                                    SizedBox(height: 0.3.h),
+                                    Text(item['Date'] ?? '', style: AppTheme.labelSmall.copyWith(color: Colors.white38)),
                                   ],
                                 ),
                               ),
-                              const Icon(Icons.open_in_new, color: AppTheme.textMuted, size: 18),
+                              const Icon(Icons.download_outlined, color: Colors.white38),
                             ],
                           ),
-                        ),
-                      ).animate(delay: Duration(milliseconds: 100 + index * 40))
-                          .fadeIn(duration: 300.ms);
+                        ).animate(delay: (50 * i).ms).fadeIn(duration: 300.ms),
+                      );
                     },
                   );
                 }),

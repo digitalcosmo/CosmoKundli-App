@@ -135,7 +135,7 @@ class ProfileScreen extends StatelessWidget {
       return Padding(
         padding: EdgeInsets.only(bottom: 1.h),
         child: GlassCard(
-          onTap: item.onTap,
+          onPressed: item.onTap,
           padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.8.h),
           child: Row(
             children: [
