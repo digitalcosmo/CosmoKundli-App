@@ -95,7 +95,12 @@ class _VargKundalisScreenState extends State<VargKundalisScreen> {
                   padding: EdgeInsets.all(3.w),
                   child: AspectRatio(
                     aspectRatio: 1,
-                    child: KundaliChartWidget(planets: data.kundaliModel!),
+                    child: KundaliChartWidget(
+                      planetsData: data.kundaliModel!.map((p) => KundaliPlanetData(
+                        planet: p.planet ?? '', rashi: p.rashi ?? '', degree: p.degree ?? '', color: p.color ?? '',
+                      )).toList(),
+                      rashiToGharMapping: _ctrl.rashiToGharMapping,
+                    ),
                   ),
                 ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.05, end: 0),
                 SizedBox(height: 3.w),

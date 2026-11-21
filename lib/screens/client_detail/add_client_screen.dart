@@ -5,190 +5,157 @@ import 'package:responsive_sizer/responsive_sizer.dart';
 import 'package:cosmo_kundli/controllers/client_detail_controller.dart';
 import 'package:cosmo_kundli/theme/app_theme.dart';
 import 'package:cosmo_kundli/values/get_tags.dart';
-import 'package:cosmo_kundli/widgets/glass_button.dart';
+import 'package:cosmo_kundli/values/app_constants.dart';
 import 'package:cosmo_kundli/widgets/glass_card.dart';
 import 'package:cosmo_kundli/widgets/glass_text_field.dart';
-import 'package:cosmo_kundli/widgets/glass_dropdown.dart';
+import 'package:cosmo_kundli/widgets/glass_button.dart';
+import 'package:cosmo_kundli/widgets/app_bar_widget.dart';
 
 class AddClientScreen extends StatelessWidget {
-  AddClientScreen({super.key});
-
-  final controller = Get.find<ClientDetailController>(tag: GetTags.clientDetailTag);
-  final bool isEdit = Get.arguments != null;
+  const AddClientScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    if (isEdit) {
-      controller.populateForEdit(Get.arguments);
-    } else {
-      controller.clearForm();
-    }
+    final ClientDetailController ctrl = Get.find(tag: GetTags.clientDetailTag);
 
     return Scaffold(
       body: Container(
-        width: double.infinity,
-        height: double.infinity,
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppTheme.bgPrimary, AppTheme.bgSecondary],
-          ),
+          gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [AppTheme.bgPrimary, AppTheme.bgSecondary]),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              // Header
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Get.back(),
-                      icon: const Icon(Icons.arrow_back_ios, color: AppTheme.textPrimary, size: 20),
-                    ),
-                    Expanded(
-                      child: Text(
-                        isEdit ? 'Edit Client' : 'Add New Client',
-                        style: AppTheme.headingLarge,
-                      ),
-                    ),
-                  ],
-                ),
-              ).animate().fadeIn(duration: 300.ms),
-
-              // Form
+              const CustomAppBar(title: 'Add Client'),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.symmetric(horizontal: 4.w),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(height: 1.h),
-
-                      // Name
-                      GlassTextField(
-                        controller: controller.nameController,
-                        hint: 'Full Name',
-                        prefixIcon: Icons.person_outline,
-                      ),
-                      SizedBox(height: 1.5.h),
-
-                      // Gender
-                      GlassDropdown<String>(
-                        hint: 'Gender',
-                        items: const ['Male', 'Female'],
-                        value: controller.selectedGender.value.isEmpty ? null : controller.selectedGender.value,
-                        onChanged: (val) => controller.selectedGender.value = val ?? '',
-                        itemLabel: (item) => item,
-                      ),
-                      SizedBox(height: 1.5.h),
-
-                      // Date of Birth
-                      GestureDetector(
-                        onPressed: () => _pickDate(context),
-                        child: AbsorbPointer(
-                          child: GlassTextField(
-                            controller: controller.dobController,
-                            hint: 'Date of Birth',
-                            prefixIcon: Icons.calendar_today_outlined,
+                  padding: EdgeInsets.all(4.w),
+                  child: Form(
+                    key: ctrl.clientDetailFormKey,
+                    child: Column(
+                      children: [
+                        GlassCard(
+                          padding: EdgeInsets.all(4.w),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Personal Details', style: AppTheme.headingSmall),
+                              SizedBox(height: 2.h),
+                              GlassTextField(controller: ctrl.firstNameController, label: 'First Name'),
+                              SizedBox(height: 1.5.h),
+                              GlassTextField(controller: ctrl.middleNameController, label: 'Middle Name'),
+                              SizedBox(height: 1.5.h),
+                              GlassTextField(controller: ctrl.lastNameController, label: 'Last Name'),
+                              SizedBox(height: 1.5.h),
+                              GlassTextField(controller: ctrl.mobileNumberController, label: 'Mobile', keyboardType: TextInputType.phone),
+                              SizedBox(height: 1.5.h),
+                              // Gender dropdown
+                              Obx(() => Container(
+                                padding: EdgeInsets.symmetric(horizontal: 4.w),
+                                decoration: AppTheme.glassControl(),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: ctrl.selectedGender.value == 'Gender' ? null : ctrl.selectedGender.value,
+                                    hint: Text('Gender', style: AppTheme.bodyMedium.copyWith(color: Colors.white38)),
+                                    dropdownColor: AppTheme.bgSecondary,
+                                    isExpanded: true,
+                                    style: AppTheme.bodyMedium,
+                                    items: AppConstants.genderList.map((g) {
+                                      return DropdownMenuItem(value: g, child: Text(g));
+                                    }).toList(),
+                                    onChanged: (val) => ctrl.selectedGender.value = val!,
+                                  ),
+                                ),
+                              )),
+                            ],
                           ),
-                        ),
-                      ),
-                      SizedBox(height: 1.5.h),
+                        ).animate().fadeIn(duration: 500.ms),
 
-                      // Birth Time
-                      GestureDetector(
-                        onPressed: () => _pickTime(context),
-                        child: AbsorbPointer(
-                          child: GlassTextField(
-                            controller: controller.birthTimeController,
-                            hint: 'Birth Time',
-                            prefixIcon: Icons.access_time_outlined,
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 1.5.h),
+                        SizedBox(height: 2.h),
 
-                      // Birth Place (with Google Places autocomplete)
-                      Obx(() => Column(
-                        children: [
-                          GlassTextField(
-                            controller: controller.birthPlaceController,
-                            hint: 'Birth Place',
-                            prefixIcon: Icons.location_on_outlined,
-                            onChanged: (val) => controller.searchPlaces(val),
-                          ),
-                          if (controller.placesSuggestions.isNotEmpty)
-                            GlassCard(
-                              margin: EdgeInsets.only(top: 0.5.h),
-                              padding: EdgeInsets.zero,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: controller.placesSuggestions.map((place) {
-                                  return ListTile(
-                                    dense: true,
-                                    title: Text(
-                                      place.description ?? '',
-                                      style: AppTheme.bodySmall,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    leading: const Icon(Icons.place, color: AppTheme.textMuted, size: 18),
-                                    onPressed: () => controller.selectPlace(place),
-                                  );
-                                }).toList(),
+                        GlassCard(
+                          padding: EdgeInsets.all(4.w),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Birth Details', style: AppTheme.headingSmall),
+                              SizedBox(height: 2.h),
+                              // Date picker
+                              GestureDetector(
+                                onTap: () => ctrl.selectDate(context),
+                                child: AbsorbPointer(
+                                  child: Obx(() => GlassTextField(
+                                    controller: ctrl.dobController,
+                                    label: ctrl.selectedBday.value,
+                                    suffixIcon: const Icon(Icons.calendar_today, color: Colors.white38),
+                                  )),
+                                ),
                               ),
-                            ),
-                        ],
-                      )),
-                      SizedBox(height: 1.5.h),
+                              SizedBox(height: 1.5.h),
+                              // Time
+                              Row(
+                                children: [
+                                  Expanded(child: GlassTextField(controller: ctrl.birthTimeHourController, label: 'HH', keyboardType: TextInputType.number)),
+                                  SizedBox(width: 2.w),
+                                  Expanded(child: GlassTextField(controller: ctrl.birthTimeMinController, label: 'MM', keyboardType: TextInputType.number)),
+                                  SizedBox(width: 2.w),
+                                  Expanded(child: GlassTextField(controller: ctrl.birthTimeSecController, label: 'SS', keyboardType: TextInputType.number)),
+                                  SizedBox(width: 2.w),
+                                  IconButton(
+                                    icon: const Icon(Icons.access_time, color: AppTheme.accent),
+                                    onPressed: () => ctrl.selectTime(context),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 1.5.h),
+                              // Birth place with autocomplete
+                              GlassTextField(
+                                controller: ctrl.birthPlaceController,
+                                label: 'Birth Place',
+                                onChanged: (val) => ctrl.debounceSearch(val),
+                              ),
+                              Obx(() {
+                                if (ctrl.googlePlaceList.isEmpty) return const SizedBox();
+                                return Container(
+                                  constraints: BoxConstraints(maxHeight: 20.h),
+                                  margin: EdgeInsets.only(top: 0.5.h),
+                                  decoration: AppTheme.glassCard(),
+                                  child: ListView.builder(
+                                    shrinkWrap: true,
+                                    itemCount: ctrl.googlePlaceList.length,
+                                    itemBuilder: (_, i) {
+                                      final place = ctrl.googlePlaceList[i];
+                                      return ListTile(
+                                        dense: true,
+                                        title: Text(place['description'] ?? '', style: AppTheme.bodySmall),
+                                        onTap: () => ctrl.selectPlace(place),
+                                      );
+                                    },
+                                  ),
+                                );
+                              }),
+                              SizedBox(height: 1.5.h),
+                              Row(
+                                children: [
+                                  Expanded(child: GlassTextField(controller: ctrl.latController, label: 'Latitude', keyboardType: TextInputType.number)),
+                                  SizedBox(width: 2.w),
+                                  Expanded(child: GlassTextField(controller: ctrl.longController, label: 'Longitude', keyboardType: TextInputType.number)),
+                                ],
+                              ),
+                              SizedBox(height: 1.5.h),
+                              GlassTextField(controller: ctrl.timmDiffController, label: 'Time Diff'),
+                            ],
+                          ),
+                        ).animate(delay: 200.ms).fadeIn(duration: 500.ms),
 
-                      // Latitude
-                      GlassTextField(
-                        controller: controller.latController,
-                        hint: 'Latitude',
-                        prefixIcon: Icons.explore_outlined,
-                        keyboardType: TextInputType.number,
-                      ),
-                      SizedBox(height: 1.5.h),
-
-                      // Longitude
-                      GlassTextField(
-                        controller: controller.longController,
-                        hint: 'Longitude',
-                        prefixIcon: Icons.explore_outlined,
-                        keyboardType: TextInputType.number,
-                      ),
-                      SizedBox(height: 1.5.h),
-
-                      // Timezone
-                      GlassTextField(
-                        controller: controller.timezoneController,
-                        hint: 'Timezone (e.g. +5.5)',
-                        prefixIcon: Icons.timer_outlined,
-                        keyboardType: TextInputType.number,
-                      ),
-                      SizedBox(height: 3.h),
-
-                      // Submit Button
-                      Obx(() => GlassButton(
-                        onPressed: controller.isSaving.value
-                            ? null
-                            : () {
-                                if (isEdit) {
-                                  controller.updateMember(context);
-                                } else {
-                                  controller.addMember(context);
-                                }
-                              },
-                        isLoading: controller.isSaving.value,
-                        label: isEdit ? 'Update Client' : 'Add Client',
-                        icon: isEdit ? Icons.check : Icons.person_add,
-                      )),
-
-                      SizedBox(height: 4.h),
-                    ],
+                        SizedBox(height: 3.h),
+                        Obx(() => GlassButton(
+                          label: 'Add Member',
+                          onTap: () => ctrl.addMember(),
+                          isLoading: ctrl.isLoading.value,
+                        )).animate(delay: 400.ms).fadeIn(duration: 400.ms),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -197,47 +164,5 @@ class AddClientScreen extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _pickDate(BuildContext context) async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: DateTime(2000),
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-      builder: (context, child) => Theme(
-        data: ThemeData.dark().copyWith(
-          colorScheme: const ColorScheme.dark(
-            primary: AppTheme.accent,
-            surface: AppTheme.bgSecondary,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (date != null) {
-      controller.dobController.text =
-          '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
-    }
-  }
-
-  Future<void> _pickTime(BuildContext context) async {
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-      builder: (context, child) => Theme(
-        data: ThemeData.dark().copyWith(
-          colorScheme: const ColorScheme.dark(
-            primary: AppTheme.accent,
-            surface: AppTheme.bgSecondary,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (time != null) {
-      controller.birthTimeController.text =
-          '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-    }
   }
 }

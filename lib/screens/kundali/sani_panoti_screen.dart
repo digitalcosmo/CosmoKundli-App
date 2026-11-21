@@ -21,7 +21,7 @@ class _SaniPanotiScreenState extends State<SaniPanotiScreen> {
   @override
   void initState() {
     super.initState();
-    if (!_ctrl.isSaniPanotiApiCalled) _ctrl.getShaniPanotiData();
+    if (!_ctrl.isSaniPanotiApiCalled.value) _ctrl.getShaniPanotiData();
   }
 
   @override
@@ -40,10 +40,10 @@ class _SaniPanotiScreenState extends State<SaniPanotiScreen> {
               const GlassAppBar(title: 'Sani Panoti'),
               Expanded(
                 child: Obx(() {
-                  if (_ctrl.isLoading.value || _ctrl.saniPanotiData == null) {
+                  if (_ctrl.isLoading.value || _ctrl.saniPanotiData.value == null) {
                     return const LoadingWidget();
                   }
-                  final items = _ctrl.saniPanotiData!.list ?? [];
+                  final items = _ctrl.saniPanotiData.value!.list ?? [];
                   return SingleChildScrollView(
                     padding: EdgeInsets.all(4.w),
                     child: GlassCard(

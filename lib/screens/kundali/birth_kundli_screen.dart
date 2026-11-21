@@ -65,7 +65,10 @@ class _BirthKundliScreenState extends State<BirthKundliScreen> {
                             child: SizedBox(
                               height: 45.h,
                               child: KundaliChartWidget(
-                                planets: _kundaliCtrl.planetsData,
+                                planetsData: _kundaliCtrl.planetsData.map((p) => KundaliPlanetData(
+                                  planet: p.planet ?? '', rashi: p.rashi ?? '', degree: p.degree ?? '', color: p.color ?? '',
+                                )).toList(),
+                                rashiToGharMapping: _kundaliCtrl.rashiToGharMapping,
                               ),
                             ),
                           ).animate().fadeIn(duration: 500.ms),

@@ -10,6 +10,7 @@ import 'package:cosmo_kundli/models/melapak_opp_user_list_model.dart';
 import 'package:cosmo_kundli/repos/other_repo.dart';
 import 'package:cosmo_kundli/values/get_tags.dart';
 import 'package:cosmo_kundli/values/user_data.dart';
+import 'package:cosmo_kundli/values/routes.dart';
 import 'package:cosmo_kundli/services/services.dart';
 
 import 'home_controller.dart';
@@ -28,17 +29,17 @@ class OtherController extends GetxController {
   RxList<List<String>> rows = <List<String>>[].obs;
   RxString gun = ''.obs;
 
-  // New member form for melapak
-  TextEditingController oppNameController = TextEditingController();
-  TextEditingController dobController = TextEditingController();
-  TextEditingController btimeHrsController = TextEditingController();
-  TextEditingController btimeMinController = TextEditingController();
-  TextEditingController btimeSecController = TextEditingController();
-  TextEditingController birthPlaceController = TextEditingController();
-  TextEditingController latitudeController = TextEditingController();
-  TextEditingController longitudeController = TextEditingController();
+  // New member form for melapak (aliased for screen access)
+  TextEditingController melapakNameController = TextEditingController();
+  TextEditingController melapakDobController = TextEditingController();
+  TextEditingController melapakHourController = TextEditingController();
+  TextEditingController melapakMinController = TextEditingController();
+  TextEditingController melapakSecController = TextEditingController();
+  TextEditingController melapakPlaceController = TextEditingController();
+  TextEditingController melapakLatController = TextEditingController();
+  TextEditingController melapakLongController = TextEditingController();
   TextEditingController timmDiffController = TextEditingController();
-  TextEditingController genderController = TextEditingController();
+  RxString melapakGender = 'Gender'.obs;
 
   // Gochar table
   Rx<GocharTable?> gocharTableData = Rx<GocharTable?>(null);
@@ -92,16 +93,16 @@ class OtherController extends GetxController {
       isLoading.value = true;
       Map<String, dynamic> data = {
         "mID": mId.value,
-        "opp_name": oppNameController.text,
-        "dob": dobController.text,
-        "btime_hrs": btimeHrsController.text,
-        "btime_min": btimeMinController.text,
-        "btime_sec": btimeSecController.text,
-        "birth_place": birthPlaceController.text,
-        "latitude": latitudeController.text,
-        "longitude": longitudeController.text,
+        "opp_name": melapakNameController.text,
+        "dob": melapakDobController.text,
+        "btime_hrs": melapakHourController.text,
+        "btime_min": melapakMinController.text,
+        "btime_sec": melapakSecController.text,
+        "birth_place": melapakPlaceController.text,
+        "latitude": melapakLatController.text,
+        "longitude": melapakLongController.text,
         "timm_diff": timmDiffController.text,
-        "gender": genderController.text,
+        "gender": melapakGender.value,
       };
       melapakDetailsData.value = await _repo.matchKundalisWithNewMember(data);
       if (melapakDetailsData.value != null) {
@@ -112,6 +113,25 @@ class OtherController extends GetxController {
       debugPrint(e.toString());
       isLoading.value = false;
       isError.value = true;
+    }
+  }
+
+  Future<void> selectMelapakDate(BuildContext context) async {
+    DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      melapakDobController.text = DateFormat('dd/MM/yyyy').format(picked);
+    }
+  }
+
+  Future<void> getMelapakMatch() async {
+    await addNewMember(Get.context!);
+    if (melapakDetailsData.value != null) {
+      Get.toNamed(AppRoutes.melapakDetails);
     }
   }
 
@@ -227,15 +247,15 @@ class OtherController extends GetxController {
   }
 
   void clearData() {
-    oppNameController.clear();
-    dobController.clear();
-    btimeHrsController.clear();
-    btimeMinController.clear();
-    btimeSecController.clear();
-    birthPlaceController.clear();
-    latitudeController.clear();
-    longitudeController.clear();
+    melapakNameController.clear();
+    melapakDobController.clear();
+    melapakHourController.clear();
+    melapakMinController.clear();
+    melapakSecController.clear();
+    melapakPlaceController.clear();
+    melapakLatController.clear();
+    melapakLongController.clear();
     timmDiffController.clear();
-    genderController.clear();
+    melapakGender.value = 'Gender';
   }
 }

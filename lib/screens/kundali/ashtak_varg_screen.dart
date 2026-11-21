@@ -92,7 +92,7 @@ class _AshtakVargScreenState extends State<AshtakVargScreen> {
               rows: List.generate(data.table.length, (rowIdx) {
                 final row = data.table[rowIdx];
                 return DataRow(cells: [
-                  DataCell(Text(rowIdx < AppConstants.planetHeaders.length ? AppConstants.planetHeaders[rowIdx] : '${rowIdx + 1}',
+                  DataCell(Text('${rowIdx + 1}',
                     style: TextStyle(color: AppTheme.textSecondary, fontSize: 12.sp))),
                   ...row.map((cell) => DataCell(Text(cell,
                     style: TextStyle(color: AppTheme.textPrimary, fontSize: 12.sp)))),

@@ -34,7 +34,9 @@ class KundaliController extends GetxController {
   RxBool isAshtakApiCalled = false.obs;
   RxBool isChanchaApiCalled = false.obs;
   RxBool isTaraChakraApiCalled = false.obs;
+  RxBool isSaniPanotiApiCalled = false.obs;
   RxBool isVargKundaliApiCalled = false.obs;
+  RxBool isAshtakVargApiCalled = false.obs;
 
   // Data holders
   RxList<KundaliModel> planetsData = <KundaliModel>[].obs;
@@ -235,6 +237,7 @@ class KundaliController extends GetxController {
 
   Future<void> getShaniPanotiData() async {
     try {
+      isSaniPanotiApiCalled.value = true;
       isLoading.value = true;
       saniPanotiData.value = await _repo.saniPanotiData(_baseData);
       isLoading.value = false;
