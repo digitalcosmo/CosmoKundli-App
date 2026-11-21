@@ -34,7 +34,7 @@ class CosmoPowerScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              const CustomAppBar(title: 'Cosmo Power'),
+              const GlassAppBar(title: 'Cosmo Power'),
               Expanded(
                 child: Obx(() {
                   if (controller.isCosmoPowerLoading.value) {

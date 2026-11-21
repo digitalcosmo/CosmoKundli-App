@@ -37,7 +37,7 @@ class _TaraChakraScreenState extends State<TaraChakraScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              const CustomAppBar(title: 'Tara Chakra'),
+              const GlassAppBar(title: 'Tara Chakra'),
               Expanded(
                 child: Obx(() {
                   if (_ctrl.isLoading.value || _ctrl.taraChakraData == null) {

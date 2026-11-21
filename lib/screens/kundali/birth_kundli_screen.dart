@@ -45,7 +45,7 @@ class _BirthKundliScreenState extends State<BirthKundliScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              CustomAppBar(
+              GlassAppBar(
                 title: 'Birth Kundli',
                 subtitle: _homeCtrl.selectedUserName.value,
               ),

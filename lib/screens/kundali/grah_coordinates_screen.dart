@@ -24,8 +24,8 @@ class GrahCoordinatesScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.bgPrimary,
-      appBar: const AppBarWidget(title: 'Grah Coordinates'),
+      backgroundColor: AppTheme.bgPrimary,
+      appBar: const GlassAppBar(title: 'Grah Coordinates'),
       body: Obx(() {
         if (controller.isLoading.value) {
           return const LoadingWidget();
@@ -52,7 +52,7 @@ class GrahCoordinatesScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     _buildHeaderRow(),
-                    const Divider(color: AppColors.gmBorder, height: 1),
+                    const Divider(color: AppTheme.gmBorder, height: 1),
                     ...data.planets.asMap().entries.map((entry) {
                       final index = entry.key;
                       final planet = entry.value;
@@ -76,10 +76,10 @@ class GrahCoordinatesScreen extends StatelessWidget {
       padding: EdgeInsets.symmetric(vertical: 1.5.h, horizontal: 3.w),
       child: Row(
         children: [
-          Expanded(flex: 2, child: Text('Planet', style: AppTheme.labelSmall.copyWith(color: AppColors.accent))),
-          Expanded(flex: 2, child: Text('Rashi', style: AppTheme.labelSmall.copyWith(color: AppColors.accent))),
-          Expanded(flex: 2, child: Text('Degree', style: AppTheme.labelSmall.copyWith(color: AppColors.accent))),
-          Expanded(flex: 2, child: Text('Nakshatra', style: AppTheme.labelSmall.copyWith(color: AppColors.accent))),
+          Expanded(flex: 2, child: Text('Planet', style: AppTheme.labelSmall.copyWith(color: AppTheme.accent))),
+          Expanded(flex: 2, child: Text('Rashi', style: AppTheme.labelSmall.copyWith(color: AppTheme.accent))),
+          Expanded(flex: 2, child: Text('Degree', style: AppTheme.labelSmall.copyWith(color: AppTheme.accent))),
+          Expanded(flex: 2, child: Text('Nakshatra', style: AppTheme.labelSmall.copyWith(color: AppTheme.accent))),
         ],
       ),
     );
@@ -89,7 +89,7 @@ class GrahCoordinatesScreen extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(vertical: 1.2.h, horizontal: 3.w),
       decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.gmBorder, width: 0.5)),
+        border: Border(bottom: BorderSide(color: AppTheme.gmBorder, width: 0.5)),
       ),
       child: Row(
         children: [

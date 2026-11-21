@@ -33,7 +33,7 @@ class GocharPrabhavScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              const CustomAppBar(title: 'Gochar Prabhav'),
+              const GlassAppBar(title: 'Gochar Prabhav'),
               Expanded(
                 child: Obx(() {
                   if (controller.isGocharPrabhavLoading.value) {

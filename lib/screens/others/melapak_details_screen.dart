@@ -31,7 +31,7 @@ class MelapakDetailsScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              const CustomAppBar(title: 'Melapak Results'),
+              const GlassAppBar(title: 'Melapak Results'),
               Expanded(
                 child: Obx(() {
                   if (controller.isMelapakLoading.value) {

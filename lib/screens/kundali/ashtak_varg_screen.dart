@@ -101,7 +101,7 @@ class _AshtakVargScreenState extends State<AshtakVargScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              const CustomAppBar(title: 'Ashtak Varg'),
+              const GlassAppBar(title: 'Ashtak Varg'),
               Expanded(
                 child: Obx(() {
                   if (_ctrl.isLoading.value) return const LoadingWidget();

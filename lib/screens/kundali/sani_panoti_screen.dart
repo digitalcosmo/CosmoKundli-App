@@ -37,7 +37,7 @@ class _SaniPanotiScreenState extends State<SaniPanotiScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              const CustomAppBar(title: 'Sani Panoti'),
+              const GlassAppBar(title: 'Sani Panoti'),
               Expanded(
                 child: Obx(() {
                   if (_ctrl.isLoading.value || _ctrl.saniPanotiData == null) {

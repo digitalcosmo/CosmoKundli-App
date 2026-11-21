@@ -35,7 +35,7 @@ class _ChanchaChakraScreenState extends State<ChanchaChakraScreen> {
         ),
         child: SafeArea(
           child: Column(children: [
-            const CustomAppBar(title: 'Chancha Chakra'),
+            const GlassAppBar(title: 'Chancha Chakra'),
             Expanded(child: Obx(() {
               if (controller.isLoading.value) return const LoadingWidget();
               final data = controller.chanchaChakraData.value;

@@ -33,7 +33,7 @@ class PeriodicMonthlyScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              const CustomAppBar(title: 'Periodic Monthly Report'),
+              const GlassAppBar(title: 'Periodic Monthly Report'),
               Expanded(
                 child: Obx(() {
                   if (controller.isPeriodicMonthlyLoading.value) {

@@ -43,7 +43,7 @@ class _ShadbalScreenState extends State<ShadbalScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              const CustomAppBar(title: 'Shadbal'),
+              const GlassAppBar(title: 'Shadbal'),
               Expanded(
                 child: Obx(() {
                   if (_ctrl.isLoading.value || _ctrl.shadbalData.value == null) {

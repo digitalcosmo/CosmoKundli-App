@@ -42,7 +42,7 @@ class _FiveFoldScreenState extends State<FiveFoldScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              const CustomAppBar(title: 'Five Fold Friendship'),
+              const GlassAppBar(title: 'Five Fold Friendship'),
               Expanded(
                 child: Obx(() {
                   if (_ctrl.isLoading.value || _ctrl.fiveFoldRelationshipModel == null) {

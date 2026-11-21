@@ -53,7 +53,7 @@ class _VargKundalisScreenState extends State<VargKundalisScreen> {
         ),
         child: SafeArea(
           child: Column(children: [
-            const CustomAppBar(title: 'Varg Kundalis'),
+            const GlassAppBar(title: 'Varg Kundalis'),
             SizedBox(
               height: 5.h,
               child: ListView.builder(

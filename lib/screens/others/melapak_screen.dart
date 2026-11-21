@@ -35,7 +35,7 @@ class MelapakScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              const CustomAppBar(title: 'Melapak - Kundali Matching'),
+              const GlassAppBar(title: 'Melapak - Kundali Matching'),
               // Search bar
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),

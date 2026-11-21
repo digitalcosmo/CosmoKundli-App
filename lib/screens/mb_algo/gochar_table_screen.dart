@@ -34,7 +34,7 @@ class GocharTableScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              const CustomAppBar(title: 'Gochar Table'),
+              const GlassAppBar(title: 'Gochar Table'),
               Expanded(
                 child: Obx(() {
                   if (controller.isGocharTableLoading.value) {

@@ -33,7 +33,7 @@ class StarPowerScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              const CustomAppBar(title: 'Star Power Sentiment'),
+              const GlassAppBar(title: 'Star Power Sentiment'),
               Expanded(
                 child: Obx(() {
                   if (controller.isStarPowerLoading.value) {
