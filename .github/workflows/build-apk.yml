@@ -23,6 +23,12 @@ jobs:
       - name: Create Flutter project scaffolding
         run: flutter create --project-name cosmo_kundli .
 
+      - name: Ensure correct build config
+        run: |
+          rm -f android/settings.gradle
+          cat android/settings.gradle.kts
+          cat android/gradle/wrapper/gradle-wrapper.properties
+
       - name: Get dependencies
         run: flutter pub get
 
