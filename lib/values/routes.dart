@@ -1,0 +1,34 @@
+class AppRoutes {
+  static const String splash = '/splash';
+  static const String login = '/login';
+  static const String signUp = '/sign-up';
+  static const String home = '/home';
+  static const String clientList = '/client-list';
+  static const String addClient = '/add-client';
+  static const String editClient = '/edit-client';
+  static const String kundali = '/kundali';
+  static const String birthKundli = '/birth-kundli';
+  static const String fiveFold = '/five-fold';
+  static const String shadbal = '/shadbal';
+  static const String vargKundalis = '/varg-kundalis';
+  static const String ashtakVarg = '/ashtak-varg';
+  static const String chanchaChakra = '/chancha-chakra';
+  static const String dasha = '/dasha';
+  static const String taraChakra = '/tara-chakra';
+  static const String saniPanoti = '/sani-panoti';
+  static const String grahCoordinates = '/grah-coordinates';
+  static const String starPower = '/star-power';
+  static const String cosmoPower = '/cosmo-power';
+  static const String periodicMonthly = '/periodic-monthly';
+  static const String gocharPrabhav = '/gochar-prabhav';
+  static const String gocharTable = '/gochar-table';
+  static const String melapak = '/melapak';
+  static const String melapakDetails = '/melapak-details';
+  static const String melapakNewUser = '/melapak-new-user';
+  static const String profile = '/profile';
+  static const String displayDetails = '/display-details';
+  static const String appDetails = '/app-details';
+  static const String changePassword = '/change-password';
+  static const String creditTransaction = '/credit-transaction';
+  static const String reportHistory = '/report-history';
+}
