@@ -23,47 +23,6 @@ jobs:
       - name: Create Flutter project scaffolding
         run: flutter create --project-name cosmo_kundli .
 
-      - name: Fix Android build versions
-        run: |
-          # Rewrite settings.gradle.kts with correct versions
-          SETTINGS_FILE="android/settings.gradle.kts"
-          if [ -f "$SETTINGS_FILE" ]; then
-            cat > "$SETTINGS_FILE" << 'SETTINGS_EOF'
-          pluginManagement {
-              val flutterSdkPath = run {
-                  val properties = java.util.Properties()
-                  file("local.properties").inputStream().use { properties.load(it) }
-                  val flutterSdkPath = properties.getProperty("flutter.sdk")
-                  require(flutterSdkPath != null) { "flutter.sdk not set in local.properties" }
-                  flutterSdkPath
-              }
-
-              includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
-
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-
-          plugins {
-              id("dev.flutter.flutter-plugin-loader") version "1.0.0"
-              id("com.android.application") version "9.1.1" apply false
-              id("org.jetbrains.kotlin.android") version "2.4.20" apply false
-          }
-
-          include(":app")
-          SETTINGS_EOF
-          fi
-
-          # Also fix gradle wrapper version
-          WRAPPER="android/gradle/wrapper/gradle-wrapper.properties"
-          if [ -f "$WRAPPER" ]; then
-            sed -i -E 's|gradle-[0-9.]+-all\.zip|gradle-9.3.1-all.zip|' "$WRAPPER"
-            sed -i -E 's|gradle-[0-9.]+-bin\.zip|gradle-9.3.1-bin.zip|' "$WRAPPER"
-          fi
-
       - name: Get dependencies
         run: flutter pub get
 
