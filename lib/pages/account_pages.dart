@@ -438,6 +438,7 @@ class _DisplayPageState extends State<DisplayPage> {
             left(.638, _address.text, 'Display Address', lines: 2),
           ]);
         });
+    }
     return ClipRRect(
       borderRadius: r,
       child: Container(
