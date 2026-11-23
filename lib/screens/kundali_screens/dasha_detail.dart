@@ -222,7 +222,7 @@ class _DashaDetailState extends State<DashaDetail> {
                                           builder: (context) {
                                             return Obx(() => Dialog(
                                                   child: Container(
-                                                    color: Colors.white,
+                                                    color: Colors.transparent,
                                                     width: double.infinity,
                                                     child: FittedBox(
                                                       child: Row(

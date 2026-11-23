@@ -53,13 +53,17 @@ class ExistingClients extends StatelessWidget {
                     child: Obx(
                       () => ListView.separated(
                         padding: EdgeInsets.zero,
+                        physics: const BouncingScrollPhysics(),
                         separatorBuilder: (context, index) {
-                          return const Divider();
+                          return const SizedBox(height: 10);
                         },
                         itemCount: clientDetailController.memberList.length,
                         itemBuilder: (context, index) {
                           Members data = clientDetailController.memberList[index];
-                          return GestureDetector(
+                          return FadeSlideIn(
+                           index: index,
+                           child: Pressable(
+                            scale: .98,
                             onTap: () async {
                               String inputDate = data.DOB;
                               DateFormat inputFormat = DateFormat("dd-MM-yyyy HH:mm:ss");
@@ -77,7 +81,8 @@ class ExistingClients extends StatelessWidget {
                               homeController.selectedGender.value = data.Gender;
                               homeController.selectedBirthDate.value = formattedDate;
                             },
-                            child: Container(
+                            child: Glass(
+                              radius: 20,
                               padding: EdgeInsets.all(11.sp),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -206,7 +211,7 @@ class ExistingClients extends StatelessWidget {
                                 ],
                               ),
                             ),
-                          );
+                          ));
                         },
                       ),
                     ),
