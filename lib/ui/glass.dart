@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ck_theme.dart';
+import 'cosmic_background.dart';
 
 const String kCkBackground = 'assets/images/ck_bg.jpg';
 
@@ -13,29 +14,13 @@ class CkBackground extends StatelessWidget {
   const CkBackground({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
+  Widget build(BuildContext context) => ColoredBox(
         color: CkColors.deepSpace,
-        image: DecorationImage(
-          image: AssetImage(kCkBackground),
-          fit: BoxFit.cover,
-        ),
-      ),
-      child: DecoratedBox(
-        // soft vignette so glass panels keep contrast
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0x33000814), Color(0x00000000), Color(0x55000814)],
-            stops: [0, .45, 1],
-          ),
-        ),
-        child: child,
-      ),
-    );
-  }
+        child: Stack(fit: StackFit.expand, children: [
+          const CosmicBackground(),
+          child,
+        ]),
+      );
 }
 
 /// Drop-in replacement for [Scaffold]: paints the cosmic backdrop under a
@@ -116,8 +101,8 @@ class Glass extends StatelessWidget {
     this.margin,
     this.radius = CkRadius.card,
     this.blur = 0,
-    this.tint = CkColors.glassFill,
-    this.stroke = CkColors.glassStroke,
+    this.tint = const Color(0x08FFFFFF),
+    this.stroke = const Color(0x29A0C3FF),
     this.width,
     this.height,
     this.shadow = true,
@@ -135,11 +120,11 @@ class Glass extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color.alphaBlend(const Color(0x14FFFFFF), tint),
-            tint,
-            Color.alphaBlend(const Color(0x05FFFFFF), tint),
+            Color.alphaBlend(const Color(0x2278AAFF), tint),
+            Color.alphaBlend(const Color(0x1A1E4696), tint),
+            Color.alphaBlend(const Color(0x2E0A1E50), tint),
           ],
-          stops: const [0, .55, 1],
+          stops: const [0, .45, 1],
         ),
       ),
       child: Container(alignment: alignment, padding: padding, child: child),

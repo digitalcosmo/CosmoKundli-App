@@ -101,7 +101,7 @@ class _PlannerPageState extends State<PlannerPage> {
           ]),
           Glass(
             margin: const EdgeInsets.only(top: 12),
-            radius: 24,
+            radius: 18,
             stroke: CkColors.orangeStroke,
             padding: const EdgeInsets.all(16),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

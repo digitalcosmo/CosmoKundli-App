@@ -76,7 +76,7 @@ class CkTheme {
     final body = GoogleFonts.interTextTheme(ThemeData.dark().textTheme)
         .apply(bodyColor: CkColors.text, displayColor: CkColors.text);
     TextStyle? h(TextStyle? s) =>
-        GoogleFonts.plusJakartaSans(textStyle: s, fontWeight: FontWeight.w600);
+        GoogleFonts.inter(textStyle: s, fontWeight: FontWeight.w600);
     return body.copyWith(
       displayLarge: h(body.displayLarge),
       displayMedium: h(body.displayMedium),
@@ -87,7 +87,7 @@ class CkTheme {
       titleLarge: h(body.titleLarge),
       titleMedium: h(body.titleMedium),
       titleSmall: h(body.titleSmall),
-      labelLarge: GoogleFonts.manrope(
+      labelLarge: GoogleFonts.inter(
           textStyle: body.labelLarge, fontWeight: FontWeight.w600),
     );
   }
@@ -185,8 +185,8 @@ class CkTheme {
         disabledBorder: border(CkColors.glassFillStrong),
       ),
       dataTableTheme: DataTableThemeData(
-        headingTextStyle: GoogleFonts.manrope(
-            color: CkColors.text, fontWeight: FontWeight.w700, fontSize: 13),
+        headingTextStyle: GoogleFonts.inter(
+            color: CkColors.text, fontWeight: FontWeight.w600, fontSize: 13),
         dataTextStyle: GoogleFonts.inter(color: CkColors.textTertiary),
         headingRowColor: const WidgetStatePropertyAll(CkColors.glassFillStrong),
         dividerThickness: 0.6,

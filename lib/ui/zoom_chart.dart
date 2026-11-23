@@ -269,7 +269,7 @@ class _ZoomChartState extends State<ZoomChart> with SingleTickerProviderStateMix
                       border: Border.all(color: const Color(0x40FFFFFF)),
                     ),
                     child: Text('${(_scale * 10).round() / 10}×  Reset',
-                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white)),
+                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.white)),
                   ),
                 ),
               ),

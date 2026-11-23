@@ -152,7 +152,7 @@ class _PanchangPageState extends State<PanchangPage> {
         title: 'Panchang',
         children: [
           Glass(
-            radius: 24,
+            radius: 18,
             padding: const EdgeInsets.all(14),
             child: Row(children: [
               Expanded(
@@ -175,7 +175,7 @@ class _PanchangPageState extends State<PanchangPage> {
                 decoration: BoxDecoration(
                     color: CkColors.orangeTint, borderRadius: BorderRadius.circular(20), border: Border.all(color: CkColors.orangeStroke)),
                 child: Text(_at == null ? '--:--' : DateFormat('hh:mm a').format(_at!),
-                    style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFFFFB27A))),
+                    style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFFFB27A))),
               ),
             ]),
           ),
@@ -198,7 +198,7 @@ class _PanchangPageState extends State<PanchangPage> {
                 });
               return Glass(
                 margin: const EdgeInsets.only(top: 12),
-                radius: 24,
+                radius: 18,
                 padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
                 child: Column(children: [
                   const CardTitle('Astronomical values', Icons.blur_on_rounded),
@@ -218,7 +218,7 @@ class _PanchangPageState extends State<PanchangPage> {
                             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                               Text(_pretty(k).toUpperCase(), style: CkText.label.copyWith(fontSize: 9.5)),
                               const SizedBox(height: 2),
-                              Text(flat[k]!, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                              Text(flat[k]!, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                             ]),
                           ),
                         ]),
@@ -275,7 +275,7 @@ class _MelapakPageState extends State<MelapakPage> {
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('${_female ? 'BRIDE' : 'GROOM'} · THIS CLIENT', style: CkText.label.copyWith(fontSize: 9.5)),
-                  Text(_client.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                  Text(_client.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                   Text(_client.subtitle, style: CkText.muted.copyWith(fontSize: 11.5)),
                 ]),
               ),
@@ -324,7 +324,7 @@ class _MelapakPageState extends State<MelapakPage> {
                                 decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x14FFFFFF)))),
                                 child: Row(children: [
                                   Expanded(
-                                      child: Text('${e['Name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14))),
+                                      child: Text('${e['Name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14))),
                                   Text('${e['Gender'] ?? ''}', style: CkText.muted.copyWith(fontSize: 12)),
                                   const Icon(Icons.chevron_right_rounded, color: CkColors.textMuted),
                                 ]),
@@ -349,7 +349,7 @@ class _MelapakPageState extends State<MelapakPage> {
                   child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                     Icon(Icons.add_rounded, color: Color(0xFFFFB27A), size: 19),
                     SizedBox(width: 6),
-                    Text('Enter new birth details', style: TextStyle(color: Color(0xFFFFB27A), fontWeight: FontWeight.w700)),
+                    Text('Enter new birth details', style: TextStyle(color: Color(0xFFFFB27A), fontWeight: FontWeight.w600)),
                   ]),
                 ),
               ),
@@ -395,7 +395,7 @@ class _NewPersonPageState extends State<_NewPersonPage> {
         title: 'New person',
         children: [
           Glass(
-            radius: 24,
+            radius: 18,
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
             child: Column(children: [
               Field('Name', controller: _name, required: true),
@@ -447,7 +447,7 @@ class MelapakResultPage extends StatelessWidget {
                 ]),
                 Glass(
                   margin: const EdgeInsets.only(top: 12),
-                  radius: 26,
+                  radius: 18,
                   padding: const EdgeInsets.all(16),
                   child: Column(children: [
                     Row(children: [
@@ -485,7 +485,7 @@ class MelapakResultPage extends StatelessWidget {
                         decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x14FFFFFF)))),
                         child: Column(children: [
                           Row(children: [
-                            SizedBox(width: 96, child: Text(row.$1, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13))),
+                            SizedBox(width: 96, child: Text(row.$1, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
                             Expanded(
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(4),
@@ -499,7 +499,7 @@ class MelapakResultPage extends StatelessWidget {
                             SizedBox(
                                 width: 46,
                                 child: Text('${pts % 1 == 0 ? pts.toInt() : pts}/${row.$4}',
-                                    textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5))),
+                                    textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5))),
                           ]),
                           if (r['Var_${row.$2}'] != null || r['Vadhu_${row.$2}'] != null)
                             Padding(
@@ -523,12 +523,12 @@ class MelapakResultPage extends StatelessWidget {
 
   Widget _person(String role, String name, String rashi) => Expanded(
         child: Glass(
-          radius: 20,
+          radius: 16,
           padding: const EdgeInsets.all(12),
           child: Column(children: [
             Text(role, style: CkText.label.copyWith(fontSize: 9.5)),
             const SizedBox(height: 4),
-            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
             if (rashi.isNotEmpty) Text('Moon $rashi', style: CkText.muted.copyWith(fontSize: 11)),
           ]),
         ),

@@ -130,13 +130,13 @@ class _SentimentsPageState extends State<SentimentsPage> {
                 ]),
                 Glass(
                   margin: const EdgeInsets.only(top: 12),
-                  radius: 24,
+                  radius: 18,
                   padding: const EdgeInsets.fromLTRB(0, 12, 8, 12),
                   child: Column(children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(14, 0, 6, 10),
                       child: Row(children: [
-                        Text('Sentiments', style: CkText.h(15, w: FontWeight.w700)),
+                        Text('Sentiments', style: CkText.h(15, w: FontWeight.w600)),
                         const Spacer(),
                         Text('Swipe for more days →', style: CkText.muted.copyWith(fontSize: 11)),
                       ]),
@@ -152,10 +152,10 @@ class _SentimentsPageState extends State<SentimentsPage> {
                 if (sel != null && sel < l.length)
                   Glass(
                     margin: const EdgeInsets.only(top: 10),
-                    radius: 20,
+                    radius: 16,
                     padding: const EdgeInsets.all(14),
                     child: Row(children: [
-                      Text(DateFormat('EEE, d MMM').format(l[sel].key), style: CkText.h(15, w: FontWeight.w700)),
+                      Text(DateFormat('EEE, d MMM').format(l[sel].key), style: CkText.h(15, w: FontWeight.w600)),
                       const Spacer(),
                       Text(_pct(l[sel].value),
                           style: CkText.h(18, color: l[sel].value >= 0 ? const Color(0xFF74E2B7) : const Color(0xFFFF8A8A))),

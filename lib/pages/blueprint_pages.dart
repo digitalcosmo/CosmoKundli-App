@@ -104,7 +104,7 @@ class _BlueprintSectionState extends State<BlueprintSection> {
           onTap: onTap,
           child: Glass(
             margin: const EdgeInsets.only(top: 12),
-            radius: 24,
+            radius: 18,
             padding: const EdgeInsets.all(14),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               CardTitle(title, icon, trailing: const Icon(Icons.chevron_right_rounded, color: CkColors.textMuted)),
@@ -135,7 +135,7 @@ class _BlueprintSectionState extends State<BlueprintSection> {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 10),
                         child: Row(children: [
-                          Expanded(child: Text('CosmoKundli', style: CkText.h(16, w: FontWeight.w700))),
+                          Expanded(child: Text('CosmoKundli', style: CkText.h(16, w: FontWeight.w600))),
                           const Icon(Icons.chevron_right_rounded, color: CkColors.textMuted),
                         ]),
                       ),
@@ -164,9 +164,9 @@ class _BlueprintSectionState extends State<BlueprintSection> {
                             child: Row(children: [
                               GrahDot(p.id, size: 8),
                               const SizedBox(width: 6),
-                              SizedBox(width: 22, child: Text(p.id, style: TextStyle(fontWeight: FontWeight.w800, color: p.color, fontSize: 12.5))),
+                              SizedBox(width: 22, child: Text(p.id, style: TextStyle(fontWeight: FontWeight.w600, color: p.color, fontSize: 12.5))),
                               Expanded(child: Text(rashiShort(p.rashi), style: const TextStyle(fontSize: 12.5))),
-                              Text(fmtDeg(p.degIn).split(' ').first, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
+                              Text(fmtDeg(p.degIn).split(' ').first, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5)),
                               if (p.retro) const RetroBadge(),
                             ]),
                           ))
@@ -250,7 +250,7 @@ class _KundliPageState extends State<KundliPage> {
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  Text(p.id, style: TextStyle(fontWeight: FontWeight.w800, color: p.color, fontSize: 12)),
+                                  Text(p.id, style: TextStyle(fontWeight: FontWeight.w600, color: p.color, fontSize: 12)),
                                   Text('${rashiShort(p.rashi, 2)} ${p.degIn.floor()}°',
                                       style: const TextStyle(fontSize: 10, color: CkColors.textSecondary)),
                                 ]),
@@ -333,7 +333,7 @@ Widget _cell(String l, String v) => Container(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
         Text(upper(l), style: CkText.label.copyWith(fontSize: 9.5)),
         const SizedBox(height: 3),
-        Text(v, maxLines: 1, overflow: TextOverflow.ellipsis, style: CkText.h(14.5, w: FontWeight.w700)),
+        Text(v, maxLines: 1, overflow: TextOverflow.ellipsis, style: CkText.h(14.5, w: FontWeight.w600)),
       ]),
     );
 
@@ -368,7 +368,7 @@ class _CoordinatesPageState extends State<CoordinatesPage> {
             builder: (planets) => Column(children: [
               Glass(
                 margin: const EdgeInsets.only(top: 12),
-                radius: 24,
+                radius: 18,
                 padding: const EdgeInsets.fromLTRB(14, 14, 0, 6),
                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   SizedBox(
@@ -381,7 +381,7 @@ class _CoordinatesPageState extends State<CoordinatesPage> {
                             child: Row(children: [
                               GrahDot(p.id, size: 10),
                               const SizedBox(width: 8),
-                              Text(p.id, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: p.color)),
+                              Text(p.id, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: p.color)),
                             ]),
                           )),
                     ]),
@@ -403,7 +403,7 @@ class _CoordinatesPageState extends State<CoordinatesPage> {
                             final cells = <Widget>[
                               Text(rashiName(p.rashi), style: const TextStyle(fontSize: 14.5)),
                               Row(children: [
-                                Text(deg, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, fontFeatures: [FontFeature.tabularFigures()])),
+                                Text(deg, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, fontFeatures: [FontFeature.tabularFigures()])),
                                 if (p.retro) const RetroBadge(),
                               ]),
                               Text(tatva(p.rashi), style: const TextStyle(fontSize: 14.5)),
@@ -463,7 +463,7 @@ class _StrengthPageState extends State<StrengthPage> {
               final sorted = [...v]..sort((a, b) => b.value.compareTo(a.value));
               return Column(children: [
                 Glass(
-                  radius: 24,
+                  radius: 18,
                   padding: const EdgeInsets.fromLTRB(8, 14, 14, 12),
                   child: GrahBarChart(values: v, height: 340),
                 ),

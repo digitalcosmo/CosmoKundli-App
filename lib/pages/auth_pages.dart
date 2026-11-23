@@ -145,7 +145,7 @@ class _LoginPageState extends State<LoginPage> {
           const Text('New to CosmoKundli? ', style: CkText.muted),
           GestureDetector(
             onTap: () => Get.to(() => const SignUpPage()),
-            child: const Text('Create account', style: TextStyle(color: Color(0xFFF7A45E), fontWeight: FontWeight.w700)),
+            child: const Text('Create account', style: TextStyle(color: Color(0xFFF7A45E), fontWeight: FontWeight.w600)),
           ),
         ]),
         children: [

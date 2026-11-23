@@ -51,7 +51,7 @@ class _TrajectorySectionState extends State<TrajectorySection> {
                             child: Row(children: [
                               GrahDot(p.id, size: 8),
                               const SizedBox(width: 8),
-                              SizedBox(width: 66, child: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13))),
+                              SizedBox(width: 66, child: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
                               Text('${rashiName(p.rashi)} ${fmtDeg(p.degIn)}', style: const TextStyle(fontSize: 12.5, color: CkColors.textSecondary)),
                               if (p.retro) const RetroBadge(),
                             ]),
@@ -156,7 +156,7 @@ class _TransitPageState extends State<TransitPage> {
                   const Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFFFFB27A)),
                   const SizedBox(width: 6),
                   Text(DateFormat('dd MMM yyyy · HH:mm').format(_at),
-                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFFFFB27A))),
+                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFFFFB27A))),
                 ]),
               ),
             ),
@@ -191,7 +191,7 @@ class _TransitPageState extends State<TransitPage> {
                                   ),
                                   child: Text(_stepLabel[st]!,
                                       style: TextStyle(
-                                          fontWeight: FontWeight.w700,
+                                          fontWeight: FontWeight.w600,
                                           fontSize: 12.5,
                                           color: st == _step ? const Color(0xFFFFB27A) : CkColors.text)),
                                 ),
@@ -218,7 +218,7 @@ class _TransitPageState extends State<TransitPage> {
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
                           Icon(Icons.circle, size: 9, color: _live ? CkColors.green : CkColors.textMuted),
                           const SizedBox(width: 7),
-                          const Text('Real time', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                          const Text('Real time', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                         ]),
                       ),
                     ),
@@ -235,7 +235,7 @@ class _TransitPageState extends State<TransitPage> {
                                 tooltip: 'Back ${_stepLabel[_step]}',
                                 onPressed: () => _set(_move(_at, _step, -1)),
                                 icon: const Icon(Icons.chevron_left_rounded))),
-                        Text(_stepLabel[_step]!, style: const TextStyle(fontWeight: FontWeight.w700)),
+                        Text(_stepLabel[_step]!, style: const TextStyle(fontWeight: FontWeight.w600)),
                         Expanded(
                             child: IconButton(
                                 tooltip: 'Forward ${_stepLabel[_step]}',
@@ -263,14 +263,14 @@ class _CoordTable extends StatelessWidget {
       : Row(children: [
           Flexible(child: Text(rashiName(p.rashi), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13))),
           const SizedBox(width: 5),
-          Text('${p.degIn.floor()}°', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+          Text('${p.degIn.floor()}°', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           if (p.retro) const RetroBadge(),
         ]);
 
   @override
   Widget build(BuildContext context) => Glass(
         margin: const EdgeInsets.only(top: 12),
-        radius: 24,
+        radius: 18,
         padding: const EdgeInsets.all(14),
         child: Column(children: [
           const CardTitle('GRAH Coordinates', Icons.table_chart_outlined),
@@ -298,7 +298,7 @@ class _CoordTable extends StatelessWidget {
                   child: Row(children: [
                     GrahDot(id, size: 8),
                     const SizedBox(width: 7),
-                    Flexible(child: Text(kGrahNames[id]!, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13))),
+                    Flexible(child: Text(kGrahNames[id]!, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
                   ]),
                 ),
                 Expanded(child: _pos(b)),

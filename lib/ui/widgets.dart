@@ -13,9 +13,9 @@ import 'glass.dart';
 // ───────────────────────── basics
 
 class CkText {
-  static TextStyle h(double size, {Color color = CkColors.text, FontWeight w = FontWeight.w800}) =>
-      GoogleFonts.plusJakartaSans(fontSize: size, fontWeight: w, color: color, height: 1.2);
-  static const label = TextStyle(fontSize: 11, letterSpacing: .8, fontWeight: FontWeight.w700, color: CkColors.textSecondary);
+  static TextStyle h(double size, {Color color = CkColors.text, FontWeight w = FontWeight.w600}) =>
+      GoogleFonts.inter(fontSize: size, fontWeight: w, color: color, height: 1.2, letterSpacing: size > 20 ? -.4 : -.1);
+  static const label = TextStyle(fontSize: 11, letterSpacing: .8, fontWeight: FontWeight.w600, color: CkColors.textSecondary);
   static const muted = TextStyle(fontSize: 12.5, color: CkColors.textSecondary);
 }
 
@@ -44,7 +44,7 @@ Future<bool> confirm(BuildContext context, String title, String body, {String ok
         TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel', style: TextStyle(color: CkColors.text))),
         TextButton(
             onPressed: () => Navigator.pop(c, true),
-            child: Text(ok, style: TextStyle(color: danger ? CkColors.red : CkColors.orangeSoft, fontWeight: FontWeight.w700))),
+            child: Text(ok, style: TextStyle(color: danger ? CkColors.red : CkColors.orangeSoft, fontWeight: FontWeight.w600))),
       ],
     ),
   );
@@ -98,7 +98,7 @@ class PrimaryButton extends StatelessWidget {
               ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.4))
               : Row(mainAxisSize: MainAxisSize.min, children: [
                   if (icon != null) ...[Icon(icon, color: Colors.white, size: 20), const SizedBox(width: 8)],
-                  Text(text, style: CkText.h(15.5, w: FontWeight.w700)),
+                  Text(text, style: CkText.h(15.5, w: FontWeight.w600)),
                 ]),
         ),
       );
@@ -115,13 +115,13 @@ class GhostButton extends StatelessWidget {
         onTap: onTap,
         child: Glass(
           height: 50,
-          radius: 20,
+          radius: 16,
           shadow: false,
           stroke: color == CkColors.text ? CkColors.glassStroke : color.withOpacity(.5),
           alignment: Alignment.center,
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             if (icon != null) ...[Icon(icon, color: color, size: 19), const SizedBox(width: 8)],
-            Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 14.5)),
+            Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 14.5)),
           ]),
         ),
       );
@@ -214,7 +214,7 @@ class Segmented<T> extends StatelessWidget {
                   ),
                   child: Text(label(v),
                       style: TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700, color: sel ? Colors.white : CkColors.textSecondary)),
+                          fontSize: 13, fontWeight: FontWeight.w600, color: sel ? Colors.white : CkColors.textSecondary)),
                 ),
               ),
             );
@@ -248,7 +248,7 @@ class ChoiceChips<T> extends StatelessWidget {
                         ),
                         child: Text(label(v),
                             style: TextStyle(
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w600,
                                 color: v == selected ? const Color(0xFFFFB27A) : CkColors.textSecondary)),
                       ),
                     ),
@@ -397,15 +397,14 @@ class ModuleCard extends StatelessWidget {
       this.comingSoon = false,
       this.index = 0});
   @override
-  Widget build(BuildContext context) => FadeSlideIn(
-        index: index,
+  Widget build(BuildContext context) => KeyedSubtree(
         child: Pressable(
           onTap: comingSoon ? null : onTap,
           child: Opacity(
             opacity: comingSoon ? .72 : 1,
             child: Glass(
               margin: const EdgeInsets.only(top: 12),
-              radius: 24,
+              radius: 18,
               padding: const EdgeInsets.all(14),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
@@ -471,7 +470,7 @@ class CardTitle extends StatelessWidget {
                 : Icon(icon, size: 16, color: const Color(0xFFFFB27A)),
           ),
           const SizedBox(width: 9),
-          Expanded(child: Text(title, style: CkText.h(16, w: FontWeight.w700))),
+          Expanded(child: Text(title, style: CkText.h(16, w: FontWeight.w600))),
           if (trailing != null) trailing!,
         ]),
       );
@@ -512,7 +511,7 @@ class InfoPill extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(upper(label), style: CkText.label.copyWith(fontSize: 9.5)),
             const SizedBox(height: 2),
-            Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: color)),
+            Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5, color: color)),
           ]),
         ),
       );
@@ -628,7 +627,7 @@ class _MonthSheetState extends State<_MonthSheet> {
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: CkColors.orangeStroke)),
                 child: const Text('This month',
-                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFFFFB27A))),
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFFFFB27A))),
               ),
             ),
           ]),
@@ -659,7 +658,7 @@ class _MonthSheetState extends State<_MonthSheet> {
                     child: Text('$y',
                         style: TextStyle(
                             fontSize: sel ? 15 : 14,
-                            fontWeight: sel ? FontWeight.w800 : FontWeight.w600,
+                            fontWeight: sel ? FontWeight.w600 : FontWeight.w600,
                             color: sel ? Colors.white : (y == now.year ? CkColors.orangeSoft : CkColors.textSecondary))),
                   ),
                 );
@@ -689,7 +688,7 @@ class _MonthSheetState extends State<_MonthSheet> {
                     border: Border.all(color: isNow && !sel ? CkColors.orangeStroke : CkColors.glassStroke),
                   ),
                   child: Text(DateFormat('MMM').format(DateTime(2000, i + 1)),
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: sel ? Colors.white : CkColors.text)),
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: sel ? Colors.white : CkColors.text)),
                 ),
               );
             }),
@@ -801,7 +800,7 @@ void showZonesSheet(BuildContext context) {
                 child: Row(children: [
                   ZoneArrows(z, size: 18),
                   const SizedBox(width: 10),
-                  SizedBox(width: 78, child: Text(z.name, style: TextStyle(color: z.color, fontWeight: FontWeight.w700))),
+                  SizedBox(width: 78, child: Text(z.name, style: TextStyle(color: z.color, fontWeight: FontWeight.w600))),
                   SizedBox(width: 66, child: Text('${z.min}–${z.max}%', style: const TextStyle(fontSize: 12.5))),
                   Expanded(child: Text(z.advice, style: CkText.muted)),
                 ]),
@@ -923,12 +922,12 @@ class DailyBarChart extends StatelessWidget {
             Positioned(
               bottom: signed ? (up ? height / 2 + h + 3 : null) : h + 3,
               top: signed && !up ? height / 2 + h + 3 : null,
-              child: Text(label, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800)),
+              child: Text(label, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600)),
             ),
           ]),
         ),
         const SizedBox(height: 6),
-        Text('${d.date.day}', style: TextStyle(fontSize: 12, fontWeight: sel ? FontWeight.w800 : FontWeight.w600)),
+        Text('${d.date.day}', style: TextStyle(fontSize: 12, fontWeight: sel ? FontWeight.w600 : FontWeight.w600)),
         Text(DateFormat('E').format(d.date), style: const TextStyle(fontSize: 10, color: CkColors.textMuted)),
       ]),
     );
@@ -981,7 +980,7 @@ class GrahBarChart extends StatelessWidget {
                     child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
                       FittedBox(
                           fit: BoxFit.scaleDown,
-                          child: Text('${v.round()}%', style: TextStyle(fontSize: axis ? 11 : 9.5, fontWeight: FontWeight.w800))),
+                          child: Text('${v.round()}%', style: TextStyle(fontSize: axis ? 11 : 9.5, fontWeight: FontWeight.w600))),
                       const SizedBox(height: 3),
                       TweenAnimationBuilder<double>(
                         tween: Tween(begin: 0, end: v),
@@ -1014,7 +1013,7 @@ class GrahBarChart extends StatelessWidget {
         ...values.map((e) => Expanded(
             child: Text(e.key,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: axis ? 11.5 : 10, fontWeight: FontWeight.w800, color: Colors.white)))),
+                style: TextStyle(fontSize: axis ? 11.5 : 10, fontWeight: FontWeight.w600, color: Colors.white)))),
       ]),
     ]);
   }
@@ -1028,7 +1027,7 @@ class RetroBadge extends StatelessWidget {
         margin: const EdgeInsets.only(left: 4),
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
         decoration: BoxDecoration(color: const Color(0x38FF3B3B), borderRadius: BorderRadius.circular(5)),
-        child: const Text('R', style: TextStyle(color: Color(0xFFFF9A9A), fontSize: 10.5, fontWeight: FontWeight.w800)),
+        child: const Text('R', style: TextStyle(color: Color(0xFFFF9A9A), fontSize: 10.5, fontWeight: FontWeight.w600)),
       );
 }
 

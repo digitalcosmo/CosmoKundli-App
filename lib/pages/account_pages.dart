@@ -37,7 +37,7 @@ class AccountFrame extends StatelessWidget {
               child: ListView(
                 physics: const BouncingScrollPhysics(),
                 padding: EdgeInsets.fromLTRB(16, 6, 16, action == null ? 30 : 110),
-                children: children,
+                children: [for (var i = 0; i < children.length; i++) i < 7 ? FadeSlideIn(index: i, child: children[i]) : children[i]],
               ),
             ),
           ]),
@@ -96,7 +96,7 @@ class _AccountPageState extends State<AccountPage> {
               final cr = s.data?[1] ?? {};
               final name = (p['Name'] ?? '').toString();
               return Glass(
-                radius: 26,
+                radius: 18,
                 padding: const EdgeInsets.all(16),
                 child: Column(children: [
                   Row(children: [
@@ -137,7 +137,7 @@ class _AccountPageState extends State<AccountPage> {
           ),
           Glass(
             margin: const EdgeInsets.only(top: 12),
-            radius: 24,
+            radius: 18,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             child: Column(children: [
               _row('Personal details', Icons.person_outline_rounded, 'Name, mobile, date of birth', const PersonalPage(), true),
@@ -150,7 +150,7 @@ class _AccountPageState extends State<AccountPage> {
           ),
           Glass(
             margin: const EdgeInsets.only(top: 12),
-            radius: 20,
+            radius: 16,
             padding: const EdgeInsets.all(12),
             child: Row(children: [
               Container(
@@ -260,7 +260,7 @@ class _PersonalPageState extends State<PersonalPage> {
             ? [const SizedBox(height: 200, child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)))]
             : [
                 Glass(
-                  radius: 24,
+                  radius: 18,
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Field('Name', controller: _name, required: true),
@@ -431,7 +431,7 @@ class _DisplayPageState extends State<DisplayPage> {
 
           return Stack(fit: StackFit.expand, children: [
             Image.asset('assets/images/report_last.jpg', fit: BoxFit.fill),
-            centred(.383, _name.text, 'Consultant Name', st(5.9, FontWeight.w700, ls: .07)),
+            centred(.383, _name.text, 'Consultant Name', st(5.9, FontWeight.w600, ls: .07)),
             centred(.437, _message.text, 'Consultant Message', st(3.55, FontWeight.w500, ls: .07)),
             left(.538, _mobile.text, 'Display Number'),
             left(.585, _email.text, 'Display E-mail'),
@@ -460,7 +460,7 @@ class _DisplayPageState extends State<DisplayPage> {
               const Text('How you appear on every report you send.', style: CkText.muted),
               Glass(
                 margin: const EdgeInsets.only(top: 10),
-                radius: 26,
+                radius: 18,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 child: Column(children: [
                   SizedBox(
@@ -512,7 +512,7 @@ class _DisplayPageState extends State<DisplayPage> {
                             child: _uploading
                                 ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                                 : Text('${(_page == 1 ? _front : _back).isEmpty ? 'Choose' : 'Change'} ${_page == 1 ? 'front' : 'back'} inner image',
-                                    style: const TextStyle(color: Color(0xFFFFB27A), fontWeight: FontWeight.w700)),
+                                    style: const TextStyle(color: Color(0xFFFFB27A), fontWeight: FontWeight.w600)),
                           ),
                         ),
                       ],
@@ -548,7 +548,7 @@ class _DisplayPageState extends State<DisplayPage> {
                               Text(_labels[i],
                                   style: TextStyle(
                                       fontSize: 10,
-                                      fontWeight: i == _page ? FontWeight.w800 : FontWeight.w500,
+                                      fontWeight: i == _page ? FontWeight.w600 : FontWeight.w500,
                                       color: i == _page ? const Color(0xFFF7A45E) : CkColors.textSecondary)),
                             ]),
                           ),
@@ -560,7 +560,7 @@ class _DisplayPageState extends State<DisplayPage> {
               ),
               Glass(
                 margin: const EdgeInsets.only(top: 12),
-                radius: 24,
+                radius: 18,
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                 child: Column(children: [
                   Field('Display name', controller: _name),
@@ -659,7 +659,7 @@ class _AppDetailsPageState extends State<AppDetailsPage> {
                 const Text('What your clients see in their MyAcharyaji app.', style: CkText.muted),
                 Glass(
                   margin: const EdgeInsets.only(top: 10),
-                  radius: 26,
+                  radius: 18,
                   padding: const EdgeInsets.all(16),
                   child: Column(children: [
                     Row(children: [
@@ -667,7 +667,7 @@ class _AppDetailsPageState extends State<AppDetailsPage> {
                       const Spacer(),
                       _iconBox(28),
                       const SizedBox(width: 8),
-                      Text(_appName.text.isEmpty ? 'Your app' : _appName.text, style: const TextStyle(fontWeight: FontWeight.w700)),
+                      Text(_appName.text.isEmpty ? 'Your app' : _appName.text, style: const TextStyle(fontWeight: FontWeight.w600)),
                     ]),
                     const SizedBox(height: 14),
                     // phone frame with a simplified client-app home
@@ -696,7 +696,7 @@ class _AppDetailsPageState extends State<AppDetailsPage> {
                                 _iconBox(26),
                                 const SizedBox(width: 8),
                                 Text(_appName.text.isEmpty ? 'Your app' : _appName.text,
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                               ]),
                             ),
                             Expanded(
@@ -710,7 +710,7 @@ class _AppDetailsPageState extends State<AppDetailsPage> {
                                       border: Border.all(color: const Color(0xFFE3DDF5))),
                                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                     const Text('About your Acharyaji',
-                                        style: TextStyle(color: Color(0xFF3B2A6B), fontWeight: FontWeight.w800, fontSize: 12)),
+                                        style: TextStyle(color: Color(0xFF3B2A6B), fontWeight: FontWeight.w600, fontSize: 12)),
                                     const SizedBox(height: 6),
                                     Expanded(
                                       child: Text(_desc.text.isEmpty ? 'Your description appears here.' : _desc.text,
@@ -731,7 +731,7 @@ class _AppDetailsPageState extends State<AppDetailsPage> {
                 ),
                 Glass(
                   margin: const EdgeInsets.only(top: 12),
-                  radius: 24,
+                  radius: 18,
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Field('App name', controller: _appName, readOnly: true),
@@ -752,7 +752,7 @@ class _AppDetailsPageState extends State<AppDetailsPage> {
                             alignment: Alignment.center,
                             child: _uploading
                                 ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                                : const Text('Change icon', style: TextStyle(color: Color(0xFFFFB27A), fontWeight: FontWeight.w700)),
+                                : const Text('Change icon', style: TextStyle(color: Color(0xFFFFB27A), fontWeight: FontWeight.w600)),
                           ),
                         ),
                       ),
@@ -814,7 +814,7 @@ class _CreditsPageState extends State<CreditsPage> {
                 ...groups.entries.map((g) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Padding(padding: const EdgeInsets.fromLTRB(4, 14, 4, 6), child: Text(g.key, style: CkText.label)),
                       Glass(
-                        radius: 20,
+                        radius: 16,
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Column(
                           children: g.value.asMap().entries.map((e) {
@@ -832,7 +832,7 @@ class _CreditsPageState extends State<CreditsPage> {
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(child: Text('${e.value['Details'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5))),
-                                Text('${credit ? '+' : '−'}${e.value['Qty'] ?? ''}', style: TextStyle(fontWeight: FontWeight.w800, color: col)),
+                                Text('${credit ? '+' : '−'}${e.value['Qty'] ?? ''}', style: TextStyle(fontWeight: FontWeight.w600, color: col)),
                               ]),
                             );
                           }).toList(),
@@ -880,7 +880,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   final name = '${e['Name'] ?? ''}';
                   return Glass(
                     margin: const EdgeInsets.only(top: 10),
-                    radius: 20,
+                    radius: 16,
                     padding: const EdgeInsets.all(12),
                     child: Row(children: [
                       Container(
@@ -892,7 +892,7 @@ class _HistoryPageState extends State<HistoryPage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('${e['Type'] ?? 'Report'}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                          Text('${e['Type'] ?? 'Report'}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                           Text([name, '${e['Month'] ?? ''}', 'made ${e['Date'] ?? ''}'].where((x) => x.trim().isNotEmpty && x != 'made ').join(' · '),
                               style: CkText.muted.copyWith(fontSize: 11.5)),
                           if ('${e['Status'] ?? ''}'.isNotEmpty && link.isEmpty)
@@ -979,7 +979,7 @@ class _PasswordPageState extends State<PasswordPage> {
       action: PrimaryButton('Update password', loading: _busy, onTap: _save),
       children: [
         Glass(
-          radius: 24,
+          radius: 18,
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
           child: Form(
             key: _form,

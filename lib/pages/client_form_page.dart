@@ -138,7 +138,7 @@ class _BirthFieldsState extends State<BirthFields> {
             Text(upper(label), maxLines: 1, overflow: TextOverflow.ellipsis, style: CkText.label.copyWith(fontSize: 9)),
             const SizedBox(height: 2),
             Text(v.isEmpty ? '—' : (v.length > 8 ? v.substring(0, 8) : v),
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
           ]),
         ),
       );
@@ -257,9 +257,9 @@ class _ClientFormPageState extends State<ClientFormPage> {
 
   Widget _section(String title, List<Widget> children) => Glass(
         margin: const EdgeInsets.only(top: 12),
-        radius: 24,
+        radius: 18,
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: CkText.h(16, w: FontWeight.w700)), ...children]),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: CkText.h(16, w: FontWeight.w600)), ...children]),
       );
 
   @override

@@ -96,9 +96,9 @@ class _Dock extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.fromLTRB(12, 0, 12, bottom > 0 ? bottom : 14),
       child: Glass(
-        radius: 30,
+        radius: 22,
         blur: 22,
-        tint: const Color(0x8C0E2F66),
+        tint: const Color(0x99081840),
         height: 68,
         padding: const EdgeInsets.all(5),
         child: LayoutBuilder(builder: (c, box) {
@@ -112,12 +112,22 @@ class _Dock extends StatelessWidget {
               bottom: 0,
               width: w,
               child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 2),
+                margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
-                      colors: [Color(0xFFEB4B36), Color(0xFFF56720), Color(0xFFF59E0B)]),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: const [BoxShadow(color: Color(0x73F56720), blurRadius: 16)],
+                  color: const Color(0x2478AAFF),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0x38A0C3FF)),
+                ),
+                alignment: Alignment.bottomCenter,
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Container(
+                  width: 14,
+                  height: 2,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF07E22),
+                    borderRadius: BorderRadius.circular(2),
+                    boxShadow: const [BoxShadow(color: Color(0xCCF07E22), blurRadius: 8)],
+                  ),
                 ),
               ),
             ),
@@ -142,7 +152,7 @@ class _Dock extends StatelessWidget {
                           child: Text(_tabs[i].label,
                               style: TextStyle(
                                   fontSize: 10,
-                                  fontWeight: sel ? FontWeight.w700 : FontWeight.w600,
+                                  fontWeight: sel ? FontWeight.w600 : FontWeight.w600,
                                   color: sel ? Colors.white : CkColors.textSecondary)),
                         ),
                       ]),
@@ -191,7 +201,9 @@ class ClientPage extends StatelessWidget {
     final list = ListView(
       physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
       padding: padding,
-      children: children,
+      children: [
+        for (var i = 0; i < children.length; i++) i < 7 ? FadeSlideIn(index: i, child: children[i]) : children[i],
+      ],
     );
     return CkBackground(
       child: Scaffold(
@@ -259,7 +271,7 @@ class _SwitchSheetState extends State<_SwitchSheet> {
                       itemCount: l.length,
                       itemBuilder: (c, i) => ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                        title: Text(l[i].name, style: const TextStyle(fontWeight: FontWeight.w700)),
+                        title: Text(l[i].name, style: const TextStyle(fontWeight: FontWeight.w600)),
                         subtitle: Text(l[i].subtitle, style: CkText.muted.copyWith(fontSize: 12)),
                         trailing: Session.client.value?.mId == l[i].mId
                             ? const Icon(Icons.check_rounded, color: CkColors.orangeSoft)

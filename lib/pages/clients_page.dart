@@ -127,7 +127,7 @@ class _ClientsPageState extends State<ClientsPage> {
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               const Icon(Icons.add_rounded, color: Colors.white),
               const SizedBox(width: 6),
-              Text('New client', style: CkText.h(15, w: FontWeight.w700)),
+              Text('New client', style: CkText.h(15, w: FontWeight.w600)),
             ]),
           ),
         ),
@@ -290,7 +290,7 @@ class _ClientsPageState extends State<ClientsPage> {
                                   onTap: () => _jump(l),
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(vertical: 1.5, horizontal: 4),
-                                    child: Text(l, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: CkColors.textSecondary)),
+                                    child: Text(l, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: CkColors.textSecondary)),
                                   ),
                                 ))
                             .toList(),
@@ -342,7 +342,7 @@ class _ClientCard extends StatelessWidget {
             scale: .98,
             onTap: () => openClient(client),
             child: Glass(
-              radius: 20,
+              radius: 16,
               padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
               child: Row(children: [
                 _Avatar(client),
@@ -350,7 +350,7 @@ class _ClientCard extends StatelessWidget {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
-                      Flexible(child: Text(client.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15))),
+                      Flexible(child: Text(client.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))),
                       if (client.genderText.isNotEmpty) ...[
                         const SizedBox(width: 8),
                         Text(client.genderText, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
