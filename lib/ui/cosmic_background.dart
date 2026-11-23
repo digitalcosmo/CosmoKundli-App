@@ -66,7 +66,7 @@ class _SpacePainter extends CustomPainter {
           ..shader = const RadialGradient(
             center: Alignment(-.6, -1.0),
             radius: 1.5,
-            colors: [Color(0xFF123A86), Color(0xFF0A2258), Color(0xFF05122F), Color(0xFF030A1E)],
+            colors: [Color(0xFF2159B8), Color(0xFF15408F), Color(0xFF0C2C68), Color(0xFF09214F)],
             stops: [0, .38, .72, 1],
           ).createShader(rect));
 
@@ -93,8 +93,8 @@ class _SpacePainter extends CustomPainter {
 
     // large blue sphere, gently bobbing
     final bob = math.sin(v * 2 * math.pi * 6) * 8;
-    final pc = Offset(s.width * 1.02, s.height * .80 + bob);
-    final pr = s.width * .42;
+    final pc = Offset(s.width * .02, s.height * .84 + bob);
+    final pr = s.width * .24;
     canvas.drawCircle(pc, pr * 1.25,
         Paint()..shader = RadialGradient(colors: [const Color(0x334C8DFF), const Color(0x004C8DFF)])
             .createShader(Rect.fromCircle(center: pc, radius: pr * 1.25)));

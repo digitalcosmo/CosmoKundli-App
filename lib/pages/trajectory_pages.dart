@@ -171,7 +171,18 @@ class _TransitPageState extends State<TransitPage> {
                 return const SizedBox(height: 360, child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)));
               }
               return Column(children: [
-                ZoomChart(child: KundliChart(birth, transit: tr)),
+                // Full-bleed: the chart breaks out of the page padding and
+                // uses the screen width minus a small safe margin.
+                LayoutBuilder(builder: (ctx, box) {
+                  final w = MediaQuery.of(ctx).size.width - 8;
+                  return SizedBox(
+                    height: w,
+                    child: OverflowBox(
+                      minWidth: w, maxWidth: w, minHeight: w, maxHeight: w,
+                      child: ZoomChart(child: KundliChart(birth, transit: tr)),
+                    ),
+                  );
+                }),
                 const SizedBox(height: 8),
                 Row(
                   children: _Step.values

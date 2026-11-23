@@ -313,7 +313,7 @@ class KundliSvg {
     parts.write(_tokens(cx, cy, transit.where((p) => p.id != 'As').toList(), zOut, 9.5, 10, 3, false));
     parts.write(_labels(cx, cy, birth, zIn - 8 - 7, 7, 9, 2, false, lang, false));
     parts.write(_gocharLabels(cx, cy, transit, zOut, lang));
-    return '<svg viewBox="80 80 340 340" fill="none" xmlns="http://www.w3.org/2000/svg">$parts</svg>';
+    return '<svg viewBox="93 93 314 314" fill="none" xmlns="http://www.w3.org/2000/svg">$parts</svg>';
   }
 }
 

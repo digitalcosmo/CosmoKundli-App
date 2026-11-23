@@ -18,9 +18,9 @@ class CkColors {
   static const Color linkBlue = Color(0xFF87BEFF);
 
   // Space
-  static const Color deepSpace = Color(0xFF061A3F);
+  static const Color deepSpace = Color(0xFF0C2C68);
   static const Color navy = Color(0xFF0A2A5E);
-  static const Color navySheet = Color(0xFF0E2F66);
+  static const Color navySheet = Color(0xFF14397E);
 
   // Text
   static const Color text = Color(0xFFFFFFFF);
