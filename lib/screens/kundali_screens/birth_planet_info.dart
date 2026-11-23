@@ -17,16 +17,16 @@ class BirthPlanetInfo extends StatefulWidget {
 
 class _BirthPlanetInfoState extends State<BirthPlanetInfo> {
   final List<Color> colors = [
-    Colors.red[100]!,
-    Colors.orange[100]!,
-    Colors.yellow[100]!,
-    Colors.green[100]!,
-    CkColors.linkBlue[100]!,
-    Colors.indigo[100]!,
-    Colors.purple[100]!,
-    Colors.pink[100]!,
-    Colors.teal[100]!,
-    Colors.brown[100]!,
+    Colors.red.withOpacity(0.18),
+    Colors.orange.withOpacity(0.18),
+    Colors.yellow.withOpacity(0.18),
+    Colors.green.withOpacity(0.18),
+    Colors.blue.withOpacity(0.18),
+    Colors.indigo.withOpacity(0.18),
+    Colors.purple.withOpacity(0.18),
+    Colors.pink.withOpacity(0.18),
+    Colors.teal.withOpacity(0.18),
+    Colors.brown.withOpacity(0.18),
   ];
 
    final KundaliController _kundaliController = Get.find(tag: GetTags.kundaliTag);
@@ -63,7 +63,7 @@ class _BirthPlanetInfoState extends State<BirthPlanetInfo> {
               child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: DataTable(
-                    border:TableBorder.all(color: Colors.white,width: 2.sp) ,
+                    border:TableBorder.all(color: CkColors.glassStroke, width: 1) ,
                     columnSpacing: 29.sp,
                     horizontalMargin: 4.sp,
                     dataRowHeight: 23.sp,

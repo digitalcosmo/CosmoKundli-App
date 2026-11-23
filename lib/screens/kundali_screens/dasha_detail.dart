@@ -154,7 +154,7 @@ class _DashaDetailState extends State<DashaDetail> {
                       children: [
                         DataTable(
                           headingRowColor:
-                              const WidgetStatePropertyAll(AppCkColors.textMuted),
+                              const WidgetStatePropertyAll(AppColors.grey),
                           horizontalMargin: 16.sp,
                           border:
                               TableBorder.all(color: CkColors.glassStroke),
@@ -544,7 +544,7 @@ class _DashaDetailState extends State<DashaDetail> {
                         ),
                         DataTable(
                           headingRowColor:
-                              const WidgetStatePropertyAll(AppCkColors.textMuted),
+                              const WidgetStatePropertyAll(AppColors.grey),
                           border:
                               TableBorder.all(color: CkColors.glassStroke),
                           columns: [
@@ -581,7 +581,7 @@ class _DashaDetailState extends State<DashaDetail> {
                           border:
                               TableBorder.all(color: CkColors.glassStroke),
                           headingRowColor:
-                              const WidgetStatePropertyAll(AppCkColors.textMuted),
+                              const WidgetStatePropertyAll(AppColors.grey),
 
                           columns: [
                             DataColumn(label: _dataShellChild("start_date".tr)),
@@ -677,7 +677,7 @@ class _DashaDetailState extends State<DashaDetail> {
                   //           children: [
                   //             DataTable(
                   //               headingRowColor:
-                  //               const WidgetStatePropertyAll(AppCkColors.textMuted),
+                  //               const WidgetStatePropertyAll(AppColors.grey),
                   //               border: TableBorder.all(
                   //                   color: CkColors.glassStroke),
                   //               columns: [
@@ -718,7 +718,7 @@ class _DashaDetailState extends State<DashaDetail> {
                   //               border: TableBorder.all(
                   //                   color: CkColors.glassStroke),
                   //               headingRowColor:
-                  //               const WidgetStatePropertyAll(AppCkColors.textMuted),
+                  //               const WidgetStatePropertyAll(AppColors.grey),
                   //               columns: [
                   //                 DataColumn(label: Text("start_date".tr)),
                   //                 DataColumn(label: Text("end_date".tr)),

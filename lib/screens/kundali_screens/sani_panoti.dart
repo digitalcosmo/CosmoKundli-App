@@ -47,7 +47,7 @@ class SaniPanoti extends StatelessWidget {
                         AppColors.grey.withOpacity(0.25)),
                     columnSpacing: 15.sp,
                     dataRowHeight: 24.sp,
-                    border: TableBorder.all(color: AppCkColors.textMuted),
+                    border: TableBorder.all(color: AppColors.grey),
                     columns: [
                       DataColumn(label: Text("Panoti".tr)),
                       DataColumn(label: Text("Rashi".tr)),

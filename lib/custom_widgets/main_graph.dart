@@ -53,13 +53,11 @@ class MainGraph extends StatelessWidget {
                     ),
                   ),
                 ),
-                barDecoration: BoxDecoration(
-                  color: Services.graphColors(
+                color: Services.graphColors(
                       type: graphModel.list![index].title
                           .toString()
                           .capitalizeFirst
                           .toString()),
-                ),
                 showValue: true,
                 valueCustom: Column(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,

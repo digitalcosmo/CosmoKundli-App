@@ -353,12 +353,11 @@ packages:
     source: hosted
     version: "4.6.6"
   google_maps_places_autocomplete_widgets:
-    dependency: "direct main"
+    dependency: "direct overridden"
     description:
-      name: google_maps_places_autocomplete_widgets
-      sha256: "761120c493575be9a13723b17d86c2cd3ec9873e5663a60ec8db13b783527987"
-      url: "https://pub.dev"
-    source: hosted
+      path: "packages/google_maps_places_autocomplete_widgets"
+      relative: true
+    source: path
     version: "1.3.3"
   http:
     dependency: transitive
