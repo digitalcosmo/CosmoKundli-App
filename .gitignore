@@ -44,3 +44,9 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 /android/build/
+
+# native build caches / local config
+**/.cxx/
+android/local.properties
+android/key.properties
+*.jks

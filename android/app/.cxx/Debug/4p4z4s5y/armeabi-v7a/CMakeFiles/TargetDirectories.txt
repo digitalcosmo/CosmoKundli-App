@@ -1,2 +1,0 @@
-C:/Dharmik/cosmo-kundali-app/android/app/.cxx/Debug/4p4z4s5y/armeabi-v7a/CMakeFiles/edit_cache.dir
-C:/Dharmik/cosmo-kundali-app/android/app/.cxx/Debug/4p4z4s5y/armeabi-v7a/CMakeFiles/rebuild_cache.dir
