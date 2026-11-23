@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -16,14 +17,15 @@ class _Tab {
   final String label;
   final IconData icon;
   final Widget Function() root;
-  const _Tab(this.label, this.icon, this.root);
+  final String? art; // software Menu_* icon
+  const _Tab(this.label, this.icon, this.root, [this.art]);
 }
 
 final _tabs = <_Tab>[
-  _Tab('BluePrint', Icons.blur_circular_rounded, () => const BlueprintSection()),
-  _Tab('Trajectory', Icons.timeline_rounded, () => const TrajectorySection()),
-  _Tab('Predictions', Icons.auto_awesome_rounded, () => const PredictionsSection()),
-  _Tab('Reports', Icons.description_outlined, () => const ReportsSection()),
+  _Tab('BluePrint', Icons.blur_circular_rounded, () => const BlueprintSection(), 'blueprint'),
+  _Tab('Trajectory', Icons.timeline_rounded, () => const TrajectorySection(), 'menu_transit'),
+  _Tab('Predictions', Icons.auto_awesome_rounded, () => const PredictionsSection(), 'menu_sentiments'),
+  _Tab('Reports', Icons.description_outlined, () => const ReportsSection(), 'menu_ck_planner'),
   _Tab('Traditional', Icons.light_mode_outlined, () => const TraditionalSection()),
 ];
 
@@ -65,13 +67,19 @@ class _ClientShellState extends State<ClientShell> {
           IndexedStack(
             index: _index,
             children: List.generate(_tabs.length, (i) {
-              return Navigator(
-                key: _keys[i],
-                onGenerateRoute: (s) => MaterialPageRoute(builder: (_) => _tabs[i].root()),
+              return RepaintBoundary(
+                child: HeroControllerScope.none(
+                  child: Navigator(
+                    key: _keys[i],
+                    onGenerateRoute: (s) => PageRouteBuilder(
+                        pageBuilder: (_, __, ___) => _tabs[i].root(),
+                        transitionDuration: Duration.zero),
+                  ),
+                ),
               );
             }),
           ),
-          Positioned(left: 0, right: 0, bottom: 0, child: _Dock(index: _index, onTap: _select)),
+          Positioned(left: 0, right: 0, bottom: 0, child: RepaintBoundary(child: _Dock(index: _index, onTap: _select))),
         ]),
       ),
     );
@@ -98,7 +106,7 @@ class _Dock extends StatelessWidget {
           return Stack(children: [
             AnimatedPositioned(
               duration: CkMotion.slow,
-              curve: Curves.easeOutBack,
+              curve: kEase,
               left: w * index,
               top: 0,
               bottom: 0,
@@ -125,7 +133,9 @@ class _Dock extends StatelessWidget {
                       scale: .92,
                       onTap: () => onTap(i),
                       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Icon(_tabs[i].icon, size: 21, color: sel ? Colors.white : CkColors.textSecondary),
+                        _tabs[i].art != null
+                            ? CkMenuIcon(_tabs[i].art!, size: 22, color: sel ? Colors.white : CkColors.textSecondary)
+                            : Icon(_tabs[i].icon, size: 21, color: sel ? Colors.white : CkColors.textSecondary),
                         const SizedBox(height: 3),
                         FittedBox(
                           fit: BoxFit.scaleDown,
@@ -165,6 +175,7 @@ class ClientPage extends StatelessWidget {
 
   Future<void> _switch(BuildContext context) async {
     final c = await showModalBottomSheet<Client>(
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       builder: (s) => _SwitchSheet(),
@@ -212,7 +223,7 @@ class ClientPage extends StatelessWidget {
 }
 
 void pushModule(BuildContext context, Widget page) =>
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+    Navigator.of(context).push(CupertinoPageRoute(builder: (_) => page));
 
 class _SwitchSheet extends StatefulWidget {
   @override

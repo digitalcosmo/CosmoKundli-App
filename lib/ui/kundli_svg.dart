@@ -17,11 +17,15 @@ class KundliSvg {
   }
 
   static double _charW(String ch, double fs) {
-    if (ch == ' ') return fs * 0.32;
-    if (RegExp(r'[0-9]').hasMatch(ch)) return fs * 0.58;
-    if (RegExp(r'[A-Z]').hasMatch(ch)) return fs * 0.68;
-    if (RegExp(r'[a-z]').hasMatch(ch)) return fs * 0.55;
-    return fs * 0.8; // Devanagari / Gujarati
+    if (ch == ' ') return fs * 0.28;
+    if (RegExp(r'[0-9]').hasMatch(ch)) return fs * 0.56;
+    if ('MW'.contains(ch)) return fs * 0.78;
+    if (RegExp(r'[A-Z]').hasMatch(ch)) return fs * 0.62;
+    if ('ijl'.contains(ch)) return fs * 0.24;
+    if ('mw'.contains(ch)) return fs * 0.78;
+    if ('frt'.contains(ch)) return fs * 0.34;
+    if (RegExp(r'[a-z]').hasMatch(ch)) return fs * 0.53;
+    return fs * 0.7; // Devanagari / Gujarati
   }
 
   /// Text along an arc centred at [midAngle] (0° = top, clockwise), reading
@@ -52,8 +56,10 @@ class KundliSvg {
     for (var i = 0; i < 12; i++) {
       final mid = i * -30.0;
       final bottom = i >= 4 && i <= 8;
-      // textPath baseline sits on the arc; glyphs extend outward on top, inward on bottom
-      final r = bottom ? rBottom - fs * 0.72 : rTop;
+      // Same as the software's textPath: the baseline sits on the arc. On
+      // top the glyphs rise outward; on the bottom (reversed arc) they rise
+      // inward, so rBottom is already the outer edge of the text.
+      final r = bottom ? rBottom : rTop;
       b.write(_arcText('${i + 1} ${rashiName(i + 1, lang)}', cx, cy, r, mid, bottom, fs, 'white', 600));
     }
     b.write('</g>');
@@ -136,10 +142,91 @@ class KundliSvg {
       final norm = ((a % 360) + 360) % 360;
       var rot = a;
       if (norm > 90 && norm < 270) rot += 180;
-      final label = _label(it.id, lang) + (it.retro && it.id != 'Ra' && it.id != 'Ke' ? '℞' : '');
+      final label = _label(it.id, lang) + (it.retro ? '℞' : '');
       final fill = colored ? kGrahHex[it.id] : 'white';
       b.write('<text x="${pos[0].toStringAsFixed(2)}" y="${(pos[1]).toStringAsFixed(2)}" dy="${(fs * 0.35).toStringAsFixed(2)}" fill="$fill" font-size="$fs" font-weight="600" '
           'text-anchor="middle" transform="rotate(${rot.toStringAsFixed(2)}, ${pos[0].toStringAsFixed(2)}, ${pos[1].toStringAsFixed(2)})">$label</text>');
+    }
+    b.write('</g>');
+    return b.toString();
+  }
+
+  /// Port of gochar.html renderGocharPlanetLabels: transit labels stay on a
+  /// single ring just outside the belt. Crowded labels are pushed apart
+  /// sideways (never across their rashi's border), spread evenly inside the
+  /// rashi, and joined to their real position by a thin dotted leader.
+  static String _gocharLabels(double cx, double cy, List<GrahPos> planets, double zOut, String lang) {
+    const tickLen = 10.0, fs = 7.0, minGap = 4.0;
+    final radius = zOut + tickLen + 8;
+    int rashiOf(_Lbl l) => (l.p.longitude ~/ 30) % 12 + 1;
+    final items = planets.where((p) => p.id != 'As').map((p) => _Lbl(p, _angle(p))).toList()
+      ..sort((a, b) => b.placed.compareTo(a.placed));
+    var changed = true;
+    var it = 0;
+    while (changed && it < 50) {
+      changed = false;
+      it++;
+      for (var i = 1; i < items.length; i++) {
+        final gap = items[i - 1].placed - items[i].placed;
+        if (gap < minGap) {
+          final overlap = minGap - gap;
+          final highPrev = 15.0 - (rashiOf(items[i - 1]) - 1) * 30;
+          final lowI = 15.0 - rashiOf(items[i]) * 30;
+          var up = overlap / 2, down = overlap / 2;
+          if (items[i - 1].placed + up > highPrev) {
+            up = highPrev - items[i - 1].placed;
+            down = overlap - up;
+          }
+          if (items[i].placed - down < lowI) {
+            down = items[i].placed - lowI;
+            up = overlap - down;
+          }
+          items[i - 1].placed += up;
+          items[i].placed -= down;
+          changed = true;
+        }
+      }
+    }
+    final groups = <int, List<_Lbl>>{};
+    for (final l in items) {
+      groups.putIfAbsent(rashiOf(l), () => []).add(l);
+    }
+    for (final g in groups.values) {
+      if (g.length < 2) continue;
+      final max = g.first.placed, min = g.last.placed;
+      final gap = (max - min) / (g.length - 1.1);
+      for (var i = 0; i < g.length; i++) {
+        g[i].placed = max - i * gap;
+      }
+    }
+    for (final entry in groups.entries) {
+      final g = entry.value;
+      if (g.length < 2) continue;
+      final high = 15.0 - (entry.key - 1) * 30, low = high - 30;
+      final hitsHigh = g.any((l) => l.placed >= high - 0.01);
+      final hitsLow = g.any((l) => l.placed <= low + 0.01);
+      if (!hitsHigh && !hitsLow) continue;
+      final centre = g.fold<double>(0, (a, l) => a + l.placed) / g.length;
+      final shift = centre < high - 15 ? 1.0 : -1.0;
+      for (final l in g) {
+        l.placed += shift;
+      }
+    }
+    final b = StringBuffer('<g>');
+    for (final l in items) {
+      final pos = _p(cx, cy, l.placed, radius);
+      final norm = ((l.placed % 360) + 360) % 360;
+      var rot = l.placed;
+      if (norm > 90 && norm < 270) rot += 180;
+      if ((l.placed - l.angle).abs() > 0.5) {
+        final s = _p(cx, cy, l.angle, zOut + 9.5);
+        final e = _p(cx, cy, l.placed, radius - 3);
+        b.write('<line x1="${_f(s[0])}" y1="${_f(s[1])}" x2="${_f(e[0])}" y2="${_f(e[1])}" stroke="${kGrahHex[l.p.id]}" '
+            'stroke-width="0.4" stroke-dasharray="1.5 1" opacity="0.7"/>');
+      }
+      final label = _label(l.p.id, lang) + (l.p.retro ? '℞' : '');
+      b.write('<text x="${_f(pos[0])}" y="${_f(pos[1])}" dy="${(fs * 0.35).toStringAsFixed(2)}" fill="white" font-size="$fs" font-weight="600" '
+          'text-anchor="middle" transform="rotate(${_f(rot)}, ${_f(pos[0])}, ${_f(pos[1])})">$label</text>');
     }
     b.write('</g>');
     return b.toString();
@@ -194,7 +281,7 @@ class KundliSvg {
     parts.write('<circle cx="$cx" cy="$cy" r="$logoCircle" stroke="#437FD7" stroke-width="0.5" fill="none"/>');
     parts.write('<g transform="translate(${(cx - 851 * logoScale).toStringAsFixed(2)}, ${(cy - 750 * logoScale).toStringAsFixed(2)}) scale($logoScale)" opacity="0.7">$kLogoPaths</g>');
     parts.write(_tokens(cx, cy, planets, zIn, -9.5, 10, 4, true));
-    parts.write(_labels(cx, cy, planets, zIn - 3 - 10 - 4, 9, 11, 1.5, false, lang, true));
+    parts.write(_labels(cx, cy, planets, zIn - 3 - 10 - 4, 9, 11, 1.5, false, lang, false));
     return '<svg viewBox="92 92 316 316" fill="none" xmlns="http://www.w3.org/2000/svg">$parts</svg>';
   }
 
@@ -224,8 +311,15 @@ class KundliSvg {
     parts.write('<g transform="translate(${(cx - 849 * logoScale).toStringAsFixed(2)}, ${(cy - 750 * logoScale).toStringAsFixed(2)}) scale($logoScale)" opacity="0.7">$kLogoPaths</g>');
     parts.write(_tokens(cx, cy, birth, zIn, -9.5, 10, 3, true));
     parts.write(_tokens(cx, cy, transit.where((p) => p.id != 'As').toList(), zOut, 9.5, 10, 3, false));
-    parts.write(_labels(cx, cy, birth, zIn - 8 - 7, 7, 9, 2, false, lang, true));
-    parts.write(_labels(cx, cy, transit, zOut + 10 + 8, 7, 9, 2, true, lang, true));
+    parts.write(_labels(cx, cy, birth, zIn - 8 - 7, 7, 9, 2, false, lang, false));
+    parts.write(_gocharLabels(cx, cy, transit, zOut, lang));
     return '<svg viewBox="80 80 340 340" fill="none" xmlns="http://www.w3.org/2000/svg">$parts</svg>';
   }
+}
+
+class _Lbl {
+  final GrahPos p;
+  final double angle;
+  double placed;
+  _Lbl(this.p, this.angle) : placed = angle;
 }

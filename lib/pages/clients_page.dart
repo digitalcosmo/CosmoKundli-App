@@ -30,6 +30,7 @@ void openClient(Client c) {
 
 Future<void> clientMenu(BuildContext context, Client c, {VoidCallback? onChanged, bool fromShell = false}) async {
   final action = await showModalBottomSheet<String>(
+    useRootNavigator: true,
     context: context,
     builder: (s) => SafeArea(
       child: Padding(
@@ -172,10 +173,11 @@ class _ClientsPageState extends State<ClientsPage> {
                               child: Container(
                                 width: 46,
                                 height: 46,
-                                decoration: const BoxDecoration(
+                                decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    gradient: LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFF07E22)])),
-                                child: const Icon(Icons.person_rounded, color: Colors.white),
+                                    color: const Color(0x1AFFFFFF),
+                                    border: Border.all(color: const Color(0x4DFFFFFF))),
+                                child: const Icon(Icons.person_outline_rounded, color: Colors.white, size: 24),
                               ),
                             ),
                           ]),
@@ -308,7 +310,7 @@ class _Avatar extends StatelessWidget {
   final Client c;
   final double size;
   const _Avatar(this.c, {this.size = 46});
-  static const _cols = [Color(0xFFEB4B36), Color(0xFF6C3CE1), Color(0xFF437FD7), Color(0xFF10B981), Color(0xFFEC4899), Color(0xFF8B84FF)];
+  static const _cols = [Color(0xFF4C8DFF), Color(0xFF8B84FF), Color(0xFF437FD7), Color(0xFF10B981), Color(0xFFEC4899), Color(0xFF8B84FF)];
   @override
   Widget build(BuildContext context) {
     final col = _cols[c.name.hashCode.abs() % _cols.length];
@@ -317,10 +319,11 @@ class _Avatar extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(size * .35),
-        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [col, const Color(0xFFF59E0B)]),
+        color: col.withValues(alpha: .16),
+        border: Border.all(color: col.withValues(alpha: .55)),
       ),
       alignment: Alignment.center,
-      child: Text(c.initials, style: CkText.h(size * .32)),
+      child: Text(c.initials, style: CkText.h(size * .32).copyWith(color: Color.lerp(col, Colors.white, .55))),
     );
   }
 }
@@ -331,9 +334,9 @@ class _ClientCard extends StatelessWidget {
   final VoidCallback onChanged;
   const _ClientCard({super.key, required this.client, required this.index, required this.onChanged});
   @override
-  Widget build(BuildContext context) => FadeSlideIn(
-        index: index.clamp(0, 8),
-        child: Padding(
+  Widget build(BuildContext context) => _maybeAnimate(
+        index,
+        Padding(
           padding: const EdgeInsets.only(top: 9),
           child: Pressable(
             scale: .98,
@@ -372,3 +375,8 @@ class _ClientCard extends StatelessWidget {
         ),
       );
 }
+
+// Only the first screenful animates in; cards re-created while scrolling
+// appear instantly so the list never flickers.
+Widget _maybeAnimate(int index, Widget child) =>
+    index < 8 ? FadeSlideIn(index: index, child: child) : child;

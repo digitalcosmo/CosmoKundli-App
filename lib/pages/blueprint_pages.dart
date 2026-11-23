@@ -8,6 +8,7 @@ import '../ui/ck_theme.dart';
 import '../ui/glass.dart';
 import '../ui/kundli_svg.dart';
 import '../ui/widgets.dart';
+import '../ui/zoom_chart.dart';
 import 'client_shell.dart';
 
 const _powerOrder = ['Su', 'Mo', 'Ra', 'Ke', 'Ju', 'Sa', 'Ma', 'Ve', 'Me'];
@@ -23,15 +24,29 @@ class KundliChart extends StatelessWidget {
   final List<GrahPos> planets;
   final List<GrahPos>? transit;
   const KundliChart(this.planets, {super.key, this.transit});
+
+  // Building the SVG string is the expensive part; keep the last few.
+  static final _cache = <String, String>{};
+  static String _key(List<GrahPos> l) =>
+      l.map((p) => '${p.id}${p.longitude.toStringAsFixed(3)}${p.retro ? 'R' : ''}').join();
+
+  String _svg(String lang) {
+    final k = '$lang|${_key(planets)}|${transit == null ? '' : _key(transit!)}';
+    final hit = _cache[k];
+    if (hit != null) return hit;
+    final s = transit == null
+        ? KundliSvg.birth(planets, lang: lang)
+        : KundliSvg.transit(planets, transit!, lang: lang);
+    if (_cache.length > 24) _cache.remove(_cache.keys.first);
+    return _cache[k] = s;
+  }
+
   @override
   Widget build(BuildContext context) => ValueListenableBuilder<String>(
         valueListenable: Session.lang,
         builder: (c, lang, _) => AspectRatio(
           aspectRatio: 1,
-          child: SvgPicture.string(
-            transit == null ? KundliSvg.birth(planets, lang: lang) : KundliSvg.transit(planets, transit!, lang: lang),
-            fit: BoxFit.contain,
-          ),
+          child: RepaintBoundary(child: SvgPicture.string(_svg(lang), fit: BoxFit.contain)),
         ),
       );
 }
@@ -201,8 +216,8 @@ class _KundliPageState extends State<KundliPage> {
           LoadView<List<GrahPos>>(
             future: _f,
             builder: (planets) => Column(children: [
-              InteractiveViewer(minScale: 1, maxScale: 4, child: KundliChart(planets)),
-              const Text('Pinch to zoom', style: TextStyle(fontSize: 11.5, color: CkColors.textMuted)),
+              ZoomChart(child: KundliChart(planets)),
+              const Text('Pinch to zoom · double-tap · long-press to magnify', style: TextStyle(fontSize: 11.5, color: CkColors.textMuted)),
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
                 child: SunMoonLagna(planets),
@@ -258,6 +273,7 @@ Future<void> showPlanetSheet(BuildContext context, GrahPos p) async {
   } catch (_) {}
   if (!context.mounted) return;
   showModalBottomSheet(
+    useRootNavigator: true,
     context: context,
     builder: (c) => SafeArea(
       child: Padding(

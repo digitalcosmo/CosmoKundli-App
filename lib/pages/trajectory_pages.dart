@@ -9,6 +9,7 @@ import '../core/session.dart';
 import '../ui/ck_theme.dart';
 import '../ui/glass.dart';
 import '../ui/widgets.dart';
+import '../ui/zoom_chart.dart';
 import 'blueprint_pages.dart';
 import 'client_shell.dart';
 
@@ -170,10 +171,7 @@ class _TransitPageState extends State<TransitPage> {
                 return const SizedBox(height: 360, child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)));
               }
               return Column(children: [
-                Transform.scale(
-                  scale: 1.06,
-                  child: InteractiveViewer(minScale: 1, maxScale: 4, child: KundliChart(birth, transit: tr)),
-                ),
+                ZoomChart(child: KundliChart(birth, transit: tr)),
                 const SizedBox(height: 8),
                 Row(
                   children: _Step.values

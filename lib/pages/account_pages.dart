@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
@@ -406,36 +407,37 @@ class _DisplayPageState extends State<DisplayPage> {
             : CachedNetworkImage(imageUrl: url, fit: BoxFit.cover, errorWidget: (_, __, ___) => const Icon(Icons.broken_image_outlined));
         break;
       default:
-        child = Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF0E2F66), Color(0xFF061A3F)]),
-          ),
-          padding: EdgeInsets.all(thumb ? 4 : 18),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: SizedBox(
-              width: 220,
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Image.asset('assets/images/ck_logo.png', width: 150),
-                const SizedBox(height: 22),
-                const Text('A REPORT BY', style: CkText.label),
-                const SizedBox(height: 4),
-                Text(_name.text.isEmpty ? 'Consultant name' : _name.text, textAlign: TextAlign.center, style: CkText.h(20)),
-                if (_message.text.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(_message.text, textAlign: TextAlign.center, style: CkText.muted),
-                ],
-                const SizedBox(height: 16),
-                for (final t in [_mobile.text, _email.text, _address.text])
-                  if (t.isNotEmpty)
-                    Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(t, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12.5))),
-              ]),
-            ),
-          ),
-        );
-    }
+        // Same template and text positions as the software's last page
+        // (styles.css .dd-t--last-*): the art is fixed, only text changes.
+        child = LayoutBuilder(builder: (c, box) {
+          final w = box.maxWidth, h = box.maxHeight;
+          TextStyle st(double cqw, FontWeight fw, {double ls = 0, bool ph = false}) => GoogleFonts.poppins(
+              fontSize: w * cqw / 100, fontWeight: fw, letterSpacing: w * cqw / 100 * ls,
+              color: ph ? Colors.white54 : Colors.white, height: 1.25);
+          Widget centred(double top, String v, String ph, TextStyle s) => Positioned(
+                left: w * .19, right: w * .19, top: h * top - s.fontSize! * .7,
+                child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(v.isEmpty ? ph : v, maxLines: 1, style: v.isEmpty ? s.copyWith(color: Colors.white54) : s)),
+              );
+          Widget left(double top, String v, String ph, {int lines = 1}) {
+            final s = st(2.6, FontWeight.w500);
+            return Positioned(
+              left: w * .334, width: w * .46, top: h * top - s.fontSize! * .65,
+              child: Text(v.isEmpty ? ph : v, maxLines: lines, overflow: TextOverflow.ellipsis,
+                  style: v.isEmpty ? s.copyWith(color: Colors.white54) : s),
+            );
+          }
+
+          return Stack(fit: StackFit.expand, children: [
+            Image.asset('assets/images/report_last.jpg', fit: BoxFit.fill),
+            centred(.383, _name.text, 'Consultant Name', st(5.9, FontWeight.w700, ls: .07)),
+            centred(.437, _message.text, 'Consultant Message', st(3.55, FontWeight.w500, ls: .07)),
+            left(.538, _mobile.text, 'Display Number'),
+            left(.585, _email.text, 'Display E-mail'),
+            left(.638, _address.text, 'Display Address', lines: 2),
+          ]);
+        });
     return ClipRRect(
       borderRadius: r,
       child: Container(

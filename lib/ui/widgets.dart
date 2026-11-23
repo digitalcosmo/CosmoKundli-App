@@ -413,11 +413,17 @@ class ModuleCard extends StatelessWidget {
                     width: 42,
                     height: 42,
                     decoration: BoxDecoration(
-                      gradient: comingSoon ? null : CkColors.cta,
-                      color: comingSoon ? CkColors.glassFill : null,
+                      gradient: comingSoon || ckIconAsset(title) != null ? null : CkColors.cta,
+                      color: comingSoon || ckIconAsset(title) != null ? CkColors.glassFill : null,
                       borderRadius: BorderRadius.circular(14),
+                      border: ckIconAsset(title) != null ? Border.all(color: CkColors.glassStroke) : null,
                     ),
-                    child: Icon(icon, color: comingSoon ? CkColors.textSecondary : Colors.white, size: 21),
+                    padding: EdgeInsets.all(ckIconAsset(title) != null ? 7 : 0),
+                    child: ckIconAsset(title) != null
+                        ? Opacity(
+                            opacity: comingSoon ? .55 : 1,
+                            child: Image.asset(ckIconAsset(title)!, filterQuality: FilterQuality.medium))
+                        : Icon(icon, color: comingSoon ? CkColors.textSecondary : Colors.white, size: 21),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -457,10 +463,12 @@ class CardTitle extends StatelessWidget {
             width: 30,
             height: 30,
             decoration: BoxDecoration(
-                color: CkColors.orangeTint,
+                color: ckIconAsset(title) != null ? null : CkColors.orangeTint,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: CkColors.orangeStroke)),
-            child: Icon(icon, size: 16, color: const Color(0xFFFFB27A)),
+                border: ckIconAsset(title) != null ? null : Border.all(color: CkColors.orangeStroke)),
+            child: ckIconAsset(title) != null
+                ? Image.asset(ckIconAsset(title)!, filterQuality: FilterQuality.medium)
+                : Icon(icon, size: 16, color: const Color(0xFFFFB27A)),
           ),
           const SizedBox(width: 9),
           Expanded(child: Text(title, style: CkText.h(16, w: FontWeight.w700))),
@@ -517,71 +525,218 @@ class MonthBar extends StatelessWidget {
   const MonthBar({super.key, required this.month, required this.onChanged});
   @override
   Widget build(BuildContext context) => Row(children: [
-        CircleBtn(Icons.chevron_left_rounded, size: 38, label: 'Previous month',
+        CircleBtn(Icons.chevron_left_rounded, size: 40, label: 'Previous month',
             onTap: () => onChanged(DateTime(month.year, month.month - 1))),
+        const SizedBox(width: 8),
         Expanded(
-          child: GestureDetector(
+          child: Pressable(
+            scale: .97,
             onTap: () async {
               final m = await pickMonth(context, month);
               if (m != null) onChanged(m);
             },
-            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Text(DateFormat('MMMM yyyy').format(month), style: CkText.h(18)),
-              const SizedBox(width: 4),
-              const Icon(Icons.keyboard_arrow_down_rounded, color: CkColors.text),
-            ]),
+            child: Container(
+              height: 44,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: CkColors.glassFill,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: CkColors.glassStroke),
+              ),
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                const Icon(Icons.calendar_month_rounded, size: 17, color: CkColors.orangeSoft),
+                const SizedBox(width: 8),
+                Text(DateFormat('MMMM').format(month), style: CkText.h(16)),
+                const SizedBox(width: 6),
+                Text('${month.year}',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: CkColors.textSecondary)),
+              ]),
+            ),
           ),
         ),
-        CircleBtn(Icons.chevron_right_rounded, size: 38, label: 'Next month',
+        const SizedBox(width: 8),
+        CircleBtn(Icons.chevron_right_rounded, size: 40, label: 'Next month',
             onTap: () => onChanged(DateTime(month.year, month.month + 1))),
       ]);
 }
 
-Future<DateTime?> pickMonth(BuildContext context, DateTime initial) {
-  var year = initial.year;
-  return showModalBottomSheet<DateTime>(
-    context: context,
-    builder: (c) => StatefulBuilder(
-      builder: (c, set) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Row(children: [
-              IconButton(onPressed: () => set(() => year--), icon: const Icon(Icons.chevron_left_rounded)),
-              Expanded(child: Center(child: Text('$year', style: CkText.h(18)))),
-              IconButton(onPressed: () => set(() => year++), icon: const Icon(Icons.chevron_right_rounded)),
-            ]),
-            const SizedBox(height: 8),
-            GridView.count(
-              shrinkWrap: true,
-              crossAxisCount: 4,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 1.7,
-              physics: const NeverScrollableScrollPhysics(),
-              children: List.generate(12, (i) {
-                final sel = year == initial.year && i + 1 == initial.month;
-                return Pressable(
-                  onTap: () => Navigator.pop(c, DateTime(year, i + 1)),
-                  child: Container(
+/// Month picker sheet: a swipeable strip of years (tap any year directly)
+/// above a 4×3 month grid, plus a one-tap jump to the current month.
+Future<DateTime?> pickMonth(BuildContext context, DateTime initial) =>
+    showModalBottomSheet<DateTime>(
+      useRootNavigator: true,
+      context: context,
+      builder: (c) => _MonthSheet(initial),
+    );
+
+class _MonthSheet extends StatefulWidget {
+  final DateTime initial;
+  const _MonthSheet(this.initial);
+  @override
+  State<_MonthSheet> createState() => _MonthSheetState();
+}
+
+class _MonthSheetState extends State<_MonthSheet> {
+  static const _chipW = 76.0;
+  late int _year = widget.initial.year;
+  late final int _first = math.min(widget.initial.year, DateTime.now().year) - 60;
+  late final int _last = math.max(widget.initial.year, DateTime.now().year) + 30;
+  ScrollController? _ctl;
+  ScrollController get _years => _ctl!;
+
+  double _centred(int y) =>
+      math.max(0.0, (y - _first) * _chipW - (MediaQuery.of(context).size.width - 36) / 2 + _chipW / 2);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _ctl ??= ScrollController(initialScrollOffset: _centred(_year));
+  }
+
+  @override
+  void dispose() {
+    _ctl?.dispose();
+    super.dispose();
+  }
+
+  void _setYear(int y) {
+    setState(() => _year = y);
+    _years.animateTo(_centred(y).clamp(0.0, _years.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 380), curve: CkMotion.ease);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 10, 18, 16),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Center(
+              child: Container(
+                  width: 44, height: 5,
+                  decoration: BoxDecoration(color: CkColors.glassStroke, borderRadius: BorderRadius.circular(3)))),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: Text('Choose month', style: CkText.h(18))),
+            Pressable(
+              onTap: () => Navigator.pop(context, DateTime(now.year, now.month)),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                    color: CkColors.orangeTint,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: CkColors.orangeStroke)),
+                child: const Text('This month',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFFFFB27A))),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 40,
+            child: ListView.builder(
+              controller: _years,
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemExtent: _chipW,
+              itemCount: _last - _first + 1,
+              itemBuilder: (_, i) {
+                final y = _first + i;
+                final sel = y == _year;
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _setYear(y),
+                  child: AnimatedContainer(
+                    duration: CkMotion.fast,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       gradient: sel ? CkColors.cta : null,
-                      color: sel ? null : CkColors.glassFill,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: CkColors.glassStroke),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: sel ? Colors.transparent : const Color(0x1FFFFFFF)),
                     ),
-                    child: Text(DateFormat('MMM').format(DateTime(2000, i + 1)),
-                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    child: Text('$y',
+                        style: TextStyle(
+                            fontSize: sel ? 15 : 14,
+                            fontWeight: sel ? FontWeight.w800 : FontWeight.w600,
+                            color: sel ? Colors.white : (y == now.year ? CkColors.orangeSoft : CkColors.textSecondary))),
                   ),
                 );
-              }),
+              },
             ),
-          ]),
-        ),
+          ),
+          const SizedBox(height: 16),
+          GridView.count(
+            shrinkWrap: true,
+            crossAxisCount: 4,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 1.55,
+            physics: const NeverScrollableScrollPhysics(),
+            children: List.generate(12, (i) {
+              final sel = _year == widget.initial.year && i + 1 == widget.initial.month;
+              final isNow = _year == now.year && i + 1 == now.month;
+              return Pressable(
+                scale: .94,
+                onTap: () => Navigator.pop(context, DateTime(_year, i + 1)),
+                child: Container(
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    gradient: sel ? CkColors.cta : null,
+                    color: sel ? null : CkColors.glassFill,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: isNow && !sel ? CkColors.orangeStroke : CkColors.glassStroke),
+                  ),
+                  child: Text(DateFormat('MMM').format(DateTime(2000, i + 1)),
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: sel ? Colors.white : CkColors.text)),
+                ),
+              );
+            }),
+          ),
+        ]),
       ),
-    ),
-  );
+    );
+  }
+}
+
+// ───────────────────────── software icons
+
+/// The CosmoKundli software's own module icons (CK-Icons), by module title.
+const kCkIcons = <String, String>{
+  'BluePrint': 'blueprint',
+  'CK BluePrint': 'blueprint',
+  'CosmoKundli': 'cosmokundli',
+  'GRAH Coordinates': 'grahcoordinates',
+  'Power': 'cosmobal',
+  'Flavor': 'cosmoprakruti',
+  'Power & Flavor': 'cosmobal',
+  'Transit': 'transit',
+  'GRAH Vibes Weekly': 'situations',
+  'GRAH Vibes Monthly': 'situations',
+  'GRAH Trigger': 'triggerpoint',
+  'CK Trajectory': 'triggerpoint',
+  'Sentiments': 'sentiments',
+  'Situations': 'situations',
+  'Sentiments 5D': 'sentiments5d',
+  'CK Planner': 'ck_planner',
+  'CK Profile': 'profile',
+};
+
+String? ckIconAsset(String title) {
+  final n = kCkIcons[title];
+  return n == null ? null : 'assets/icons/$n.png';
+}
+
+/// Monochrome software icon (Menu_* set), tinted like an [Icon].
+class CkMenuIcon extends StatelessWidget {
+  final String name;
+  final double size;
+  final Color color;
+  const CkMenuIcon(this.name, {super.key, this.size = 22, this.color = Colors.white});
+  @override
+  Widget build(BuildContext context) => Image.asset('assets/icons/$name.png',
+      width: size, height: size, color: color, colorBlendMode: BlendMode.srcIn, filterQuality: FilterQuality.medium);
 }
 
 // ───────────────────────── zones
@@ -627,6 +782,7 @@ class _ArrowPainter extends CustomPainter {
 
 void showZonesSheet(BuildContext context) {
   showModalBottomSheet(
+    useRootNavigator: true,
     context: context,
     isScrollControlled: true,
     builder: (c) => SafeArea(
@@ -858,7 +1014,7 @@ class GrahBarChart extends StatelessWidget {
         ...values.map((e) => Expanded(
             child: Text(e.key,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: axis ? 11.5 : 10, fontWeight: FontWeight.w800, color: grahColor(e.key))))),
+                style: TextStyle(fontSize: axis ? 11.5 : 10, fontWeight: FontWeight.w800, color: Colors.white)))),
       ]),
     ]);
   }

@@ -145,7 +145,7 @@ class GrahPos {
       rashi = (deg ~/ 30) % 12 + 1;
       deg = deg % 30;
     }
-    final retro = id == 'Ra' || id == 'Ke' || _retroFlag(j);
+    final retro = _retroFlag(j); // true nodes: Ra/Ke only when the API says so
     return GrahPos(id, rashi, deg, nakshatra: (j['nakshatra'] ?? j['Nakshatra'] ?? '').toString(), retro: retro);
   }
 

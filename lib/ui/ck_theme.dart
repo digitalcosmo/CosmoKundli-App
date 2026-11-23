@@ -30,7 +30,7 @@ class CkColors {
   static const Color textDim = Color(0x59FFFFFF);
 
   // Glass
-  static const Color glassFill = Color(0x0FFFFFFF);
+  static const Color glassFill = Color(0x14FFFFFF);
   static const Color glassFillStrong = Color(0x1AFFFFFF);
   static const Color glassStroke = Color(0x40FFFFFF);
   static const Color glassHighlight = Color(0x4DFFFFFF);
@@ -67,7 +67,7 @@ class CkMotion {
   static const Duration fast = Duration(milliseconds: 160);
   static const Duration base = Duration(milliseconds: 280);
   static const Duration slow = Duration(milliseconds: 450);
-  static const Curve ease = Curves.easeOutCubic;
+  static const Curve ease = Cubic(.22, 1, .36, 1);
   static const Curve spring = Curves.easeOutBack;
 }
 
@@ -238,8 +238,7 @@ class CkTheme {
       ),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: <TargetPlatform, PageTransitionsBuilder>{
-          TargetPlatform.android: ZoomPageTransitionsBuilder(
-              allowEnterRouteSnapshotting: false),
+          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
           TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
         },
       ),

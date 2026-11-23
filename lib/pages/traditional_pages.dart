@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:flutter/cupertino.dart';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -56,12 +57,29 @@ class PanchangPage extends StatefulWidget {
 }
 
 class _PanchangPageState extends State<PanchangPage> {
-  DateTime _at = DateTime.now();
+  DateTime? _at;
   late Future<Map<String, dynamic>> _f = _load();
   String _place = '';
 
+  static DateTime? _birthOf(Map<String, dynamic> d) {
+    final dob = (d['dob'] ?? '').toString().trim();
+    DateTime? day;
+    for (final f in ['yyyy-MM-dd', 'dd-MM-yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd HH:mm:ss', 'dd-MM-yyyy HH:mm:ss']) {
+      try {
+        day = DateFormat(f).parseStrict(dob);
+        break;
+      } catch (_) {}
+    }
+    if (day == null) return null;
+    int n(String k) => int.tryParse('${d[k] ?? ''}'.trim()) ?? 0;
+    return DateTime(day.year, day.month, day.day, n('btime_hrs'), n('btime_min'), n('btime_sec'));
+  }
+
   Future<Map<String, dynamic>> _load() async {
     final d = await _data.details();
+    // Panchang of the client's birth moment, at the birth place.
+    final at = _birthOf(d) ?? _clientBirth() ?? DateTime.now();
+    _at = at;
     final lat = double.tryParse('${d['latitude']}') ?? 0;
     final lng = double.tryParse('${d['longitude']}') ?? 0;
     _place = (d['birth_place'] ?? '').toString();
@@ -70,23 +88,31 @@ class _PanchangPageState extends State<PanchangPage> {
       'LongDeg': lo[0], 'LongMnt': lo[1], 'LongSec': lo[2], 'LongDirection': lng >= 0 ? 'E' : 'W',
       'LatDeg': la[0], 'LatMnt': la[1], 'LatSec': la[2], 'LatDirection': lat >= 0 ? 'N' : 'S',
       'timezone': '${d['timm_diff'] ?? '330'}',
-      'dob': DateFormat('yyyy-MM-dd').format(_at),
-      'birthhour': '${_at.hour}', 'birthmin': '${_at.minute}', 'birthsec': '0',
+      'dob': DateFormat('yyyy-MM-dd').format(at),
+      'birthhour': '${at.hour}', 'birthmin': '${at.minute}', 'birthsec': '${at.second}',
     });
+    if (mounted) setState(() {});
     return r;
   }
 
-  Future<void> _pick() async {
-    final d = await showDatePicker(context: context, initialDate: _at, firstDate: DateTime(1900), lastDate: DateTime(2200));
-    if (d == null || !mounted) return;
-    final t = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(_at));
-    setState(() {
-      _at = DateTime(d.year, d.month, d.day, t?.hour ?? _at.hour, t?.minute ?? _at.minute);
-      _f = _load();
-    });
+  DateTime? _clientBirth() {
+    final c = Session.client.value;
+    if (c == null) return null;
+    try {
+      return DateFormat('dd-MM-yyyy HH:mm:ss').parseStrict(c.dobRaw);
+    } catch (_) {
+      return null;
+    }
   }
 
-  static const _featured = ['tithi', 'paksha', 'nakshatra', 'yog', 'yoga', 'karan', 'karana', 'rashi', 'sunrise', 'sunset', 'moonrise', 'moonset', 'var', 'vaar', 'day'];
+  // Only what the software's Panchang shows, in its order. Raw longitudes
+  // and other internals are left out.
+  static const _featured = ['paksha', 'sunrise', 'sunset', 'tithi', 'nakshatra', 'yog', 'karan', 'sun rashi', 'sun_rashi', 'sunrashi', 'moon rashi', 'moon_rashi', 'moonrashi', 'rashi', 'var', 'day'];
+  static bool _wanted(String k) {
+    final l = k.toLowerCase();
+    if (l.contains('long') || l.contains('lat') || l.contains('deg') || l.contains('time_zone') || l.contains('timezone')) return false;
+    return _featured.any((f) => l.contains(f));
+  }
 
   String _pretty(String k) => k.replaceAll('_', ' ').replaceAllMapped(RegExp(r'([a-z])([A-Z])'), (m) => '${m[1]} ${m[2]}').trim();
 
@@ -131,9 +157,9 @@ class _PanchangPageState extends State<PanchangPage> {
             child: Row(children: [
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('CURRENT ALIGNMENT', style: CkText.label),
+                  const Text('AT BIRTH', style: CkText.label),
                   const SizedBox(height: 4),
-                  Text(DateFormat('EEEE, d MMM yyyy').format(_at), style: CkText.h(19)),
+                  Text(_at == null ? '—' : DateFormat('EEEE, d MMM yyyy').format(_at!), style: CkText.h(19)),
                   const SizedBox(height: 3),
                   Row(children: [
                     const Icon(Icons.place_outlined, size: 14, color: CkColors.textSecondary),
@@ -144,15 +170,12 @@ class _PanchangPageState extends State<PanchangPage> {
                   ]),
                 ]),
               ),
-              Pressable(
-                onTap: _pick,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                      color: CkColors.orangeTint, borderRadius: BorderRadius.circular(20), border: Border.all(color: CkColors.orangeStroke)),
-                  child: Text(DateFormat('HH:mm').format(_at),
-                      style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFFFFB27A))),
-                ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                    color: CkColors.orangeTint, borderRadius: BorderRadius.circular(20), border: Border.all(color: CkColors.orangeStroke)),
+                child: Text(_at == null ? '--:--' : DateFormat('hh:mm a').format(_at!),
+                    style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFFFFB27A))),
               ),
             ]),
           ),
@@ -160,7 +183,7 @@ class _PanchangPageState extends State<PanchangPage> {
             future: _f,
             onRetry: () => setState(() => _f = _load()),
             builder: (r) {
-              final flat = _flatten(r);
+              final flat = _flatten(r)..removeWhere((k, _) => !_wanted(k));
               if (flat.isEmpty) {
                 return EmptyBox(icon: Icons.light_mode_outlined, title: 'No Panchang', body: Api.msg(r, 'Nothing returned for this moment.'));
               }
@@ -317,7 +340,7 @@ class _MelapakPageState extends State<MelapakPage> {
               Pressable(
                 onTap: () async {
                   final f = await Navigator.of(context).push<Future<Map<String, dynamic>>>(
-                      MaterialPageRoute(builder: (_) => _NewPersonPage(clientId: _client.mId)));
+                      CupertinoPageRoute(builder: (_) => _NewPersonPage(clientId: _client.mId)));
                   if (f != null) _open(f);
                 },
                 child: Container(

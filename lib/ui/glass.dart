@@ -115,7 +115,7 @@ class Glass extends StatelessWidget {
     this.padding,
     this.margin,
     this.radius = CkRadius.card,
-    this.blur = 14,
+    this.blur = 0,
     this.tint = CkColors.glassFill,
     this.stroke = CkColors.glassStroke,
     this.width,
@@ -127,44 +127,42 @@ class Glass extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = BorderRadius.circular(radius);
+    final face = DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: r,
+        border: Border.all(color: stroke, width: 1),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.alphaBlend(const Color(0x14FFFFFF), tint),
+            tint,
+            Color.alphaBlend(const Color(0x05FFFFFF), tint),
+          ],
+          stops: const [0, .55, 1],
+        ),
+      ),
+      child: Container(alignment: alignment, padding: padding, child: child),
+    );
+    // Real backdrop blur is expensive (one full-screen pass per card), so
+    // only surfaces that float over moving content (dock, sheets) ask for
+    // it. Cards get the same look from a tinted, pre-blurred background.
+    final body = blur > 0
+        ? ClipRRect(
+            borderRadius: r,
+            child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur), child: face))
+        : face;
     return Container(
       width: width,
       height: height,
       margin: margin,
-      decoration: BoxDecoration(
-        borderRadius: r,
-        boxShadow: shadow
-            ? const [
-                BoxShadow(
-                    color: Color(0x33000000), blurRadius: 24, offset: Offset(0, 10)),
-              ]
-            : null,
-      ),
-      child: ClipRRect(
-        borderRadius: r,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-          child: Container(
-            alignment: alignment,
-            padding: padding,
-            decoration: BoxDecoration(
-              borderRadius: r,
-              border: Border.all(color: stroke, width: 1),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color.alphaBlend(const Color(0x14FFFFFF), tint),
-                  tint,
-                  Color.alphaBlend(const Color(0x05FFFFFF), tint),
-                ],
-                stops: const [0, .55, 1],
-              ),
-            ),
-            child: child,
-          ),
-        ),
-      ),
+      decoration: shadow
+          ? BoxDecoration(borderRadius: r, boxShadow: const [
+              BoxShadow(color: Color(0x26000000), blurRadius: 18, offset: Offset(0, 8)),
+            ])
+          : null,
+      child: body,
     );
   }
 }
@@ -211,37 +209,63 @@ class _PressableState extends State<Pressable> {
         scale: _down ? widget.scale : 1,
         duration: CkMotion.fast,
         curve: CkMotion.ease,
-        child: AnimatedOpacity(
-          opacity: _down ? .85 : 1,
-          duration: CkMotion.fast,
-          child: widget.child,
-        ),
+        child: widget.child,
       ),
     );
   }
 }
 
-/// Fade + rise entrance, staggered by [index].
-class FadeSlideIn extends StatelessWidget {
+/// Fade + rise entrance, staggered by [index] (MyAcharyaji motion: one
+/// controller, cubic(.22,1,.36,1), plays once and never on scroll-back).
+class FadeSlideIn extends StatefulWidget {
   final Widget child;
   final int index;
   const FadeSlideIn({super.key, required this.child, this.index = 0});
 
   @override
+  State<FadeSlideIn> createState() => _FadeSlideInState();
+}
+
+class _FadeSlideInState extends State<FadeSlideIn>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 520));
+  late final Animation<double> _t = CurvedAnimation(parent: _c, curve: kEase);
+
+  @override
+  void initState() {
+    super.initState();
+    final i = widget.index.clamp(0, 6);
+    if (i == 0) {
+      _c.forward();
+    } else {
+      Future.delayed(Duration(milliseconds: 55 * i), () {
+        if (mounted) _c.forward();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final delay = (index.clamp(0, 10)) * 0.06;
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: Duration(milliseconds: 420 + (delay * 1000).round()),
-      curve: Interval(delay / (0.42 + delay), 1, curve: CkMotion.ease),
-      builder: (context, t, child) => Opacity(
-        opacity: t,
-        child: Transform.translate(offset: Offset(0, (1 - t) * 16), child: child),
+    return FadeTransition(
+      opacity: _t,
+      child: AnimatedBuilder(
+        animation: _t,
+        child: widget.child,
+        builder: (_, c) =>
+            Transform.translate(offset: Offset(0, (1 - _t.value) * 14), child: c),
       ),
-      child: child,
     );
   }
 }
+
+const Curve kEase = Cubic(.22, 1, .36, 1);
 
 /// Card heading: icon chip + title, like `.ck-heading` in the software.
 class CkHeading extends StatelessWidget {
