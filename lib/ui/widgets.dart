@@ -831,7 +831,7 @@ class GrahBarChart extends StatelessWidget {
                         tween: Tween(begin: 0, end: v),
                         duration: CkMotion.slow,
                         curve: CkMotion.ease,
-                        builder: (c, t, _) => Container(
+                        builder: (ctx, t, _) => Container(
                           height: math.max(3, t / 100 * h),
                           margin: EdgeInsets.symmetric(horizontal: axis ? 6 : 3),
                           decoration: BoxDecoration(
