@@ -1,0 +1,892 @@
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+
+import '../core/astro.dart';
+import '../core/session.dart';
+import 'ck_theme.dart';
+import 'glass.dart';
+
+// ───────────────────────── basics
+
+class CkText {
+  static TextStyle h(double size, {Color color = CkColors.text, FontWeight w = FontWeight.w800}) =>
+      GoogleFonts.plusJakartaSans(fontSize: size, fontWeight: w, color: color, height: 1.2);
+  static const label = TextStyle(fontSize: 11, letterSpacing: .8, fontWeight: FontWeight.w700, color: CkColors.textSecondary);
+  static const muted = TextStyle(fontSize: 12.5, color: CkColors.textSecondary);
+}
+
+String upper(String s) => s.toUpperCase();
+
+void toast(BuildContext context, String msg, {bool error = false}) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(
+      content: Row(children: [
+        Icon(error ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+            color: error ? CkColors.red : CkColors.green, size: 20),
+        const SizedBox(width: 10),
+        Expanded(child: Text(msg)),
+      ]),
+    ));
+}
+
+Future<bool> confirm(BuildContext context, String title, String body, {String ok = 'Yes', bool danger = false}) async {
+  final r = await showDialog<bool>(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: Text(title, style: CkText.h(18)),
+      content: Text(body, style: const TextStyle(color: CkColors.textSecondary)),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel', style: TextStyle(color: CkColors.text))),
+        TextButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: Text(ok, style: TextStyle(color: danger ? CkColors.red : CkColors.orangeSoft, fontWeight: FontWeight.w700))),
+      ],
+    ),
+  );
+  return r ?? false;
+}
+
+class CircleBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final String label;
+  final double size;
+  const CircleBtn(this.icon, {super.key, this.onTap, required this.label, this.size = 42});
+  @override
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        label: label,
+        child: Pressable(
+          onTap: onTap,
+          child: Glass(
+            width: size,
+            height: size,
+            radius: size / 2,
+            shadow: false,
+            alignment: Alignment.center,
+            child: Icon(icon, size: size * .48, color: CkColors.text),
+          ),
+        ),
+      );
+}
+
+class PrimaryButton extends StatelessWidget {
+  final String text;
+  final VoidCallback? onTap;
+  final bool loading;
+  final IconData? icon;
+  final double height;
+  const PrimaryButton(this.text, {super.key, this.onTap, this.loading = false, this.icon, this.height = 54});
+  @override
+  Widget build(BuildContext context) => Pressable(
+        onTap: loading ? null : onTap,
+        child: Container(
+          height: height,
+          decoration: BoxDecoration(
+            gradient: CkColors.cta,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0x66FFFFFF)),
+            boxShadow: const [BoxShadow(color: Color(0x55F56720), blurRadius: 22, offset: Offset(0, 8))],
+          ),
+          alignment: Alignment.center,
+          child: loading
+              ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.4))
+              : Row(mainAxisSize: MainAxisSize.min, children: [
+                  if (icon != null) ...[Icon(icon, color: Colors.white, size: 20), const SizedBox(width: 8)],
+                  Text(text, style: CkText.h(15.5, w: FontWeight.w700)),
+                ]),
+        ),
+      );
+}
+
+class GhostButton extends StatelessWidget {
+  final String text;
+  final VoidCallback? onTap;
+  final IconData? icon;
+  final Color color;
+  const GhostButton(this.text, {super.key, this.onTap, this.icon, this.color = CkColors.text});
+  @override
+  Widget build(BuildContext context) => Pressable(
+        onTap: onTap,
+        child: Glass(
+          height: 50,
+          radius: 20,
+          shadow: false,
+          stroke: color == CkColors.text ? CkColors.glassStroke : color.withOpacity(.5),
+          alignment: Alignment.center,
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (icon != null) ...[Icon(icon, color: color, size: 19), const SizedBox(width: 8)],
+            Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 14.5)),
+          ]),
+        ),
+      );
+}
+
+class Field extends StatelessWidget {
+  final String label;
+  final TextEditingController? controller;
+  final String? hint;
+  final IconData? icon;
+  final bool required;
+  final bool obscure;
+  final Widget? suffix;
+  final TextInputType? keyboard;
+  final int maxLines;
+  final bool readOnly;
+  final VoidCallback? onTap;
+  final String? Function(String?)? validator;
+  final List<TextInputFormatter>? formatters;
+  const Field(this.label,
+      {super.key,
+      this.controller,
+      this.hint,
+      this.icon,
+      this.required = false,
+      this.obscure = false,
+      this.suffix,
+      this.keyboard,
+      this.maxLines = 1,
+      this.readOnly = false,
+      this.onTap,
+      this.validator,
+      this.formatters});
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text.rich(TextSpan(text: upper(label), style: CkText.label, children: [
+            if (required) const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFFF8A8A))),
+          ])),
+          const SizedBox(height: 6),
+          TextFormField(
+            controller: controller,
+            obscureText: obscure,
+            keyboardType: keyboard,
+            maxLines: maxLines,
+            readOnly: readOnly,
+            onTap: onTap,
+            inputFormatters: formatters,
+            style: const TextStyle(color: CkColors.text, fontSize: 15),
+            cursorColor: CkColors.orangeSoft,
+            validator: validator ??
+                (required ? (v) => (v == null || v.trim().isEmpty) ? '$label is required' : null : null),
+            decoration: InputDecoration(
+              hintText: hint,
+              prefixIcon: icon == null ? null : Icon(icon, size: 19),
+              suffixIcon: suffix,
+            ),
+          ),
+        ]),
+      );
+}
+
+class Segmented<T> extends StatelessWidget {
+  final List<T> values;
+  final T selected;
+  final String Function(T) label;
+  final ValueChanged<T> onChanged;
+  final double height;
+  const Segmented({super.key, required this.values, required this.selected, required this.label, required this.onChanged, this.height = 44});
+  @override
+  Widget build(BuildContext context) => Glass(
+        height: height,
+        radius: height / 2,
+        shadow: false,
+        padding: const EdgeInsets.all(4),
+        child: Row(
+          children: values.map((v) {
+            final sel = v == selected;
+            return Expanded(
+              child: Pressable(
+                onTap: () => onChanged(v),
+                child: AnimatedContainer(
+                  duration: CkMotion.base,
+                  curve: CkMotion.ease,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    gradient: sel ? CkColors.cta : null,
+                    borderRadius: BorderRadius.circular(height / 2),
+                  ),
+                  child: Text(label(v),
+                      style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w700, color: sel ? Colors.white : CkColors.textSecondary)),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      );
+}
+
+class ChoiceChips<T> extends StatelessWidget {
+  final List<T> values;
+  final T? selected;
+  final String Function(T) label;
+  final ValueChanged<T> onChanged;
+  const ChoiceChips({super.key, required this.values, required this.selected, required this.label, required this.onChanged});
+  @override
+  Widget build(BuildContext context) => Row(
+        children: values
+            .map((v) => Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Pressable(
+                      onTap: () => onChanged(v),
+                      child: AnimatedContainer(
+                        duration: CkMotion.fast,
+                        height: 44,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: v == selected ? CkColors.orangeTint : CkColors.glassFill,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: v == selected ? CkColors.orangeStroke : CkColors.glassStroke),
+                        ),
+                        child: Text(label(v),
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: v == selected ? const Color(0xFFFFB27A) : CkColors.textSecondary)),
+                      ),
+                    ),
+                  ),
+                ))
+            .toList(),
+      );
+}
+
+// ───────────────────────── loading / empty / error
+
+class LoadView<T> extends StatelessWidget {
+  final Future<T>? future;
+  final Widget Function(T data) builder;
+  final VoidCallback? onRetry;
+  final double minHeight;
+  const LoadView({super.key, required this.future, required this.builder, this.onRetry, this.minHeight = 220});
+  @override
+  Widget build(BuildContext context) => FutureBuilder<T>(
+        future: future,
+        builder: (c, s) {
+          if (s.connectionState != ConnectionState.done) {
+            return SizedBox(
+                height: minHeight,
+                child: const Center(child: CircularProgressIndicator(strokeWidth: 2.4)));
+          }
+          if (s.hasError || !s.hasData) {
+            return ErrorBox(
+                message: 'Couldn\'t load this. Check your connection and try again.', onRetry: onRetry);
+          }
+          return builder(s.data as T);
+        },
+      );
+}
+
+class ErrorBox extends StatelessWidget {
+  final String message;
+  final VoidCallback? onRetry;
+  const ErrorBox({super.key, required this.message, this.onRetry});
+  @override
+  Widget build(BuildContext context) => Glass(
+        margin: const EdgeInsets.only(top: 12),
+        padding: const EdgeInsets.all(18),
+        child: Column(children: [
+          const Icon(Icons.cloud_off_rounded, color: CkColors.textSecondary, size: 30),
+          const SizedBox(height: 8),
+          Text(message, textAlign: TextAlign.center, style: CkText.muted),
+          if (onRetry != null) ...[
+            const SizedBox(height: 12),
+            TextButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: const Text('Try again')),
+          ]
+        ]),
+      );
+}
+
+class EmptyBox extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
+  const EmptyBox({super.key, required this.icon, required this.title, required this.body});
+  @override
+  Widget build(BuildContext context) => Glass(
+        margin: const EdgeInsets.only(top: 12),
+        padding: const EdgeInsets.all(22),
+        child: Column(children: [
+          Icon(icon, color: CkColors.orangeSoft, size: 32),
+          const SizedBox(height: 10),
+          Text(title, style: CkText.h(16)),
+          const SizedBox(height: 4),
+          Text(body, textAlign: TextAlign.center, style: CkText.muted),
+        ]),
+      );
+}
+
+// ───────────────────────── client header + sections
+
+/// Single-row header used on every screen inside a client.
+class ClientHeader extends StatelessWidget {
+  final String title;
+  final VoidCallback? onBack;
+  final VoidCallback? onSwitch;
+  final VoidCallback? onMore;
+  const ClientHeader({super.key, required this.title, this.onBack, this.onSwitch, this.onMore});
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<Client?>(
+        valueListenable: Session.client,
+        builder: (c, client, _) => Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+          child: Row(children: [
+            CircleBtn(Icons.arrow_back_ios_new_rounded, label: 'Back', onTap: onBack ?? () => Navigator.maybePop(context)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: CkText.h(19)),
+                const SizedBox(height: 3),
+                GestureDetector(
+                  onTap: onSwitch,
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(children: [
+                    Flexible(
+                      child: Text(
+                        client == null ? '' : [client.name, client.dateText, client.timeText].where((e) => e.isNotEmpty).join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12, color: CkColors.textSecondary),
+                      ),
+                    ),
+                    if (onSwitch != null) const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: CkColors.textSecondary),
+                  ]),
+                ),
+              ]),
+            ),
+            if (onMore != null) ...[
+              const SizedBox(width: 10),
+              CircleBtn(Icons.more_horiz_rounded, label: 'Client options', onTap: onMore),
+            ],
+          ]),
+        ),
+      );
+}
+
+class SectionIntro extends StatelessWidget {
+  final String text;
+  const SectionIntro(this.text, {super.key});
+  @override
+  Widget build(BuildContext context) =>
+      Padding(padding: const EdgeInsets.fromLTRB(4, 0, 4, 2), child: Text(text, style: CkText.muted));
+}
+
+/// Card on a section page that opens a module.
+class ModuleCard extends StatelessWidget {
+  final String title;
+  final String description;
+  final IconData icon;
+  final VoidCallback? onTap;
+  final Widget? preview;
+  final bool comingSoon;
+  final int index;
+  const ModuleCard(
+      {super.key,
+      required this.title,
+      required this.description,
+      required this.icon,
+      this.onTap,
+      this.preview,
+      this.comingSoon = false,
+      this.index = 0});
+  @override
+  Widget build(BuildContext context) => FadeSlideIn(
+        index: index,
+        child: Pressable(
+          onTap: comingSoon ? null : onTap,
+          child: Opacity(
+            opacity: comingSoon ? .72 : 1,
+            child: Glass(
+              margin: const EdgeInsets.only(top: 12),
+              radius: 24,
+              padding: const EdgeInsets.all(14),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      gradient: comingSoon ? null : CkColors.cta,
+                      color: comingSoon ? CkColors.glassFill : null,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(icon, color: comingSoon ? CkColors.textSecondary : Colors.white, size: 21),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(title, style: CkText.h(16)),
+                      const SizedBox(height: 2),
+                      Text(description, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
+                    ]),
+                  ),
+                  if (comingSoon)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      decoration: BoxDecoration(color: CkColors.glassFillStrong, borderRadius: BorderRadius.circular(20)),
+                      child: const Text('Coming soon', style: TextStyle(fontSize: 10.5, color: CkColors.textSecondary)),
+                    )
+                  else
+                    const Icon(Icons.chevron_right_rounded, color: CkColors.textMuted),
+                ]),
+                if (preview != null && !comingSoon) ...[const SizedBox(height: 10), preview!],
+              ]),
+            ),
+          ),
+        ),
+      );
+}
+
+class CardTitle extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Widget? trailing;
+  const CardTitle(this.title, this.icon, {super.key, this.trailing});
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Row(children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+                color: CkColors.orangeTint,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: CkColors.orangeStroke)),
+            child: Icon(icon, size: 16, color: const Color(0xFFFFB27A)),
+          ),
+          const SizedBox(width: 9),
+          Expanded(child: Text(title, style: CkText.h(16, w: FontWeight.w700))),
+          if (trailing != null) trailing!,
+        ]),
+      );
+}
+
+class StatTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final String sub;
+  final Color color;
+  const StatTile(this.label, this.value, this.sub, {super.key, this.color = CkColors.text});
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: Glass(
+          radius: 18,
+          shadow: false,
+          padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(upper(label), style: CkText.label.copyWith(fontSize: 9.5)),
+            const SizedBox(height: 2),
+            FittedBox(fit: BoxFit.scaleDown, child: Text(value, style: CkText.h(19, color: color))),
+            Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, color: CkColors.textSecondary)),
+          ]),
+        ),
+      );
+}
+
+class InfoPill extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const InfoPill(this.label, this.value, this.color, {super.key});
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
+          decoration: BoxDecoration(color: CkColors.glassFill, borderRadius: BorderRadius.circular(14)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(upper(label), style: CkText.label.copyWith(fontSize: 9.5)),
+            const SizedBox(height: 2),
+            Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: color)),
+          ]),
+        ),
+      );
+}
+
+/// Month stepper with a picker sheet.
+class MonthBar extends StatelessWidget {
+  final DateTime month;
+  final ValueChanged<DateTime> onChanged;
+  const MonthBar({super.key, required this.month, required this.onChanged});
+  @override
+  Widget build(BuildContext context) => Row(children: [
+        CircleBtn(Icons.chevron_left_rounded, size: 38, label: 'Previous month',
+            onTap: () => onChanged(DateTime(month.year, month.month - 1))),
+        Expanded(
+          child: GestureDetector(
+            onTap: () async {
+              final m = await pickMonth(context, month);
+              if (m != null) onChanged(m);
+            },
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text(DateFormat('MMMM yyyy').format(month), style: CkText.h(18)),
+              const SizedBox(width: 4),
+              const Icon(Icons.keyboard_arrow_down_rounded, color: CkColors.text),
+            ]),
+          ),
+        ),
+        CircleBtn(Icons.chevron_right_rounded, size: 38, label: 'Next month',
+            onTap: () => onChanged(DateTime(month.year, month.month + 1))),
+      ]);
+}
+
+Future<DateTime?> pickMonth(BuildContext context, DateTime initial) {
+  var year = initial.year;
+  return showModalBottomSheet<DateTime>(
+    context: context,
+    builder: (c) => StatefulBuilder(
+      builder: (c, set) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Row(children: [
+              IconButton(onPressed: () => set(() => year--), icon: const Icon(Icons.chevron_left_rounded)),
+              Expanded(child: Center(child: Text('$year', style: CkText.h(18)))),
+              IconButton(onPressed: () => set(() => year++), icon: const Icon(Icons.chevron_right_rounded)),
+            ]),
+            const SizedBox(height: 8),
+            GridView.count(
+              shrinkWrap: true,
+              crossAxisCount: 4,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 1.7,
+              physics: const NeverScrollableScrollPhysics(),
+              children: List.generate(12, (i) {
+                final sel = year == initial.year && i + 1 == initial.month;
+                return Pressable(
+                  onTap: () => Navigator.pop(c, DateTime(year, i + 1)),
+                  child: Container(
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: sel ? CkColors.cta : null,
+                      color: sel ? null : CkColors.glassFill,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: CkColors.glassStroke),
+                    ),
+                    child: Text(DateFormat('MMM').format(DateTime(2000, i + 1)),
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                );
+              }),
+            ),
+          ]),
+        ),
+      ),
+    ),
+  );
+}
+
+// ───────────────────────── zones
+
+class ZoneArrows extends StatelessWidget {
+  final Zone zone;
+  final double size;
+  const ZoneArrows(this.zone, {super.key, this.size = 14});
+  @override
+  Widget build(BuildContext context) => CustomPaint(size: Size.square(size), painter: _ArrowPainter(zone));
+}
+
+class _ArrowPainter extends CustomPainter {
+  final Zone z;
+  _ArrowPainter(this.z);
+  @override
+  void paint(Canvas canvas, Size s) {
+    final p = Paint()
+      ..color = z.color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = s.width * .12
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final w = s.width;
+    if (z.dir == 0) {
+      canvas.drawLine(Offset(w * .2, w * .5), Offset(w * .8, w * .5), p);
+      return;
+    }
+    final ys = z.arrows == 1 ? [.5] : z.arrows == 2 ? [.38, .66] : [.24, .5, .76];
+    for (final y in ys) {
+      final dy = w * .16 * z.dir;
+      final path = Path()
+        ..moveTo(w * .2, w * y + dy)
+        ..lineTo(w * .5, w * y - dy)
+        ..lineTo(w * .8, w * y + dy);
+      canvas.drawPath(path, p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_) => false;
+}
+
+void showZonesSheet(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    builder: (c) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Center(child: Container(width: 44, height: 5, decoration: BoxDecoration(color: CkColors.glassStroke, borderRadius: BorderRadius.circular(3)))),
+          const SizedBox(height: 14),
+          Text('7 Zones of Situations', style: CkText.h(19)),
+          const SizedBox(height: 4),
+          const Text('How things around the client go. Higher is smoother.', style: CkText.muted),
+          const SizedBox(height: 10),
+          ...kZones.map((z) => Container(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.white.withOpacity(.08)))),
+                child: Row(children: [
+                  ZoneArrows(z, size: 18),
+                  const SizedBox(width: 10),
+                  SizedBox(width: 78, child: Text(z.name, style: TextStyle(color: z.color, fontWeight: FontWeight.w700))),
+                  SizedBox(width: 66, child: Text('${z.min}–${z.max}%', style: const TextStyle(fontSize: 12.5))),
+                  Expanded(child: Text(z.advice, style: CkText.muted)),
+                ]),
+              )),
+        ]),
+      ),
+    ),
+  );
+}
+
+// ───────────────────────── charts
+
+class DayValue {
+  final DateTime date;
+  final double value;
+  const DayValue(this.date, this.value);
+}
+
+/// Daily bar chart that shows ~7 days and scrolls sideways, with a fixed
+/// y-axis grid and % values. [signed] = −100..+100 (Sentiments);
+/// otherwise 0..100 coloured by the 7 zones (Situations).
+class DailyBarChart extends StatelessWidget {
+  final List<DayValue> days;
+  final bool signed;
+  final int? selected;
+  final ValueChanged<int>? onSelect;
+  final double height;
+  const DailyBarChart({super.key, required this.days, required this.signed, this.selected, this.onSelect, this.height = 240});
+
+  List<double> get ticks => signed ? [100, 50, 0, -50, -100] : [100, 85, 65, 55, 45, 35, 15, 0];
+  double _y(double t) => signed ? (100 - t) / 200 * height : (100 - t) / 100 * height;
+  String _lab(double t) => signed ? '${t > 0 ? '+' : ''}${t.round()}%' : '${t.round()}%';
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (c, box) {
+      const axisW = 42.0;
+      final colW = ((box.maxWidth - axisW) / 7).clamp(38.0, 60.0);
+      return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SizedBox(
+          width: axisW,
+          height: height,
+          child: Stack(children: [
+            for (final t in ticks)
+              Positioned(
+                top: _y(t) - 7,
+                right: 6,
+                child: Text(_lab(t), style: const TextStyle(fontSize: 10, color: CkColors.textMuted)),
+              ),
+          ]),
+        ),
+        Expanded(
+          child: Stack(children: [
+            for (final t in ticks)
+              Positioned(
+                top: _y(t),
+                left: 0,
+                right: 0,
+                child: Container(height: 1, color: Colors.white.withOpacity(signed && t == 0 ? .32 : .1)),
+              ),
+            SizedBox(
+              height: height + 40,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: days.length,
+                itemExtent: colW,
+                itemBuilder: (c, i) => _bar(i, colW),
+              ),
+            ),
+          ]),
+        ),
+      ]);
+    });
+  }
+
+  Widget _bar(int i, double w) {
+    final d = days[i];
+    final v = d.value.clamp(signed ? -100.0 : 0.0, 100.0);
+    final sel = selected == i;
+    final up = v >= 0;
+    final h = signed ? v.abs() / 100 * height / 2 : v / 100 * height;
+    final color = signed ? null : zoneOf(v).color;
+    final grad = signed
+        ? LinearGradient(
+            begin: up ? Alignment.topCenter : Alignment.bottomCenter,
+            end: up ? Alignment.bottomCenter : Alignment.topCenter,
+            colors: up ? const [Color(0xFF74E2B7), Color(0xFF10B981)] : const [Color(0xFFFF8A8A), Color(0xFFEF4444)],
+          )
+        : null;
+    final label = signed ? '${v > 0 ? '+' : ''}${v.round()}%' : '${v.round()}%';
+    final bw = math.max(10.0, w * .46);
+    return GestureDetector(
+      onTap: onSelect == null ? null : () => onSelect!(i),
+      child: Column(children: [
+        Container(
+          height: height,
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          decoration: BoxDecoration(color: sel ? Colors.white.withOpacity(.07) : null, borderRadius: BorderRadius.circular(10)),
+          child: Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
+            Positioned(
+              bottom: signed ? (up ? height / 2 : null) : 0,
+              top: signed && !up ? height / 2 : null,
+              child: AnimatedContainer(
+                duration: CkMotion.slow,
+                curve: CkMotion.ease,
+                width: bw,
+                height: math.max(h, 3),
+                decoration: BoxDecoration(
+                  color: color,
+                  gradient: grad,
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(signed && !up ? 2 : 8),
+                    bottom: Radius.circular(signed && !up ? 8 : 2),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: signed ? (up ? height / 2 + h + 3 : null) : h + 3,
+              top: signed && !up ? height / 2 + h + 3 : null,
+              child: Text(label, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800)),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 6),
+        Text('${d.date.day}', style: TextStyle(fontSize: 12, fontWeight: sel ? FontWeight.w800 : FontWeight.w600)),
+        Text(DateFormat('E').format(d.date), style: const TextStyle(fontSize: 10, color: CkColors.textMuted)),
+      ]),
+    );
+  }
+}
+
+/// Planet bars on the software's grid (0,15,35,45,55,65,85,100) with % at the bar end.
+class GrahBarChart extends StatelessWidget {
+  final List<MapEntry<String, double>> values; // grah id → 0..100
+  final double height;
+  final bool axis;
+  const GrahBarChart({super.key, required this.values, this.height = 300, this.axis = true});
+  static const _ticks = [0, 15, 35, 45, 55, 65, 85, 100];
+  @override
+  Widget build(BuildContext context) {
+    final axisW = axis ? 28.0 : 0.0;
+    final top = 18.0;
+    final h = height - top;
+    return Column(children: [
+      SizedBox(
+        height: height,
+        child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          if (axis)
+            SizedBox(
+              width: axisW,
+              height: height,
+              child: Stack(children: [
+                for (final t in _ticks)
+                  Positioned(
+                      bottom: t / 100 * h - 6,
+                      right: 4,
+                      child: Text('$t', style: const TextStyle(fontSize: 9.5, color: CkColors.textMuted))),
+              ]),
+            ),
+          Expanded(
+            child: Stack(children: [
+              for (final t in _ticks)
+                Positioned(
+                  bottom: t / 100 * h,
+                  left: 0,
+                  right: 0,
+                  child: Container(height: 1, color: Colors.white.withOpacity(t == 0 || t == 100 ? .18 : .09)),
+                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: values.map((e) {
+                  final c = grahColor(e.key);
+                  final v = e.value.clamp(0.0, 100.0);
+                  return Expanded(
+                    child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+                      FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('${v.round()}%', style: TextStyle(fontSize: axis ? 11 : 9.5, fontWeight: FontWeight.w800))),
+                      const SizedBox(height: 3),
+                      TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: v),
+                        duration: CkMotion.slow,
+                        curve: CkMotion.ease,
+                        builder: (c, t, _) => Container(
+                          height: math.max(3, t / 100 * h),
+                          margin: EdgeInsets.symmetric(horizontal: axis ? 6 : 3),
+                          decoration: BoxDecoration(
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(8), bottom: Radius.circular(2)),
+                            gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [c, c.withOpacity(.25)]),
+                            boxShadow: [BoxShadow(color: c.withOpacity(.25), blurRadius: 12)],
+                          ),
+                        ),
+                      ),
+                    ]),
+                  );
+                }).toList(),
+              ),
+            ]),
+          ),
+        ]),
+      ),
+      const SizedBox(height: 6),
+      Row(children: [
+        SizedBox(width: axisW),
+        ...values.map((e) => Expanded(
+            child: Text(e.key,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: axis ? 11.5 : 10, fontWeight: FontWeight.w800, color: grahColor(e.key))))),
+      ]),
+    ]);
+  }
+}
+
+/// Small "R" retrograde badge.
+class RetroBadge extends StatelessWidget {
+  const RetroBadge({super.key});
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(left: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+        decoration: BoxDecoration(color: const Color(0x38FF3B3B), borderRadius: BorderRadius.circular(5)),
+        child: const Text('R', style: TextStyle(color: Color(0xFFFF9A9A), fontSize: 10.5, fontWeight: FontWeight.w800)),
+      );
+}
+
+class GrahDot extends StatelessWidget {
+  final String id;
+  final double size;
+  const GrahDot(this.id, {super.key, this.size = 9});
+  @override
+  Widget build(BuildContext context) {
+    final c = grahColor(id);
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: c, shape: BoxShape.circle, boxShadow: [BoxShadow(color: c.withOpacity(.6), blurRadius: 8)]),
+    );
+  }
+}
