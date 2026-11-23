@@ -1,0 +1,60 @@
+class AppUrls {
+  static const String baseUrl = 'https://software.cosmokundli.com/API/';
+  static const String login = 'Login';
+  static const String signUp = 'SignUp';
+  static const String forgot_pass = 'forgot_password';
+  static const String reset_password = 'reset_password';
+  static const String memberAdd = 'MemberAdd';
+  static const String MemberUpdate = 'MemberUpdate';
+  static const String memberDelete = 'MemberDelete';
+  static const String memberList = 'MemberList';
+  static const String memberDetails = 'MemberDetails';
+  static const String verifyDevice = 'VerifyDevice';
+  static const String birthChart = 'BirthChart';
+  static const String bithPlanetInfo = 'BithPlanetInfo';
+  static const String shadbal = 'Shadbal';
+  static const String vimshottriMahaDasha = 'VimshottriMahaDasha';
+  static const String fiveFoldFriendship = 'FiveFoldFriendship';
+  static const String Dasha = 'Dasha';
+  static const String Ashtakvarg_Sun = 'Ashtakvarg_Sun';
+  static const String Ashtakvarg_Moon = 'Ashtakvarg_Moon';
+  static const String Ashtakvarg_Mars = 'Ashtakvarg_Mars';
+  static const String Ashtakvarg_Mercury = 'Ashtakvarg_Mercury';
+  static const String Ashtakvarg_Jupiter = 'Ashtakvarg_Jupiter';
+  static const String Ashtakvarg_Venus = 'Ashtakvarg_Venus';
+  static const String Ashtakvarg_Saturn = 'Ashtakvarg_Saturn';
+  static const String Ashtakvarg_Lagan = 'Ashtakvarg_Lagan';
+  static const String Star_Power_Daily = 'Star_Power_Daily';
+  static const String Star_Power_Report = 'Star_Power_Report';
+  static const String Cosmo_Power_Daily = 'Cosmo_Power_Daily';
+  static const String Periodic_Monthly_Report = 'Periodic_Monthly_Report';
+  static const String Tara_Chakra = 'Tara_Chakra';
+  static const String Sani_Panoti = 'Sani_Panoti';
+  static const String Melapak_Opp_User_List = 'Melapak_Opp_User_List';
+  static const String Melapak_Details_Existing_User =
+      'Melapak_Details_Existing_User';
+  static const String Melapak_Details_New_User = 'Melapak_Details_New_User';
+  static const String GocharAnimated = 'GocharAnimated';
+  static const String Gochar_Prabhav = 'Gochar_Prabhav';
+  static String varg_kundali = 'D1';
+  static String profileDetails = 'Profile_Details';
+  static String appDetails = 'App_Details';
+  static String creditTransaction = 'Credit_Transactions';
+  static String changePassword = 'Change_Password';
+  static String displayDetails = 'Display_Details';
+  static String profileUpdate = 'Profile_Update';
+  static String appDetailsUpdate = 'App_Update';
+  static String displayDetailsUpdate = 'Display_Update';
+  static String reportHistory = 'Report_History';
+  static String appImageUpdate = 'App_Icon_Update';
+  static String updateBackImage = 'Display_Back_Image_Update';
+  static String updateFrontImage = 'Display_Front_Image_Update';
+  static String chanchaChakra = 'ChanchaChakra';
+  static String CosmoPower_3Month = 'CosmoPower_3Month';
+  static String CosmoPower_6Month = 'CosmoPower_6Month';
+  static String CosmoPower_12Month = 'CosmoPower_12Month';
+  static String DeactivateAccount = 'DeactivateAccount';
+
+  static const googlePlaceAutoCompleteApi =
+      'https://maps.googleapis.com/maps/api/place/autocomplete/json';
+}
