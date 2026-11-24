@@ -435,7 +435,7 @@ class _HomePageState extends State<HomePage> {
             future: _reports,
             builder: (c, s) {
               final l = s.data ?? [];
-              final gen = l.where((e) => !e.ready && !e.failed).length;
+              final gen = l.where((e) => e.pending).length;
               final ready = l.where((e) => e.ready).length;
               return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('REPORTS', style: CkText.label),

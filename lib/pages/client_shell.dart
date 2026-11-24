@@ -193,6 +193,7 @@ class ClientPage extends StatelessWidget {
   final Future<void> Function()? onRefresh;
   final EdgeInsets padding;
   final bool animate;
+  final Widget? floating;
   const ClientPage(
       {super.key,
       required this.title,
@@ -200,6 +201,7 @@ class ClientPage extends StatelessWidget {
       this.isRoot = false,
       this.onRefresh,
       this.animate = true,
+      this.floating,
       this.padding = const EdgeInsets.fromLTRB(14, 0, 14, 120)});
 
   Future<void> _details(BuildContext context) async {
@@ -294,7 +296,13 @@ class ClientPage extends StatelessWidget {
               onSwitch: () => _details(context),
               onMore: () => _menu(context),
             ),
-            Expanded(child: onRefresh == null ? list : RefreshIndicator(onRefresh: onRefresh!, child: list)),
+            Expanded(
+              child: Stack(children: [
+                Positioned.fill(child: onRefresh == null ? list : RefreshIndicator(onRefresh: onRefresh!, child: list)),
+                if (floating != null)
+                  Positioned(right: 16, bottom: 104 + MediaQuery.of(context).padding.bottom, child: floating!),
+              ]),
+            ),
           ]),
         ),
       ),

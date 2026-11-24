@@ -60,8 +60,6 @@ final kWorkspaceModules = <String, WModule>{
   'power': WModule('power', 'Power', 'BluePrint', WSize.s, (m, s) => _BarsW(m, s, flavor: false), () => const StrengthPage(flavor: false)),
   'flavor': WModule('flavor', 'Flavor', 'BluePrint', WSize.s, (m, s) => _BarsW(m, s, flavor: true), () => const StrengthPage(flavor: true)),
   'transit': WModule('transit', 'Transit', 'Trajectory', WSize.w, (m, s) => _TransitW(m, s), () => const TransitPage()),
-  'vibes': WModule('vibes', 'GRAH Vibes', 'Trajectory', WSize.w, (m, s) => const _PendingW('GRAH Vibes', 'Monthly vibes for each GRAH'), () => const _PendingPage('GRAH Vibes', 'Monthly vibes for each GRAH')),
-  'intensity': WModule('intensity', 'GRAH Intensity', 'Trajectory', WSize.w, (m, s) => const _PendingW('GRAH Intensity', 'Daily intensity of each GRAH'), () => const _PendingPage('GRAH Intensity', 'Daily intensity of each GRAH')),
   'sentiments': WModule('sentiments', 'Sentiments', 'Predictions', WSize.w, (m, s) => _SentimentsW(m, s), () => const SentimentsPage()),
 };
 
@@ -81,8 +79,7 @@ List<WItem> _defaultLayout(String name) {
         WItem('power', WSize.s),
         WItem('flavor', WSize.s),
         WItem('transit', WSize.w),
-        WItem('vibes', WSize.w),
-        WItem('intensity', WSize.w),
+        WItem('sentiments', WSize.w),
       ];
   }
 }
@@ -217,10 +214,17 @@ class _WorkspacePageState extends State<WorkspacePage> {
     if (dy != 0) pos.jumpTo((pos.pixels + dy).clamp(pos.minScrollExtent, pos.maxScrollExtent));
   }
 
+  DateTime _lastSwap = DateTime(0);
+
   void _moveTo(Offset p, List<Rect> rects) {
     if (_dragging == null) return;
+    if (DateTime.now().difference(_lastSwap) < const Duration(milliseconds: 280)) return;
     for (var i = 0; i < rects.length; i++) {
-      if (i != _dragging && rects[i].contains(p)) {
+      // Only swap once the finger is past the middle of the target tile, so
+      // the order doesn't flip back and forth on the boundary.
+      final core = rects[i].deflate(rects[i].shortestSide * .22);
+      if (i != _dragging && core.contains(p)) {
+        _lastSwap = DateTime.now();
         final it = _items.removeAt(_dragging!);
         _items.insert(i, it);
         _dragging = i;
@@ -257,6 +261,24 @@ class _WorkspacePageState extends State<WorkspacePage> {
       title: 'Workspace',
       isRoot: true,
       animate: false,
+      floating: _edit && _items.isNotEmpty
+          ? Pressable(
+              onTap: _add,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+                decoration: BoxDecoration(
+                  color: CkColors.cyan,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: const [BoxShadow(color: Color(0x665CE1FF), blurRadius: 22, offset: Offset(0, 8))],
+                ),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.add_rounded, color: Color(0xFF06204F), size: 20),
+                  SizedBox(width: 6),
+                  Text('Add module', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF06204F))),
+                ]),
+              ),
+            )
+          : null,
       onRefresh: () async {
         ClientData.of(mId).chart(refresh: true);
         ClientData.of(mId).shadbal(refresh: true);
@@ -280,8 +302,7 @@ class _WorkspacePageState extends State<WorkspacePage> {
               ),
             ),
             if (_edit) ...[
-              _Chip('+ Add', onTap: _add),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               _Chip('Done', filled: true, onTap: () {
                 _save();
                 workspaceEditing.value = false;
@@ -292,7 +313,7 @@ class _WorkspacePageState extends State<WorkspacePage> {
         if (_edit)
           Padding(
             padding: const EdgeInsets.only(top: 10),
-            child: Text('HOLD & DRAG TO MOVE · DRAG THE CYAN CORNER TO RESIZE · − TO REMOVE', style: CkText.label.copyWith(fontSize: 9.5)),
+            child: Text('HOLD TO MOVE · DRAG CORNER TO RESIZE', style: CkText.label.copyWith(fontSize: 9.5)),
           ),
         const SizedBox(height: 12),
         LayoutBuilder(builder: (ctx, box) {
@@ -316,8 +337,7 @@ class _WorkspacePageState extends State<WorkspacePage> {
             height: h,
             child: Stack(clipBehavior: Clip.none, children: [
               for (var i = 0; i < _items.length; i++)
-                if (i != _dragging)
-                  AnimatedPositioned(
+                AnimatedPositioned(
                     key: ValueKey(_items[i].id),
                     duration: const Duration(milliseconds: 320),
                     curve: kEase,
@@ -325,7 +345,13 @@ class _WorkspacePageState extends State<WorkspacePage> {
                     top: rects[i].top,
                     width: rects[i].width,
                     height: rects[i].height,
-                    child: _tile(i, mId, rects),
+                    // The tile being dragged stays in the tree as a faded
+                    // placeholder, so its gesture recognizer keeps tracking.
+                    child: AnimatedOpacity(
+                      duration: CkMotion.fast,
+                      opacity: i == _dragging ? .22 : 1,
+                      child: _tile(i, mId, rects),
+                    ),
                   ),
               if (_resizing != null && _resizeRect != null)
                 Positioned.fromRect(
@@ -620,13 +646,114 @@ class _Loading extends StatelessWidget {
   Widget build(BuildContext context) => const Padding(padding: EdgeInsets.only(top: 4), child: Skeleton(height: double.infinity, radius: 10));
 }
 
+// Shaped skeletons: each one mirrors the module it stands in for.
+
+Widget _skelCircle() => LayoutBuilder(builder: (c, b) {
+      final d = math.min(b.maxWidth, b.maxHeight) * .92;
+      return Center(child: Skeleton(width: d, height: d, radius: d / 2));
+    });
+
+Widget _skelPill() => const Skeleton(height: 46, radius: 11);
+
+Widget _skelKundli(WSize size) {
+  switch (size) {
+    case WSize.s:
+      return _skelCircle();
+    case WSize.w:
+      return Row(children: [
+        Expanded(child: _skelCircle()),
+        const SizedBox(width: 10),
+        Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_skelPill(), _skelPill(), _skelPill()])),
+      ]);
+    case WSize.t:
+      return Column(children: [
+        Expanded(child: _skelCircle()),
+        for (var i = 0; i < 3; i++) Padding(padding: const EdgeInsets.only(top: 6), child: _skelPill()),
+      ]);
+    case WSize.l:
+      return Column(children: [
+        Expanded(child: _skelCircle()),
+        const SizedBox(height: 8),
+        Row(children: [
+          for (var i = 0; i < 3; i++) ...[if (i > 0) const SizedBox(width: 6), Expanded(child: _skelPill())]
+        ]),
+      ]);
+  }
+}
+
+Widget _skelRows(int n, {bool twoCols = false, bool mid = true}) {
+  Widget col(int k) => Column(children: [
+        for (var i = 0; i < k; i++)
+          Expanded(
+            child: Row(children: [
+              const Skeleton(width: 26, height: 10, radius: 4),
+              const SizedBox(width: 12),
+              if (mid) const Expanded(child: Align(alignment: Alignment.centerLeft, child: Skeleton(width: 54, height: 9, radius: 4))) else const Spacer(),
+              const Skeleton(width: 40, height: 10, radius: 4),
+            ]),
+          ),
+      ]);
+  if (!twoCols) return col(n);
+  return Row(children: [Expanded(child: col((n + 1) ~/ 2)), const SizedBox(width: 14), Expanded(child: col(n ~/ 2))]);
+}
+
+Widget _skelBars() => LayoutBuilder(builder: (c, b) {
+      const hs = [.55, .8, .4, .95, .6, .7, .35, .85, .5];
+      return Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        for (final h in hs)
+          Expanded(
+            child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+              Skeleton(width: 8, height: math.max(6, (b.maxHeight - 18) * h), radius: 3),
+              const SizedBox(height: 6),
+              const Skeleton(width: 12, height: 7, radius: 3),
+            ]),
+          ),
+      ]);
+    });
+
+Widget _skelSentiments() => LayoutBuilder(builder: (c, b) {
+      final mid = (b.maxHeight - 14) / 2;
+      return Column(children: [
+        SizedBox(
+          height: mid * 2,
+          child: Row(children: [
+            for (var i = 0; i < 30; i++)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: .8),
+                  child: Column(children: [
+                    SizedBox(
+                        height: mid,
+                        child: Align(
+                            alignment: Alignment.bottomCenter,
+                            child: i % 3 != 2 ? Skeleton(height: (mid - 4) * (.3 + (i * 37 % 60) / 100), radius: 2) : null)),
+                    SizedBox(
+                        height: mid,
+                        child: Align(
+                            alignment: Alignment.topCenter,
+                            child: i % 3 == 2 ? Skeleton(height: (mid - 4) * (.25 + (i * 23 % 50) / 100), radius: 2) : null)),
+                  ]),
+                ),
+              ),
+          ]),
+        ),
+        const SizedBox(height: 4),
+        const Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Skeleton(width: 10, height: 7, radius: 3),
+          Skeleton(width: 10, height: 7, radius: 3),
+          Skeleton(width: 10, height: 7, radius: 3),
+          Skeleton(width: 10, height: 7, radius: 3),
+        ]),
+      ]);
+    });
+
 Widget _fail() => const Center(child: Text('Couldn\'t load', style: CkText.muted));
 
-Widget _future<T>(Future<T> f, Widget Function(T) b) => FutureBuilder<T>(
+Widget _future<T>(Future<T> f, Widget Function(T) b, {Widget? skel}) => FutureBuilder<T>(
       future: f,
       builder: (c, s) {
         if (s.hasError) return _fail();
-        if (!s.hasData) return const _Loading();
+        if (!s.hasData) return skel ?? const _Loading();
         return b(s.data as T);
       },
     );
@@ -675,7 +802,7 @@ class _KundliW extends StatelessWidget {
         const _WHead('CosmoKundli'),
         const SizedBox(height: 6),
         Expanded(
-          child: _future<List<GrahPos>>(ClientData.of(mId).chart(), (planets) {
+          child: _future<List<GrahPos>>(ClientData.of(mId).chart(), skel: _skelKundli(size), (planets) {
             GrahPos? f(String id) => planets.where((e) => e.id == id).firstOrNull;
             final pills = [_pill('Sun', f('Su')), _pill('Moon', f('Mo')), _pill('Lagna', f('As'))];
             final chart = KundliChart(planets);
@@ -733,7 +860,7 @@ class _DegreeW extends StatelessWidget {
         const _WHead('Degree'),
         const SizedBox(height: 6),
         Expanded(
-          child: _future<List<GrahPos>>(ClientData.of(mId).chart(), (l) {
+          child: _future<List<GrahPos>>(ClientData.of(mId).chart(), skel: _skelRows(10, twoCols: size == WSize.w, mid: size != WSize.s), (l) {
             final ps = _ordered(l);
             if (size == WSize.w) {
               final a = ps.take(5).toList(), b = ps.skip(5).toList();
@@ -761,7 +888,7 @@ class _BarsW extends StatelessWidget {
       _WHead(flavor ? 'Flavor' : 'Power'),
       const SizedBox(height: 8),
       Expanded(
-        child: _future<Map<String, double>>(ClientData.of(mId).shadbal(), (m) {
+        child: _future<Map<String, double>>(ClientData.of(mId).shadbal(), skel: _skelBars(), (m) {
           final ids = kGrahOrder.where((id) => id != 'As' && m.containsKey(id)).toList();
           final maxV = m.values.fold<double>(1, math.max);
           return LayoutBuilder(builder: (c, box) {
@@ -845,10 +972,11 @@ class _TransitW extends StatelessWidget {
       _WHead('Transit', trailing: Text('● ${DateFormat('HH:mm').format(now)}', style: CkText.mono(10.5, color: CkColors.cyan))),
       const SizedBox(height: 6),
       Expanded(
-        child: _future<List<GrahPos>>(ClientData.of(mId).transit(now), (t) {
+        child: _future<List<GrahPos>>(ClientData.of(mId).transit(now),
+            skel: size == WSize.l ? _skelCircle() : size == WSize.s ? _skelRows(5, mid: false) : _skelRows(10, twoCols: size == WSize.w), (t) {
           final ps = _ordered(t);
           if (size == WSize.l) {
-            return _future<List<GrahPos>>(ClientData.of(mId).chart(), (b) => Center(child: KundliChart(b, transit: t)));
+            return _future<List<GrahPos>>(ClientData.of(mId).chart(), skel: _skelCircle(), (b) => Center(child: KundliChart(b, transit: t)));
           }
           if (size == WSize.s) {
             return Column(children: [for (final p in ps.where((e) => const ['Su', 'Mo', 'Ju', 'Ra', 'Ke'].contains(e.id))) _row(p, rashi: false)]);
@@ -878,76 +1006,74 @@ class _SentimentsW extends StatelessWidget {
       _WHead('Sentiments', trailing: Text(DateFormat('MMM yyyy').format(now).toUpperCase(), style: CkText.mono(10.5, color: CkColors.cyan))),
       const SizedBox(height: 8),
       Expanded(
-        child: _future<List<MapEntry<DateTime, double>>>(ClientData.of(mId).sentiments(DateTime(now.year, now.month)), (l) {
+        child: _future<List<MapEntry<DateTime, double>>>(ClientData.of(mId).sentiments(DateTime(now.year, now.month)), skel: _skelSentiments(), (l) {
           if (l.isEmpty) return const Center(child: Text('No data for this month', style: CkText.muted));
           final maxAbs = l.map((e) => e.value.abs()).fold<double>(1, math.max);
           return LayoutBuilder(builder: (c, box) {
-            final mid = box.maxHeight / 2;
+            const lab = 14.0;
+            final mid = (box.maxHeight - lab) / 2;
+            final n = l.length;
+            final colW = box.maxWidth / n;
+            final todayIdx = l.indexWhere((e) => e.key.year == now.year && e.key.month == now.month && e.key.day == now.day);
+            final marks = [for (var i = 0; i < n; i++) if (l[i].key.day == 1 || l[i].key.day % 5 == 0) i];
             return Stack(children: [
               Positioned(left: 0, right: 0, top: mid, child: Container(height: 1, color: const Color(0x338CBEFF))),
-              Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                for (final e in l)
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: .8),
-                      child: Column(children: [
-                        SizedBox(
-                          height: mid,
-                          child: Align(
-                            alignment: Alignment.bottomCenter,
-                            child: e.value > 0
-                                ? Container(height: (mid - 4) * e.value / maxAbs, decoration: BoxDecoration(color: const Color(0xFF5EE38A), borderRadius: BorderRadius.circular(2)))
-                                : null,
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                height: mid * 2,
+                child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  for (final e in l)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: .8),
+                        child: Column(children: [
+                          SizedBox(
+                            height: mid,
+                            child: Align(
+                              alignment: Alignment.bottomCenter,
+                              child: e.value > 0
+                                  ? Container(height: (mid - 4) * e.value / maxAbs, decoration: BoxDecoration(color: const Color(0xFF5EE38A), borderRadius: BorderRadius.circular(2)))
+                                  : null,
+                            ),
                           ),
-                        ),
-                        SizedBox(
-                          height: mid,
-                          child: Align(
-                            alignment: Alignment.topCenter,
-                            child: e.value < 0
-                                ? Container(height: (mid - 4) * -e.value / maxAbs, decoration: BoxDecoration(color: const Color(0xFFF59E0B), borderRadius: BorderRadius.circular(2)))
-                                : null,
+                          SizedBox(
+                            height: mid,
+                            child: Align(
+                              alignment: Alignment.topCenter,
+                              child: e.value < 0
+                                  ? Container(height: (mid - 4) * -e.value / maxAbs, decoration: BoxDecoration(color: const Color(0xFFF59E0B), borderRadius: BorderRadius.circular(2)))
+                                  : null,
+                            ),
                           ),
-                        ),
-                      ]),
+                        ]),
+                      ),
                     ),
-                  ),
-              ]),
+                ]),
+              ),
+              if (todayIdx >= 0)
+                Positioned(
+                  left: colW * todayIdx + colW / 2 - .75,
+                  top: 0,
+                  bottom: lab,
+                  child: Container(width: 1.5, color: CkColors.cyan),
+                ),
+              for (final i in marks)
+                Positioned(
+                  left: (colW * i + colW / 2 - 10).clamp(0.0, box.maxWidth - 20),
+                  bottom: 0,
+                  width: 20,
+                  child: Text('${l[i].key.day}',
+                      textAlign: TextAlign.center,
+                      style: CkText.mono(9, color: i == todayIdx ? CkColors.cyan : CkColors.labelMono)),
+                ),
             ]);
           });
         }),
       ),
     ]);
   }
-}
-
-class _PendingW extends StatelessWidget {
-  final String title;
-  final String what;
-  const _PendingW(this.title, this.what);
-  @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _WHead(title),
-        Expanded(
-          child: Center(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Text('COMING SOON', style: CkText.label),
-              const SizedBox(height: 4),
-              Text(what, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
-            ]),
-          ),
-        ),
-      ]);
-}
-
-class _PendingPage extends StatelessWidget {
-  final String title;
-  final String what;
-  const _PendingPage(this.title, this.what);
-  @override
-  Widget build(BuildContext context) => ClientPage(title: title, children: [
-        Glass(padding: const EdgeInsets.all(16), height: 220, child: _PendingW(title, what)),
-      ]);
 }
 
 /// Rendered chart reused inside widgets (keeps SvgPicture import used here).

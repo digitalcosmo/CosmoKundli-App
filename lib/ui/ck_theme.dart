@@ -220,6 +220,22 @@ class CkTheme {
         backgroundColor: CkColors.navySheet,
         surfaceTintColor: Colors.transparent,
         headerBackgroundColor: CkColors.navy,
+        headerForegroundColor: CkColors.text,
+        dayForegroundColor: WidgetStateProperty.resolveWith((st) => st.contains(WidgetState.selected)
+            ? const Color(0xFF06204F)
+            : st.contains(WidgetState.disabled)
+                ? CkColors.textDim
+                : CkColors.text),
+        dayBackgroundColor: WidgetStateProperty.resolveWith((st) => st.contains(WidgetState.selected) ? CkColors.cyan : null),
+        dayOverlayColor: const WidgetStatePropertyAll(CkColors.cyanTint),
+        todayForegroundColor: WidgetStateProperty.resolveWith((st) => st.contains(WidgetState.selected) ? const Color(0xFF06204F) : CkColors.cyan),
+        todayBackgroundColor: WidgetStateProperty.resolveWith((st) => st.contains(WidgetState.selected) ? CkColors.cyan : null),
+        todayBorder: const BorderSide(color: CkColors.cyan),
+        yearForegroundColor: WidgetStateProperty.resolveWith((st) => st.contains(WidgetState.selected) ? const Color(0xFF06204F) : CkColors.text),
+        yearBackgroundColor: WidgetStateProperty.resolveWith((st) => st.contains(WidgetState.selected) ? CkColors.cyan : null),
+        dividerColor: CkColors.panelStroke,
+        cancelButtonStyle: TextButton.styleFrom(foregroundColor: CkColors.textSecondary),
+        confirmButtonStyle: TextButton.styleFrom(foregroundColor: CkColors.cyan),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
           side: const BorderSide(color: CkColors.glassStroke),
@@ -227,6 +243,17 @@ class CkTheme {
       ),
       timePickerTheme: TimePickerThemeData(
         backgroundColor: CkColors.navySheet,
+        dialBackgroundColor: CkColors.navy,
+        dialHandColor: CkColors.cyan,
+        dialTextColor: WidgetStateColor.resolveWith((st) => st.contains(WidgetState.selected) ? const Color(0xFF06204F) : CkColors.text),
+        hourMinuteColor: WidgetStateColor.resolveWith((st) => st.contains(WidgetState.selected) ? CkColors.cyanTint : CkColors.field),
+        hourMinuteTextColor: WidgetStateColor.resolveWith((st) => st.contains(WidgetState.selected) ? CkColors.cyan : CkColors.text),
+        dayPeriodColor: CkColors.cyanTint,
+        dayPeriodTextColor: WidgetStateColor.resolveWith((st) => st.contains(WidgetState.selected) ? CkColors.cyan : CkColors.textSecondary),
+        dayPeriodBorderSide: const BorderSide(color: CkColors.cyanStroke),
+        entryModeIconColor: CkColors.cyan,
+        cancelButtonStyle: TextButton.styleFrom(foregroundColor: CkColors.textSecondary),
+        confirmButtonStyle: TextButton.styleFrom(foregroundColor: CkColors.cyan),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
           side: const BorderSide(color: CkColors.glassStroke),
