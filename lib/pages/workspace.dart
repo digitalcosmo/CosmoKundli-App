@@ -765,12 +765,6 @@ Widget _grahLabel(GrahPos p, {bool retroOnLabel = true, double size = 12.5}) => 
       if (retroOnLabel && p.retro) const RetroBadge(),
     ]);
 
-String fmtDegMin(double d) {
-  final deg = d.floor();
-  var min = ((d - deg) * 60).floor();
-  if (min > 59) min = 59;
-  return '${deg.toString().padLeft(2, '0')}°${min.toString().padLeft(2, '0')}′';
-}
 
 List<GrahPos> _ordered(List<GrahPos> l) {
   final m = {for (final p in l) p.id: p};
@@ -881,72 +875,21 @@ class _BarsW extends StatelessWidget {
   final WSize size;
   final bool flavor;
   const _BarsW(this.mId, this.size, {required this.flavor});
+  static const _power = ['Su', 'Mo', 'Ra', 'Ke', 'Ju', 'Sa', 'Ma', 'Ve', 'Me'];
+  static const _flavor = ['Su', 'Mo', 'Ju', 'Sa', 'Ma', 'Ve', 'Me'];
   @override
-  Widget build(BuildContext context) {
-    final col = flavor ? const Color(0xFFF5B66B) : const Color(0xFF8EEBFF);
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      _WHead(flavor ? 'Flavor' : 'Power'),
-      const SizedBox(height: 8),
-      Expanded(
-        child: _future<Map<String, double>>(ClientData.of(mId).shadbal(), skel: _skelBars(), (m) {
-          final ids = kGrahOrder.where((id) => id != 'As' && m.containsKey(id)).toList();
-          final maxV = m.values.fold<double>(1, math.max);
-          return LayoutBuilder(builder: (c, box) {
-            final barW = size.cols == 2 ? 14.0 : 8.0;
-            return CustomPaint(
-              painter: _GridPainter(lines: size.rows == 2 ? 5 : 3),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  for (var i = 0; i < ids.length; i++)
-                    Expanded(
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0, end: 1),
-                        duration: Duration(milliseconds: 700 + i * 40),
-                        curve: kEase,
-                        builder: (c, t, _) {
-                          final v = m[ids[i]]!;
-                          final pct = (v / maxV).clamp(0.0, 1.0);
-                          return Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-                            Text(v.round().toString(), style: CkText.mono(9, color: CkColors.textSecondary)),
-                            const SizedBox(height: 3),
-                            Container(
-                              width: barW,
-                              height: math.max(2, (box.maxHeight - 34) * pct * t),
-                              decoration: BoxDecoration(color: col, borderRadius: BorderRadius.circular(3)),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(ids[i], style: CkText.mono(9, color: CkColors.labelMono)),
-                          ]);
-                        },
-                      ),
-                    ),
-                ],
-              ),
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _WHead(flavor ? 'Flavor' : 'Power'),
+        const SizedBox(height: 8),
+        Expanded(
+          child: _future<Map<String, double>>(ClientData.of(mId).shadbal(), skel: _skelBars(), (m) {
+            final v = [for (final id in flavor ? _flavor : _power) if (m[id] != null) MapEntry(id, m[id]!)];
+            return LayoutBuilder(
+              builder: (c, box) => GrahBarChart(values: v, height: math.max(40, box.maxHeight - 24), axis: size != WSize.s),
             );
-          });
-        }),
-      ),
-    ]);
-  }
-}
-
-class _GridPainter extends CustomPainter {
-  final int lines;
-  _GridPainter({this.lines = 3});
-  @override
-  void paint(Canvas canvas, Size s) {
-    final p = Paint()
-      ..color = const Color(0x148CBEFF)
-      ..strokeWidth = 1;
-    for (var i = 0; i <= lines; i++) {
-      final y = (s.height - 18) * i / lines;
-      canvas.drawLine(Offset(0, y), Offset(s.width, y), p);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_GridPainter old) => old.lines != lines;
+          }),
+        ),
+      ]);
 }
 
 class _TransitW extends StatelessWidget {
@@ -1034,7 +977,7 @@ class _SentimentsW extends StatelessWidget {
                             child: Align(
                               alignment: Alignment.bottomCenter,
                               child: e.value > 0
-                                  ? Container(height: (mid - 4) * e.value / maxAbs, decoration: BoxDecoration(color: const Color(0xFF5EE38A), borderRadius: BorderRadius.circular(2)))
+                                  ? Container(height: (mid - 4) * e.value / maxAbs, decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Color(0xFF73F4C4), Color(0xFF10B981)]), borderRadius: BorderRadius.circular(2)))
                                   : null,
                             ),
                           ),
@@ -1043,7 +986,7 @@ class _SentimentsW extends StatelessWidget {
                             child: Align(
                               alignment: Alignment.topCenter,
                               child: e.value < 0
-                                  ? Container(height: (mid - 4) * -e.value / maxAbs, decoration: BoxDecoration(color: const Color(0xFFF59E0B), borderRadius: BorderRadius.circular(2)))
+                                  ? Container(height: (mid - 4) * -e.value / maxAbs, decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFF6B8B8), Color(0xFFEF4444)]), borderRadius: BorderRadius.circular(2)))
                                   : null,
                             ),
                           ),

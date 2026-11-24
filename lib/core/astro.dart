@@ -185,3 +185,11 @@ Zone zoneOf(double v) {
   }
   return kZones.last;
 }
+
+/// 27°14′ style degree.
+String fmtDegMin(double d) {
+  final deg = d.floor();
+  var min = ((d - deg) * 60).floor();
+  if (min > 59) min = 59;
+  return '${deg.toString().padLeft(2, '0')}°${min.toString().padLeft(2, '0')}′';
+}

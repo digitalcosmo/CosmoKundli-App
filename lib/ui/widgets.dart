@@ -836,23 +836,53 @@ class DayValue {
 /// Daily bar chart that shows ~7 days and scrolls sideways, with a fixed
 /// y-axis grid and % values. [signed] = −100..+100 (Sentiments);
 /// otherwise 0..100 coloured by the 7 zones (Situations).
-class DailyBarChart extends StatelessWidget {
+class DailyBarChart extends StatefulWidget {
   final List<DayValue> days;
   final bool signed;
   final int? selected;
+  final int? today;
   final ValueChanged<int>? onSelect;
   final double height;
-  const DailyBarChart({super.key, required this.days, required this.signed, this.selected, this.onSelect, this.height = 240});
+  const DailyBarChart({super.key, required this.days, required this.signed, this.selected, this.today, this.onSelect, this.height = 240});
+  @override
+  State<DailyBarChart> createState() => DailyBarChartState();
+}
 
-  List<double> get ticks => signed ? [100, 50, 0, -50, -100] : [100, 85, 65, 55, 45, 35, 15, 0];
-  double _y(double t) => signed ? (100 - t) / 200 * height : (100 - t) / 100 * height;
-  String _lab(double t) => signed ? '${t > 0 ? '+' : ''}${t.round()}%' : '${t.round()}%';
+class DailyBarChartState extends State<DailyBarChart> {
+  final _sc = ScrollController();
+  double _colW = 44;
+  double _viewW = 300;
+
+  List<double> get ticks => widget.signed ? [100, 50, 0, -50, -100] : [100, 85, 65, 55, 45, 35, 15, 0];
+  double get height => widget.height;
+  double _y(double t) => widget.signed ? (100 - t) / 200 * height : (100 - t) / 100 * height;
+  String _lab(double t) => widget.signed ? '${t > 0 ? '+' : ''}${t.round()}%' : '${t.round()}%';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => scrollTo(widget.selected ?? widget.today, animate: false));
+  }
+
+  @override
+  void dispose() {
+    _sc.dispose();
+    super.dispose();
+  }
+
+  /// Centre day [i] in view.
+  void scrollTo(int? i, {bool animate = true}) {
+    if (i == null || !_sc.hasClients) return;
+    final x = (i * _colW - (_viewW - _colW) / 2).clamp(0.0, _sc.position.maxScrollExtent);
+    animate ? _sc.animateTo(x, duration: CkMotion.base, curve: CkMotion.ease) : _sc.jumpTo(x);
+  }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (c, box) {
       const axisW = 42.0;
-      final colW = ((box.maxWidth - axisW) / 7).clamp(38.0, 60.0);
+      _viewW = box.maxWidth - axisW;
+      _colW = (_viewW / 7).clamp(38.0, 60.0);
       return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SizedBox(
           width: axisW,
@@ -862,7 +892,7 @@ class DailyBarChart extends StatelessWidget {
               Positioned(
                 top: _y(t) - 7,
                 right: 6,
-                child: Text(_lab(t), style: const TextStyle(fontSize: 10, color: CkColors.textMuted)),
+                child: Text(_lab(t), style: CkText.mono(9.5, color: CkColors.labelMono)),
               ),
           ]),
         ),
@@ -873,16 +903,17 @@ class DailyBarChart extends StatelessWidget {
                 top: _y(t),
                 left: 0,
                 right: 0,
-                child: Container(height: 1, color: Colors.white.withOpacity(signed && t == 0 ? .32 : .1)),
+                child: Container(height: 1, color: Colors.white.withValues(alpha: widget.signed && t == 0 ? .32 : .1)),
               ),
             SizedBox(
               height: height + 40,
               child: ListView.builder(
+                controller: _sc,
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
-                itemCount: days.length,
-                itemExtent: colW,
-                itemBuilder: (c, i) => _bar(i, colW),
+                itemCount: widget.days.length,
+                itemExtent: _colW,
+                itemBuilder: (c, i) => _bar(i, _colW),
               ),
             ),
           ]),
@@ -892,28 +923,36 @@ class DailyBarChart extends StatelessWidget {
   }
 
   Widget _bar(int i, double w) {
-    final d = days[i];
+    final d = widget.days[i];
+    final signed = widget.signed;
     final v = d.value.clamp(signed ? -100.0 : 0.0, 100.0);
-    final sel = selected == i;
+    final sel = widget.selected == i;
+    final today = widget.today == i;
     final up = v >= 0;
     final h = signed ? v.abs() / 100 * height / 2 : v / 100 * height;
     final color = signed ? null : zoneOf(v).color;
+    // Software: .sps-bar--pos linear-gradient(0deg,#73F4C4,#10B981); .sps-bar--neg linear-gradient(0deg,#EF4444,#F6B8B8)
     final grad = signed
         ? LinearGradient(
-            begin: up ? Alignment.topCenter : Alignment.bottomCenter,
-            end: up ? Alignment.bottomCenter : Alignment.topCenter,
-            colors: up ? const [Color(0xFF74E2B7), Color(0xFF10B981)] : const [Color(0xFFFF8A8A), Color(0xFFEF4444)],
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: up ? const [Color(0xFF73F4C4), Color(0xFF10B981)] : const [Color(0xFFEF4444), Color(0xFFF6B8B8)],
           )
         : null;
+    final glow = up ? const Color(0xFF10B981) : const Color(0xFFEF4444);
     final label = signed ? '${v > 0 ? '+' : ''}${v.round()}%' : '${v.round()}%';
     final bw = math.max(10.0, w * .46);
     return GestureDetector(
-      onTap: onSelect == null ? null : () => onSelect!(i),
+      onTap: widget.onSelect == null ? null : () => widget.onSelect!(i),
       child: Column(children: [
         Container(
           height: height,
           margin: const EdgeInsets.symmetric(horizontal: 2),
-          decoration: BoxDecoration(color: sel ? Colors.white.withOpacity(.07) : null, borderRadius: BorderRadius.circular(10)),
+          decoration: BoxDecoration(
+            color: today ? CkColors.cyanTint.withValues(alpha: .3) : sel ? Colors.white.withValues(alpha: .07) : null,
+            border: today ? Border.all(color: CkColors.cyanStroke) : null,
+            borderRadius: BorderRadius.circular(10),
+          ),
           child: Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
             Positioned(
               bottom: signed ? (up ? height / 2 : null) : 0,
@@ -926,9 +965,10 @@ class DailyBarChart extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: color,
                   gradient: grad,
+                  boxShadow: today || sel ? [BoxShadow(color: glow.withValues(alpha: .6), blurRadius: 12)] : null,
                   borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(signed && !up ? 2 : 8),
-                    bottom: Radius.circular(signed && !up ? 8 : 2),
+                    top: Radius.circular(signed && !up ? 2 : 6),
+                    bottom: Radius.circular(signed && !up ? 6 : 2),
                   ),
                 ),
               ),
@@ -936,13 +976,13 @@ class DailyBarChart extends StatelessWidget {
             Positioned(
               bottom: signed ? (up ? height / 2 + h + 3 : null) : h + 3,
               top: signed && !up ? height / 2 + h + 3 : null,
-              child: Text(label, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600)),
+              child: Text(label, style: CkText.mono(10, color: Colors.white)),
             ),
           ]),
         ),
         const SizedBox(height: 6),
-        Text('${d.date.day}', style: TextStyle(fontSize: 12, fontWeight: sel ? FontWeight.w600 : FontWeight.w600)),
-        Text(DateFormat('E').format(d.date), style: const TextStyle(fontSize: 10, color: CkColors.textMuted)),
+        Text('${d.date.day}', style: CkText.mono(11.5, color: today ? CkColors.cyan : CkColors.textTertiary)),
+        Text(today ? 'Today' : DateFormat('E').format(d.date), style: TextStyle(fontSize: 10, color: today ? CkColors.cyan : CkColors.textMuted)),
       ]),
     );
   }
@@ -957,7 +997,7 @@ class GrahBarChart extends StatelessWidget {
   static const _ticks = [0, 15, 35, 45, 55, 65, 85, 100];
   @override
   Widget build(BuildContext context) {
-    final axisW = axis ? 28.0 : 0.0;
+    final axisW = axis ? 34.0 : 0.0;
     final top = 18.0;
     final h = height - top;
     return Column(children: [
@@ -973,7 +1013,7 @@ class GrahBarChart extends StatelessWidget {
                   Positioned(
                       bottom: t / 100 * h - 6,
                       right: 4,
-                      child: Text('$t', style: const TextStyle(fontSize: 9.5, color: CkColors.textMuted))),
+                      child: Text('$t%', style: CkText.mono(9, color: CkColors.labelMono))),
               ]),
             ),
           Expanded(

@@ -87,6 +87,7 @@ class _SentimentsPageState extends State<SentimentsPage> {
   DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
   late Future<List<MapEntry<DateTime, double>>> _f = _data.sentiments(_month);
   int? _sel;
+  final _chart = GlobalKey<DailyBarChartState>();
 
   void _setMonth(DateTime m) => setState(() {
         _month = m;
@@ -122,11 +123,11 @@ class _SentimentsPageState extends State<SentimentsPage> {
               return Column(children: [
                 const SizedBox(height: 12),
                 Row(children: [
-                  StatTile('Average', _pct(avg), DateFormat('MMMM').format(_month), color: const Color(0xFFC9B8FF)),
+                  StatTile('Strongest', _pct(best.value), day(best), color: const Color(0xFF10B981)),
                   const SizedBox(width: 7),
-                  StatTile('Best', _pct(best.value), day(best), color: const Color(0xFF74E2B7)),
+                  StatTile('Weakest', _pct(worst.value), day(worst), color: const Color(0xFFEF4444)),
                   const SizedBox(width: 7),
-                  StatTile('Weakest', _pct(worst.value), day(worst), color: const Color(0xFFFF8A8A)),
+                  StatTile('Average', _pct(avg), DateFormat('MMMM').format(_month), color: Colors.white),
                 ]),
                 Glass(
                   margin: const EdgeInsets.only(top: 12),
@@ -136,16 +137,39 @@ class _SentimentsPageState extends State<SentimentsPage> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(14, 0, 6, 10),
                       child: Row(children: [
-                        Text('Sentiments', style: CkText.h(15, w: FontWeight.w600)),
+                        Text('DAILY', style: CkText.label),
                         const Spacer(),
-                        Text('Swipe for more days →', style: CkText.muted.copyWith(fontSize: 11)),
+                        if (todayIdx >= 0)
+                          Pressable(
+                            onTap: () {
+                              setState(() => _sel = todayIdx);
+                              _chart.currentState?.scrollTo(todayIdx);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(borderRadius: BorderRadius.circular(7), border: Border.all(color: CkColors.cyanStroke)),
+                              child: Text('TODAY', style: CkText.mono(10.5, color: CkColors.cyan)),
+                            ),
+                          ),
                       ]),
                     ),
                     DailyBarChart(
+                      key: _chart,
                       days: l.map((e) => DayValue(e.key, e.value)).toList(),
                       signed: true,
                       selected: sel,
+                      today: todayIdx >= 0 ? todayIdx : null,
                       onSelect: (i) => setState(() => _sel = i),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(14, 8, 6, 0),
+                      child: Row(children: [
+                        _Key(Color(0xFF10B981), 'Positive'),
+                        SizedBox(width: 14),
+                        _Key(Color(0xFFEF4444), 'Negative'),
+                        Spacer(),
+                        Text('Drag to scroll ⇆', style: TextStyle(fontSize: 11, color: CkColors.textDim)),
+                      ]),
                     ),
                   ]),
                 ),
@@ -158,7 +182,7 @@ class _SentimentsPageState extends State<SentimentsPage> {
                       Text(DateFormat('EEE, d MMM').format(l[sel].key), style: CkText.h(15, w: FontWeight.w600)),
                       const Spacer(),
                       Text(_pct(l[sel].value),
-                          style: CkText.h(18, color: l[sel].value >= 0 ? const Color(0xFF74E2B7) : const Color(0xFFFF8A8A))),
+                          style: CkText.h(18, color: l[sel].value >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444))),
                       const SizedBox(width: 8),
                       Text(l[sel].value >= 0 ? 'Lighter, more confident' : 'Heavier, more unsettled', style: CkText.muted.copyWith(fontSize: 12)),
                     ]),
@@ -173,7 +197,7 @@ class _SentimentsPageState extends State<SentimentsPage> {
                     itemBuilder: (c, i) {
                       final w = weeks[i];
                       final a = w.fold<double>(0, (s, e) => s + e.value) / w.length;
-                      final col = a >= 0 ? const Color(0xFF74E2B7) : const Color(0xFFFF8A8A);
+                      final col = a >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444);
                       return Glass(
                         width: 120,
                         radius: 18,
@@ -200,4 +224,16 @@ class _SentimentsPageState extends State<SentimentsPage> {
           ),
         ],
       );
+}
+
+class _Key extends StatelessWidget {
+  final Color c;
+  final String t;
+  const _Key(this.c, this.t);
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 5),
+        Text(t, style: const TextStyle(fontSize: 11.5, color: CkColors.textSecondary)),
+      ]);
 }

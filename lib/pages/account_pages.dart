@@ -914,22 +914,28 @@ class _CreditsPageState extends State<CreditsPage> {
               }
               return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Glass(
-                  radius: 22,
-                  padding: const EdgeInsets.all(14),
-                  child: Row(children: [
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        const Text('AVAILABLE CREDIT', style: CkText.label),
-                        Text('${r['Remaining_Credit'] ?? '—'}', style: CkText.h(26, color: const Color(0xFFF7A45E))),
-                      ]),
-                    ),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('AVAILABLE', style: CkText.label),
+                    const SizedBox(height: 6),
+                    Text(
+                        num.tryParse('${r['Remaining_Credit']}') == null
+                            ? '—'
+                            : NumberFormat.decimalPattern('en_IN').format(num.parse('${r['Remaining_Credit']}')),
+                        style: CkText.mono(32)),
+                    const SizedBox(height: 2),
+                    const Text('credits', style: TextStyle(fontSize: 12.5, color: CkColors.textSecondary)),
                   ]),
                 ),
                 const SizedBox(height: 12),
                 SizedBox(
                   width: 240,
                   child: Segmented<String>(
-                      values: const ['All', 'Credit', 'Debit'], selected: _filter, height: 38, label: (v) => v, onChanged: (v) => setState(() => _filter = v)),
+                      values: const ['All', 'Debit', 'Credit'],
+                      selected: _filter,
+                      height: 38,
+                      label: (v) => const {'All': 'All', 'Debit': 'Spent', 'Credit': 'Added'}[v]!,
+                      onChanged: (v) => setState(() => _filter = v)),
                 ),
                 if (l.isEmpty) const EmptyBox(icon: Icons.receipt_long_outlined, title: 'No transactions', body: 'Nothing to show yet.'),
                 ...groups.entries.map((g) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -940,7 +946,7 @@ class _CreditsPageState extends State<CreditsPage> {
                         child: Column(
                           children: g.value.asMap().entries.map((e) {
                             final credit = '${e.value['Type']}'.toLowerCase() == 'credit';
-                            final col = credit ? const Color(0xFF74E2B7) : const Color(0xFFFF8A8A);
+                            final col = credit ? const Color(0xFF10B981) : CkColors.textTertiary;
                             return Container(
                               padding: const EdgeInsets.symmetric(vertical: 11),
                               decoration: BoxDecoration(border: e.key == 0 ? null : const Border(top: BorderSide(color: Color(0x14FFFFFF)))),
@@ -953,7 +959,7 @@ class _CreditsPageState extends State<CreditsPage> {
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(child: Text('${e.value['Details'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5))),
-                                Text('${credit ? '+' : '−'}${e.value['Qty'] ?? ''}', style: TextStyle(fontWeight: FontWeight.w600, color: col)),
+                                Text('${credit ? '+' : '−'}${e.value['Qty'] ?? ''}', style: CkText.mono(13.5, color: credit ? const Color(0xFF10B981) : Colors.white)),
                               ]),
                             );
                           }).toList(),

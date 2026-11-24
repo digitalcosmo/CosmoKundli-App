@@ -337,7 +337,7 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(height: 4),
                       if (l != null)
                         Text(
-                          ['Ju', 'Sa', 'Ra'].map((id) => f(id)).whereType<GrahPos>().map((p) => '${kGrahNames[p.id]} in ${rashiName(p.rashi)}${p.retro ? ' (R)' : ''}').join(' · '),
+                          ['Ra', 'Ju', 'Sa'].map((id) => f(id)).whereType<GrahPos>().map((p) => '${kGrahNames[p.id]} in ${rashiName(p.rashi)}${p.retro ? ' (R)' : ''}').join(' · '),
                           style: const TextStyle(fontSize: 12.5, height: 1.4, color: CkColors.textSecondary),
                         ),
                       const SizedBox(height: 8),
@@ -574,6 +574,9 @@ class _SkyNowPageState extends State<SkyNowPage> {
     _set(DateTime(d.year, d.month, d.day, t?.hour ?? _at.hour, t?.minute ?? _at.minute));
   }
 
+  Client? _cmp;
+  Future<List<GrahPos>>? _birth;
+
   Future<void> _compare() async {
     final all = await fetchClients();
     if (!mounted) return;
@@ -600,15 +603,20 @@ class _SkyNowPageState extends State<SkyNowPage> {
         ),
       ),
     );
-    if (c == null) return;
-    Session.open(c);
-    Get.off(() => const ClientShell());
-    workspaceEditing.value = false;
+    if (c == null || !mounted) return;
+    // Stay on Transit: draw this client's birth chart with the transit on it.
+    setState(() {
+      _cmp = c;
+      _birth = ClientData(c.mId).chart();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     const steps = {_Step.h: '1H', _Step.d: '1D', _Step.w: '1W', _Step.m: '1M', _Step.y: '1Y', _Step.y10: '10Y'};
+    final now = DateTime.now();
+    final sameDay = _at.year == now.year && _at.month == now.month && _at.day == now.day;
+    final when = '${sameDay ? 'Today' : DateFormat('d MMM yyyy').format(_at)} · ${DateFormat('HH:mm').format(_at)}';
     return CkScaffold(
       body: SafeArea(
         child: ListView(
@@ -620,49 +628,27 @@ class _SkyNowPageState extends State<SkyNowPage> {
               const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Sky now', style: CkText.h(19)),
+                  Text('Transit', style: CkText.h(19)),
                   const SizedBox(height: 2),
-                  const Text('Transit · no client selected', style: TextStyle(fontSize: 12, color: CkColors.textSecondary)),
+                  Text(_cmp == null ? 'Sky now${Here.name.isEmpty ? '' : ' · ${Here.name}'}' : 'With ${_cmp!.name}\'s chart',
+                      maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
                 ]),
               ),
-            ]),
-            const SizedBox(height: 14),
-            Row(children: [
-              Expanded(
-                child: Pressable(
-                  onTap: _pick,
-                  child: Container(
-                    height: 42,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(color: CkColors.cyanTint, borderRadius: BorderRadius.circular(12), border: Border.all(color: CkColors.cyanStroke)),
-                    child: Row(children: [
-                      const Icon(Icons.calendar_today_outlined, size: 15, color: CkColors.cyan),
-                      const SizedBox(width: 8),
-                      Text(DateFormat('dd-MM-yyyy · HH:mm').format(_at), style: CkText.mono(13)),
-                    ]),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
               Pressable(
-                onTap: () => _set(DateTime.now(), live: true),
+                onTap: _pick,
                 child: Container(
-                  height: 42,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: _live ? CkColors.cyanTint : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _live ? CkColors.cyanStroke : CkColors.panelStroke),
-                  ),
+                  height: 36,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(color: CkColors.orangeTint, borderRadius: BorderRadius.circular(10), border: Border.all(color: CkColors.orangeStroke)),
                   child: Row(children: [
-                    Container(width: 7, height: 7, decoration: BoxDecoration(shape: BoxShape.circle, color: _live ? CkColors.cyan : CkColors.labelMono)),
+                    const Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFFFFD08A)),
                     const SizedBox(width: 6),
-                    Text('LIVE', style: CkText.mono(12, color: _live ? Colors.white : CkColors.textSecondary)),
+                    Text(when, style: CkText.mono(12, color: const Color(0xFFFFD08A))),
                   ]),
                 ),
               ),
             ]),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             FutureBuilder<List<GrahPos>>(
               future: _f,
               builder: (c, s) {
@@ -671,12 +657,18 @@ class _SkyNowPageState extends State<SkyNowPage> {
                   return const Padding(padding: EdgeInsets.all(40), child: Center(child: Text('Add a client first to read the sky.', style: CkText.muted)));
                 }
                 if (t == null) return const SkeletonCard(height: 340);
-                final w = MediaQuery.of(context).size.width - 8;
                 return Column(children: [
-                  SizedBox(
-                    height: w,
-                    child: OverflowBox(minWidth: w, maxWidth: w, minHeight: w, maxHeight: w, child: ZoomChart(child: KundliChart(const [], transit: t))),
+                  Glass(
+                    padding: const EdgeInsets.all(6),
+                    child: Stack(children: [
+                      FutureBuilder<List<GrahPos>>(
+                        future: _birth,
+                        builder: (c, b) => ZoomChart(child: KundliChart(b.data ?? const [], transit: t)),
+                      ),
+                      const Positioned(left: 10, top: 8, child: Text('Pinch to zoom', style: TextStyle(fontSize: 11, color: CkColors.textSecondary))),
+                    ]),
                   ),
+                  const SizedBox(height: 12),
                   Row(children: [
                     for (final e in steps.entries)
                       Expanded(
@@ -686,60 +678,114 @@ class _SkyNowPageState extends State<SkyNowPage> {
                             onTap: () => setState(() => _step = e.key),
                             child: AnimatedContainer(
                               duration: CkMotion.fast,
-                              height: 36,
+                              height: 38,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: _step == e.key ? CkColors.cyanTint : Colors.transparent,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: _step == e.key ? CkColors.cyanStroke : CkColors.panelStroke),
+                                color: _step == e.key ? CkColors.orangeTint : Colors.transparent,
+                                borderRadius: BorderRadius.circular(11),
+                                border: Border.all(color: _step == e.key ? CkColors.orangeStroke : CkColors.panelStroke),
                               ),
-                              child: Text(e.value, style: CkText.mono(12, color: _step == e.key ? Colors.white : CkColors.textSecondary)),
+                              child: Text(e.value, style: CkText.mono(12.5, color: _step == e.key ? const Color(0xFFFFD08A) : CkColors.textTertiary)),
                             ),
                           ),
                         ),
                       ),
                   ]),
                   const SizedBox(height: 8),
-                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    _Arrow(Icons.chevron_left_rounded, () => _set(_shift(-1))),
+                  Row(children: [
+                    Expanded(
+                      child: Pressable(
+                        onTap: () => _set(DateTime.now(), live: true),
+                        child: Glass(
+                          height: 46,
+                          radius: 13,
+                          alignment: Alignment.center,
+                          stroke: _live ? const Color(0x8010B981) : CkColors.panelStroke,
+                          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: _live ? const Color(0xFF10B981) : CkColors.labelMono,
+                                boxShadow: _live ? const [BoxShadow(color: Color(0xFF10B981), blurRadius: 8)] : null,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text('Real time', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                          ]),
+                        ),
+                      ),
+                    ),
                     const SizedBox(width: 8),
-                    _Arrow(Icons.chevron_right_rounded, () => _set(_shift(1))),
+                    Expanded(
+                      flex: 13,
+                      child: Glass(
+                        height: 46,
+                        radius: 13,
+                        child: Row(children: [
+                          IconButton(onPressed: () => _set(_shift(-1)), icon: const Icon(Icons.chevron_left_rounded), tooltip: 'Step back'),
+                          Expanded(child: Text('STEP ${steps[_step]}', textAlign: TextAlign.center, style: CkText.mono(12, color: CkColors.textSecondary))),
+                          IconButton(onPressed: () => _set(_shift(1)), icon: const Icon(Icons.chevron_right_rounded), tooltip: 'Step forward'),
+                        ]),
+                      ),
+                    ),
                   ]),
+                  const SizedBox(height: 10),
+                  Pressable(
+                    onTap: _compare,
+                    child: Glass(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      child: Row(children: [
+                        const Icon(Icons.people_outline_rounded, size: 19, color: CkColors.cyan),
+                        const SizedBox(width: 10),
+                        const Expanded(child: Text('Compare with a client', style: TextStyle(fontSize: 14))),
+                        Text(_cmp == null ? 'Choose ▾' : '${_cmp!.name} ▾', style: const TextStyle(fontSize: 12.5, color: CkColors.textSecondary)),
+                        if (_cmp != null)
+                          GestureDetector(
+                            onTap: () => setState(() {
+                              _cmp = null;
+                              _birth = null;
+                            }),
+                            child: const Padding(padding: EdgeInsets.only(left: 8), child: Icon(Icons.close_rounded, size: 18, color: CkColors.textSecondary)),
+                          ),
+                      ]),
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   Glass(
-                    padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
-                    child: Column(children: [
-                      Row(children: [
-                        SizedBox(width: 60, child: Text('GRAH', style: CkText.label)),
-                        Expanded(child: Text('RASHI', style: CkText.label)),
-                        Text('TRANSIT', style: CkText.label.copyWith(color: const Color(0xFFFFB27A))),
-                      ]),
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('GRAH POSITIONS', style: CkText.label),
+                      const SizedBox(height: 4),
                       for (final id in kGrahOrder)
-                        if (t.any((p) => p.id == id && (id != 'As' || false)))
+                        if (id != 'As' && t.any((p) => p.id == id))
                           () {
                             final p = t.firstWhere((x) => x.id == id);
                             return Container(
                               padding: const EdgeInsets.symmetric(vertical: 9),
-                              decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x1A8CBEFF)))),
+                              decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x1F8CBEFF)))),
                               child: Row(children: [
                                 SizedBox(
-                                  width: 60,
+                                  width: 52,
                                   child: Row(children: [
                                     GrahDot(p.id),
                                     const SizedBox(width: 6),
-                                    Text(p.id, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                    if (p.retro) const RetroBadge(),
+                                    Text(p.id, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                                   ]),
                                 ),
-                                Expanded(child: Text(rashiName(p.rashi), style: const TextStyle(color: CkColors.textSecondary))),
-                                Text(fmtDegMin(p.degIn), style: CkText.mono(13.5)),
+                                Expanded(child: Text(rashiName(p.rashi), style: const TextStyle(fontSize: 13, color: CkColors.textTertiary))),
+                                SizedBox(
+                                  width: 90,
+                                  child: Text(p.nakshatra, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
+                                ),
+                                Text(fmtDegMin(p.degIn), style: CkText.mono(12.5)),
+                                SizedBox(width: 9, child: p.retro ? const RetroBadge() : null),
                               ]),
                             );
                           }(),
                     ]),
                   ),
-                  const SizedBox(height: 14),
-                  GhostButton('Compare with a client', icon: Icons.compare_arrows_rounded, onTap: _compare),
                 ]);
               },
             ),

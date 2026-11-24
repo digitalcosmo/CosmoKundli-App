@@ -215,125 +215,178 @@ class _KundliPageState extends State<KundliPage> {
   @override
   Widget build(BuildContext context) => ClientPage(
         title: 'CosmoKundli',
-        padding: const EdgeInsets.fromLTRB(0, 0, 0, 120),
         children: [
           LoadView<List<GrahPos>>(
             future: _f,
-            builder: (planets) => Column(children: [
-              ZoomChart(child: KundliChart(planets)),
-              const Text('Pinch to zoom · double-tap · long-press to magnify', style: TextStyle(fontSize: 11.5, color: CkColors.textMuted)),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-                child: SunMoonLagna(planets),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 84,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  children: planets
-                      .map((p) => Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Pressable(
-                              onTap: () => showPlanetSheet(context, p),
-                              child: Container(
-                                width: 62,
-                                decoration: BoxDecoration(
-                                    color: CkColors.glassFill,
-                                    borderRadius: BorderRadius.circular(18),
-                                    border: Border.all(color: CkColors.glassStroke)),
-                                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                  Container(
-                                    width: 26,
-                                    height: 26,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      gradient: RadialGradient(center: const Alignment(-.3, -.4), colors: [Colors.white, p.color]),
-                                      boxShadow: [BoxShadow(color: p.color.withOpacity(.45), blurRadius: 12)],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(p.id, style: TextStyle(fontWeight: FontWeight.w600, color: p.color, fontSize: 12)),
-                                  Text('${rashiShort(p.rashi, 2)} ${p.degIn.floor()}°',
-                                      style: const TextStyle(fontSize: 10, color: CkColors.textSecondary)),
+            builder: (planets) {
+              final ordered = [for (final id in kGrahOrder) ...planets.where((p) => p.id == id)];
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Glass(
+                  padding: const EdgeInsets.all(6),
+                  child: Stack(children: [
+                    ZoomChart(child: KundliChart(planets)),
+                    const Positioned(
+                      right: 10,
+                      top: 8,
+                      child: Text('Pinch to zoom · tap a GRAH below', style: TextStyle(fontSize: 11, color: CkColors.textSecondary)),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 10),
+                SunMoonLagna(planets),
+                Glass(
+                  margin: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+                      child: Row(children: [
+                        Expanded(child: Text('GRAH IN RASHI · TAP FOR DETAILS', style: CkText.label)),
+                        GestureDetector(
+                          onTap: () => pushModule(context, const CoordinatesPage()),
+                          child: const Text('Coordinates ›', style: TextStyle(fontSize: 12.5, color: CkColors.cyan)),
+                        ),
+                      ]),
+                    ),
+                    for (var i = 0; i < ordered.length; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Pressable(
+                          scale: .98,
+                          onTap: () => showPlanetSheet(context, ordered[i], all: ordered),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                            decoration: BoxDecoration(color: CkColors.field, borderRadius: BorderRadius.circular(11), border: Border.all(color: CkColors.panelStroke)),
+                            child: Row(children: [
+                              SizedBox(
+                                width: 54,
+                                child: Row(children: [
+                                  GrahDot(ordered[i].id),
+                                  const SizedBox(width: 6),
+                                  Text(ordered[i].id, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                  if (ordered[i].retro) const RetroBadge(),
                                 ]),
                               ),
-                            ),
-                          ))
-                      .toList(),
+                              Expanded(child: Text(rashiName(ordered[i].rashi), style: const TextStyle(fontSize: 13, color: CkColors.textTertiary))),
+                              Text(fmtDegMin(ordered[i].degIn), style: CkText.mono(12.5)),
+                              const SizedBox(width: 6),
+                              const Icon(Icons.chevron_right_rounded, size: 18, color: CkColors.labelMono),
+                            ]),
+                          ),
+                        ),
+                      ),
+                  ]),
                 ),
-              ),
-            ]),
+              ]);
+            },
           ),
         ],
       );
 }
 
-Future<void> showPlanetSheet(BuildContext context, GrahPos p) async {
+Future<void> showPlanetSheet(BuildContext context, GrahPos p, {List<GrahPos>? all}) async {
   Map<String, double> bal = {};
   try {
     bal = await _data.shadbal();
   } catch (_) {}
   if (!context.mounted) return;
+  final list = all ?? [p];
   showModalBottomSheet(
     useRootNavigator: true,
     context: context,
-    builder: (c) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Center(child: Container(width: 44, height: 5, decoration: BoxDecoration(color: CkColors.glassStroke, borderRadius: BorderRadius.circular(3)))),
-          const SizedBox(height: 14),
-          Row(children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(center: const Alignment(-.3, -.4), colors: [Colors.white, p.color]),
-                boxShadow: [BoxShadow(color: p.color.withOpacity(.55), blurRadius: 26)],
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Text('${p.name} ', style: CkText.h(22)),
-                  Text(p.id, style: CkText.h(22, color: p.color)),
-                  if (p.retro) const RetroBadge(),
-                ]),
-                Text('${rashiName(p.rashi)} ${fmtDeg(p.degIn)} · ${p.longitude.toStringAsFixed(2)}°', style: CkText.muted.copyWith(fontSize: 13)),
-              ]),
-            ),
-          ]),
-          const SizedBox(height: 16),
-          GridView.count(
-            crossAxisCount: 3,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 1.9,
-            children: [
-              _cell('Rashi', rashiName(p.rashi)),
-              _cell('Swami', swami(p.rashi)),
-              _cell('Nakshatra', p.nakshatra.isEmpty ? '—' : p.nakshatra),
-              _cell('Tatva', tatva(p.rashi)),
-              _cell('Swabhav', swabhav(p.rashi)),
-              _cell('Power', bal[p.id] == null ? '—' : '${bal[p.id]!.round()}%'),
-            ],
-          ),
-        ]),
-      ),
-    ),
+    backgroundColor: Colors.transparent,
+    builder: (c) => _GrahSheet(list: list, start: list.indexWhere((e) => e.id == p.id).clamp(0, list.length - 1), bal: bal),
   );
 }
 
+class _GrahSheet extends StatefulWidget {
+  final List<GrahPos> list;
+  final int start;
+  final Map<String, double> bal;
+  const _GrahSheet({required this.list, required this.start, required this.bal});
+  @override
+  State<_GrahSheet> createState() => _GrahSheetState();
+}
+
+class _GrahSheetState extends State<_GrahSheet> {
+  late int _i = widget.start;
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.list[_i];
+    final pw = widget.bal[p.id];
+    final n = widget.list.length;
+    GrahPos at(int k) => widget.list[(k + n) % n];
+    return Container(
+      padding: EdgeInsets.fromLTRB(18, 10, 18, 22 + MediaQuery.of(context).padding.bottom),
+      decoration: const BoxDecoration(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xF82856AA), Color(0xFC0E2860)]),
+        border: Border(top: BorderSide(color: Color(0x4DA0C8FF))),
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: const Color(0x4DFFFFFF), borderRadius: BorderRadius.circular(2)))),
+        const SizedBox(height: 16),
+        Row(children: [
+          Container(
+            width: 46,
+            height: 46,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: p.color.withValues(alpha: .15), border: Border.all(color: p.color, width: 1.5)),
+            child: Text(p.id, style: TextStyle(fontWeight: FontWeight.w700, color: p.color)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [Text(p.name, style: CkText.h(19)), if (p.retro) const RetroBadge()]),
+              const SizedBox(height: 2),
+              Text('${rashiName(p.rashi)} · ${fmtDegMin(p.degIn)}', style: CkText.mono(12, color: CkColors.textSecondary)),
+            ]),
+          ),
+          if (pw != null) Text('${pw.round()}%', style: CkText.mono(22, color: p.color)),
+        ]),
+        const SizedBox(height: 16),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          childAspectRatio: 2.9,
+          children: [
+            _cell('Rashi', '${p.rashi.toString().padLeft(2, '0')} · ${rashiName(p.rashi)}'),
+            _cell('Swami', swami(p.rashi)),
+            _cell('Nakshatra', p.nakshatra.isEmpty ? '—' : p.nakshatra),
+            _cell('Tatva', tatva(p.rashi)),
+            _cell('Swabhav', swabhav(p.rashi)),
+            _cell('Power', pw == null ? '—' : '${pw.round()}%'),
+          ],
+        ),
+        if (n > 1) ...[
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: _nav('‹ ${at(_i - 1).name}', () => setState(() => _i = (_i - 1 + n) % n))),
+            const SizedBox(width: 8),
+            Expanded(child: _nav('${at(_i + 1).name} ›', () => setState(() => _i = (_i + 1) % n))),
+          ]),
+        ],
+      ]),
+    );
+  }
+
+  Widget _nav(String t, VoidCallback onTap) => Pressable(
+        onTap: onTap,
+        child: Container(
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(13), border: Border.all(color: CkColors.panelStroke)),
+          child: Text(t, style: const TextStyle(fontSize: 13.5)),
+        ),
+      );
+}
+
 Widget _cell(String l, String v) => Container(
-      padding: const EdgeInsets.fromLTRB(11, 8, 11, 8),
-      decoration: BoxDecoration(
-          color: CkColors.glassFill, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(.12))),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      decoration: BoxDecoration(color: CkColors.field, borderRadius: BorderRadius.circular(11), border: Border.all(color: CkColors.panelStroke)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
         Text(upper(l), style: CkText.label.copyWith(fontSize: 9.5)),
         const SizedBox(height: 3),
@@ -451,30 +504,68 @@ class StrengthPage extends StatefulWidget {
 
 class _StrengthPageState extends State<StrengthPage> {
   final _f = _data.shadbal();
+  late bool _flavor = widget.flavor;
   @override
   Widget build(BuildContext context) => ClientPage(
-        title: widget.flavor ? 'Flavor' : 'Power',
+        title: _flavor ? 'Flavor' : 'Power',
         children: [
+          Segmented<bool>(
+            values: const [false, true],
+            selected: _flavor,
+            label: (v) => v ? 'Flavor' : 'Power',
+            onChanged: (v) => setState(() => _flavor = v),
+            height: 42,
+          ),
+          const SizedBox(height: 12),
           LoadView<Map<String, double>>(
             future: _f,
             builder: (m) {
-              final v = _ordered(m, widget.flavor ? _flavorOrder : _powerOrder);
+              final v = _ordered(m, _flavor ? _flavorOrder : _powerOrder);
               if (v.isEmpty) {
                 return const EmptyBox(icon: Icons.bar_chart_rounded, title: 'No values yet', body: 'This client has no strength data.');
               }
               final sorted = [...v]..sort((a, b) => b.value.compareTo(a.value));
               return Column(children: [
                 Glass(
-                  radius: 18,
-                  padding: const EdgeInsets.fromLTRB(8, 14, 14, 12),
-                  child: GrahBarChart(values: v, height: 340),
+                  padding: const EdgeInsets.fromLTRB(8, 16, 12, 12),
+                  child: GrahBarChart(key: ValueKey(_flavor), values: v, height: 300),
                 ),
-                const SizedBox(height: 10),
-                Row(children: [
-                  InfoPill(widget.flavor ? 'Highest' : 'Strongest', '${kGrahNames[sorted.first.key]} · ${sorted.first.value.round()}%', CkColors.jupiter),
-                  const SizedBox(width: 8),
-                  InfoPill(widget.flavor ? 'Lowest' : 'Weakest', '${kGrahNames[sorted.last.key]} · ${sorted.last.value.round()}%', const Color(0xFFFF9A6B)),
-                ]),
+                Glass(
+                  margin: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(_flavor ? 'HIGHEST FIRST' : 'STRONGEST FIRST', style: CkText.label),
+                    const SizedBox(height: 4),
+                    for (var i = 0; i < sorted.length; i++)
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x1F8CBEFF)))),
+                        child: Row(children: [
+                          SizedBox(width: 24, child: Text('${i + 1}', style: CkText.mono(11, color: CkColors.textDim))),
+                          SizedBox(
+                            width: 60,
+                            child: Row(children: [
+                              GrahDot(sorted[i].key),
+                              const SizedBox(width: 6),
+                              Text(sorted[i].key, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                            ]),
+                          ),
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(3),
+                              child: LinearProgressIndicator(
+                                value: (sorted[i].value / 100).clamp(0, 1),
+                                minHeight: 6,
+                                color: grahColor(sorted[i].key),
+                                backgroundColor: const Color(0x268CBEFF),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 46, child: Text('${sorted[i].value.round()}%', textAlign: TextAlign.right, style: CkText.mono(12.5))),
+                        ]),
+                      ),
+                  ]),
+                ),
               ]);
             },
           ),
