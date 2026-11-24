@@ -7,6 +7,7 @@ import 'pages/auth_pages.dart';
 import 'pages/app_shell.dart';
 import 'ui/ck_theme.dart';
 import 'ui/glass.dart';
+import 'ui/widgets.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,6 +37,7 @@ class CosmoKundliApp extends StatelessWidget {
       defaultTransition: Transition.cupertino,
       transitionDuration: const Duration(milliseconds: 320),
       home: const SplashPage(),
+      navigatorObservers: [UnfocusObserver()],
       builder: (context, child) => MediaQuery(
         // keep layouts stable on large system font settings
         data: MediaQuery.of(context).copyWith(
@@ -49,3 +51,4 @@ class CosmoKundliApp extends StatelessWidget {
 
 void goHome() => Get.offAll(() => const AppShell());
 void goLogin() => Get.offAll(() => const LoginPage());
+

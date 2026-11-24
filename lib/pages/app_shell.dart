@@ -19,6 +19,8 @@ import 'client_form_page.dart';
 import 'client_shell.dart';
 import 'clients_page.dart';
 import 'reports_pages.dart';
+import 'sky_pages.dart';
+import 'traditional_pages.dart';
 import 'workspace.dart';
 
 /// Lets screens switch the app dock tab (e.g. Home search → Clients).
@@ -38,6 +40,14 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     appTabRequest.addListener(_onReq);
+    if (searchTools.isEmpty) {
+      registerSearchTool('Transit', 'Sky now · step through time', Icons.public_rounded, (c) => Get.to(() => const SkyNowPage()));
+      registerSearchTool('Panchang now', 'Today at your location', Icons.light_mode_outlined, (c) => Get.to(() => const PanchangNowPage()));
+      registerSearchTool('Melapak', 'Match two people', Icons.join_inner_rounded, (c) => Get.to(() => const MelapakToolPage()));
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!Here.asked && mounted) askLocation(context);
+    });
   }
 
   @override
@@ -54,10 +64,13 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
-  void _go(int i) => setState(() {
-        _index = i;
-        _built.add(i);
-      });
+  void _go(int i) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _index = i;
+      _built.add(i);
+    });
+  }
 
   static const _items = [
     (Icons.space_dashboard_outlined, 'Home'),
@@ -245,31 +258,26 @@ class _HomePageState extends State<HomePage> {
               FadeSlideIn(
                 child: Pressable(
                   scale: .985,
-                  onTap: () => appTabRequest.value = 1,
+                  onTap: () => Get.to(() => const SearchPage(), transition: Transition.fadeIn),
                   child: Glass(
                     height: 48,
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: const Row(children: [
                       Icon(Icons.search_rounded, size: 19, color: CkColors.labelMono),
                       SizedBox(width: 10),
-                      Text('Search clients', style: TextStyle(fontSize: 14.5, color: CkColors.textSecondary)),
+                      Text('Search clients, reports, tools', style: TextStyle(fontSize: 14.5, color: CkColors.textSecondary)),
                     ]),
                   ),
                 ),
               ),
               const SizedBox(height: 12),
               FadeSlideIn(index: 1, child: _skyCard()),
+              const SizedBox(height: 12),
+              const FadeSlideIn(index: 2, child: PanchangNowCard()),
               const SizedBox(height: 18),
-              FadeSlideIn(index: 2, child: _recent()),
+              FadeSlideIn(index: 3, child: _recent()),
               const SizedBox(height: 18),
-              FadeSlideIn(
-                index: 3,
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Expanded(child: _creditsCard()),
-                  const SizedBox(width: 10),
-                  Expanded(child: _reportsCard()),
-                ]),
-              ),
+              FadeSlideIn(index: 4, child: _reportsCard()),
             ],
           ),
         ),
@@ -411,61 +419,55 @@ class _HomePageState extends State<HomePage> {
         },
       );
 
-  Widget _creditsCard() => Pressable(
-        scale: .97,
-        onTap: () => Get.to(() => const CreditsPage()),
-        child: Glass(
-          height: 108,
-          padding: const EdgeInsets.all(14),
-          child: FutureBuilder<Map<String, dynamic>>(
-            future: _credits,
-            builder: (c, s) {
-              final v = s.data?['Remaining_Credit'];
-              return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('CREDITS', style: CkText.label),
-                const Spacer(),
-                Text(v == null ? '—' : NumberFormat.decimalPattern('en_IN').format(num.tryParse('$v') ?? 0), style: CkText.mono(24)),
-                const SizedBox(height: 2),
-                const Text('Available', style: TextStyle(fontSize: 12, color: CkColors.textSecondary)),
-              ]);
-            },
-          ),
-        ),
-      );
-
-  Widget _reportsCard() => Pressable(
-        scale: .97,
-        onTap: () => appTabRequest.value = 2,
-        child: Glass(
-          height: 108,
-          padding: const EdgeInsets.all(14),
-          child: FutureBuilder<List<ReportItem>>(
-            future: _reports,
-            builder: (c, s) {
-              final l = s.data ?? [];
-              final gen = l.where((e) => e.pending).length;
-              final ready = l.where((e) => e.ready).length;
-              return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+  Widget _reportsCard() => Glass(
+        padding: const EdgeInsets.all(14),
+        child: FutureBuilder<List<ReportItem>>(
+          future: _reports,
+          builder: (c, s) {
+            final l = s.data ?? [];
+            final weekAgo = DateTime.now().subtract(const Duration(days: 7));
+            final gen = l.where((e) => e.pending).length;
+            final week = l.where((e) => e.ready && (e.created?.isAfter(weekAgo) ?? false)).length;
+            final latest = l.where((e) => e.ready).firstOrNull;
+            Widget stat(String v, String label, Color col, {VoidCallback? onTap}) => Expanded(
+                  child: GestureDetector(
+                    onTap: onTap,
+                    behavior: HitTestBehavior.opaque,
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      s.hasData || label == 'Credits' ? Text(v, style: CkText.mono(22, color: col)) : const Skeleton(height: 22, width: 36),
+                      const SizedBox(height: 2),
+                      Text(label, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
+                    ]),
+                  ),
+                );
+            return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
                 Text('REPORTS', style: CkText.label),
                 const Spacer(),
-                Row(children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: gen > 0 ? CkColors.cyan : const Color(0xFF5EE38A),
-                      boxShadow: [BoxShadow(color: (gen > 0 ? CkColors.cyan : const Color(0xFF5EE38A)).withValues(alpha: .7), blurRadius: 8)],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(gen > 0 ? '$gen generating' : '$ready ready', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                ]),
-                const SizedBox(height: 4),
-                Text(s.hasData ? '${l.length} in total' : 'Loading…', style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
-              ]);
-            },
-          ),
+                GestureDetector(
+                  onTap: () => appTabRequest.value = 2,
+                  child: const Text('History', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: CkColors.cyan)),
+                ),
+              ]),
+              const SizedBox(height: 10),
+              Row(children: [
+                stat('$gen', 'Generating', CkColors.cyan, onTap: () => appTabRequest.value = 2),
+                stat('$week', 'Ready this week', const Color(0xFF10B981), onTap: () => appTabRequest.value = 2),
+                FutureBuilder<Map<String, dynamic>>(
+                  future: _credits,
+                  builder: (c, cs) {
+                    final v = num.tryParse('${cs.data?['Remaining_Credit'] ?? ''}');
+                    final txt = v == null ? '—' : v >= 100000 ? '${(v / 100000).toStringAsFixed(1)}L' : NumberFormat.decimalPattern('en_IN').format(v);
+                    return stat(txt, 'Credits', Colors.white, onTap: () => Get.to(() => const CreditsPage()));
+                  },
+                ),
+              ]),
+              if (latest != null) ...[
+                const SizedBox(height: 12),
+                ReportRow(latest, showClient: true, compact: true),
+              ],
+            ]);
+          },
         ),
       );
 }

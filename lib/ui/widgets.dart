@@ -1165,3 +1165,15 @@ class SkeletonCard extends StatelessWidget {
         ]),
       );
 }
+
+/// Drops keyboard focus on every navigation, so a text field on the page you
+/// return to doesn't grab focus and pop the keyboard open.
+class UnfocusObserver extends NavigatorObserver {
+  void _off() => FocusManager.instance.primaryFocus?.unfocus();
+  @override
+  void didPush(Route route, Route? previousRoute) => _off();
+  @override
+  void didPop(Route route, Route? previousRoute) => _off();
+  @override
+  void didReplace({Route? newRoute, Route? oldRoute}) => _off();
+}

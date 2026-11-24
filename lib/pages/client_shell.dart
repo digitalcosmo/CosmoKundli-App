@@ -62,6 +62,7 @@ class _ClientShellState extends State<ClientShell> {
   }
 
   void _select(int i) {
+    FocusManager.instance.primaryFocus?.unfocus();
     if (i == _index) {
       _keys[i].currentState?.popUntil((r) => r.isFirst);
     } else {
@@ -93,6 +94,7 @@ class _ClientShellState extends State<ClientShell> {
                 child: HeroControllerScope.none(
                   child: Navigator(
                     key: _keys[i],
+                    observers: [UnfocusObserver()],
                     onGenerateRoute: (s) => PageRouteBuilder(
                         pageBuilder: (_, __, ___) => _tabs[i].root(),
                         transitionDuration: Duration.zero),

@@ -408,84 +408,119 @@ class PdfViewPage extends StatelessWidget {
 
 // ───────────────────────── history row
 
+const _kTypeLook = {
+  'CKP': ('pl', 'Planner', Color(0xFF7FB2FF)),
+  'CKPP': ('pp', 'Planner Plus', Color(0xFFF5D547)),
+  'CKPM': ('pm', 'Planner Max', Color(0xFFFF7A8A)),
+  'GV': ('vb', 'GRAH Vibes', Color(0xFFA98BFF)),
+  'CVSS': ('pl', 'Planner (earlier)', Color(0xFF7FB2FF)),
+};
+
+/// One report, built to scan: whose · which · duration · period · made.
 class ReportRow extends StatelessWidget {
   final ReportItem it;
   final bool showClient;
-  const ReportRow(this.it, {super.key, this.showClient = false});
+  final bool compact;
+  const ReportRow(this.it, {super.key, this.showClient = false, this.compact = false});
 
-  Widget _iconBtn(IconData i, String label, VoidCallback onTap, {bool filled = false}) => Semantics(
-        button: true,
-        label: label,
-        child: Pressable(
-          onTap: onTap,
-          child: Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: filled ? CkColors.cyan : CkColors.field,
-              borderRadius: BorderRadius.circular(11),
-              border: filled ? null : Border.all(color: CkColors.panelStroke),
-            ),
-            child: Icon(i, size: 19, color: filled ? const Color(0xFF06204F) : CkColors.text),
-          ),
-        ),
-      );
+  String get _short {
+    final s = it.start;
+    if (s == null) return '';
+    final e = DateTime(s.year, s.month + (it.duration > 0 ? it.duration : 1) - 1);
+    return '${DateFormat('MMM yy').format(s)} → ${DateFormat('MMM yy').format(e)}';
+  }
+
+  String get _made {
+    final c = it.created;
+    if (c == null) return '';
+    final now = DateTime.now();
+    if (c.year == now.year && c.month == now.month && c.day == now.day) return 'made today';
+    return 'made ${DateFormat('d MMM').format(c)}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final icon = ckIconAsset(it.title) ?? 'assets/icons/ck_planner.png';
-    final title = [
-      if (showClient && it.name.isNotEmpty) it.name,
-      it.title + (it.duration > 0 ? ' · ${it.duration}M' : ''),
-    ].join(' · ');
+    final look = _kTypeLook[it.source] ?? ('pl', it.title, CkColors.cyan);
     final s = it.state;
-    final row = Glass(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
-      child: Row(children: [
-        Image.asset(icon, width: 24, height: 24),
-        const SizedBox(width: 11),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-            const SizedBox(height: 5),
-            Text.rich(
-              TextSpan(children: [
-                if (it.period.isNotEmpty) ...[
-                  const TextSpan(text: 'Period ', style: TextStyle(color: CkColors.labelMono)),
-                  TextSpan(text: it.period),
-                  const TextSpan(text: '   '),
-                ],
-                if (it.created != null) ...[
-                  const TextSpan(text: 'Created ', style: TextStyle(color: CkColors.labelMono)),
-                  TextSpan(text: DateFormat('d MMM yy').format(it.created!)),
-                ],
-              ]),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, color: CkColors.textTertiary),
-            ),
-          ]),
+    final typeLine = Row(children: [
+      Flexible(child: Text(look.$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: showClient ? 12.5 : 15, fontWeight: FontWeight.w600, color: look.$3))),
+      if (it.duration > 0) ...[
+        const SizedBox(width: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), border: Border.all(color: look.$3.withValues(alpha: .45))),
+          child: Text('${it.duration}M', style: CkText.mono(10.5, color: look.$3)),
         ),
-        const SizedBox(width: 8),
-        switch (s) {
-          ReportState.ready => Row(mainAxisSize: MainAxisSize.min, children: [
-              _iconBtn(Icons.ios_share_rounded, 'Share', () => _runPdf(context, it, _PdfAction.share)),
-              const SizedBox(width: 6),
-              _iconBtn(Icons.open_in_new_rounded, 'Open', () => _runPdf(context, it, _PdfAction.open), filled: true),
+      ],
+    ]);
+    final right = switch (s) {
+      ReportState.ready => Row(mainAxisSize: MainAxisSize.min, children: [
+          Semantics(
+            button: true,
+            label: 'Share',
+            child: Pressable(
+              onTap: () => _runPdf(context, it, _PdfAction.share),
+              child: const SizedBox(width: 36, height: 38, child: Icon(Icons.ios_share_rounded, size: 18, color: CkColors.textTertiary)),
+            ),
+          ),
+          Semantics(
+            button: true,
+            label: 'Open',
+            child: Pressable(
+              onTap: () => _runPdf(context, it, _PdfAction.open),
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(color: CkColors.cyan, borderRadius: BorderRadius.circular(11)),
+                child: const Icon(Icons.open_in_new_rounded, size: 18, color: Color(0xFF06204F)),
+              ),
+            ),
+          ),
+        ]),
+      ReportState.generating => Row(mainAxisSize: MainAxisSize.min, children: [
+          const _Pulse(),
+          Text('GENERATING', style: CkText.mono(10, color: CkColors.cyan)),
+        ]),
+      ReportState.expired => Text('EXPIRED', style: CkText.mono(10, color: CkColors.textMuted)),
+      ReportState.failed => Text('FAILED', style: CkText.mono(10, color: const Color(0xFFEF4444))),
+    };
+    final body = Row(children: [
+      ClipRRect(
+        borderRadius: BorderRadius.circular(3),
+        child: Image.asset('assets/covers/${look.$1}.jpg', width: compact ? 26 : 30, height: compact ? 36 : 42, fit: BoxFit.cover),
+      ),
+      const SizedBox(width: 11),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (showClient) ...[
+            Text(it.name.isEmpty ? '—' : it.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+          ],
+          typeLine,
+          const SizedBox(height: 4),
+          Text.rich(
+            TextSpan(children: [
+              TextSpan(text: _short),
+              if (_made.isNotEmpty) TextSpan(text: '${_short.isEmpty ? '' : ' · '}$_made', style: const TextStyle(color: CkColors.labelMono)),
             ]),
-          ReportState.generating => Row(mainAxisSize: MainAxisSize.min, children: [
-              const _Pulse(),
-              Text('GENERATING', style: CkText.mono(10.5, color: CkColors.cyan)),
-            ]),
-          ReportState.expired => Text('EXPIRED', style: CkText.mono(10.5, color: CkColors.textMuted)),
-          ReportState.failed => Text('FAILED', style: CkText.mono(10.5, color: const Color(0xFFF59E0B))),
-        },
-      ]),
-    );
-    if (s == ReportState.expired) return Opacity(opacity: .55, child: row);
-    if (s != ReportState.ready) return row;
-    return Pressable(scale: .985, onTap: () => _runPdf(context, it, _PdfAction.open), child: row);
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: CkText.mono(11, color: CkColors.textSecondary),
+          ),
+        ]),
+      ),
+      const SizedBox(width: 6),
+      right,
+    ]);
+    final card = compact
+        ? Container(
+            padding: const EdgeInsets.fromLTRB(10, 9, 8, 9),
+            decoration: BoxDecoration(color: CkColors.field, borderRadius: BorderRadius.circular(12), border: Border.all(color: CkColors.panelStroke)),
+            child: body,
+          )
+        : Glass(margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.fromLTRB(10, 10, 8, 10), child: body);
+    if (s == ReportState.expired) return Opacity(opacity: .5, child: card);
+    return card;
   }
 }
 
@@ -993,42 +1028,126 @@ class AllReportsPage extends StatefulWidget {
 
 class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
   String _q = '';
+  ReportState? _state;
+  String? _type;
+  late Future<Map<String, dynamic>> _credits = Api.post(Endpoints.credits, {'uID': Session.uid});
+
+  Widget _pill(String t, bool on, VoidCallback tap) => Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: Pressable(
+          onTap: tap,
+          child: AnimatedContainer(
+            duration: CkMotion.fast,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: on ? CkColors.cyanTint : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: on ? CkColors.cyanStroke : CkColors.panelStroke),
+            ),
+            child: Text(t, style: CkText.mono(12, color: on ? Colors.white : CkColors.textSecondary)),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) => CkScaffold(
         body: SafeArea(
           bottom: false,
           child: RefreshIndicator(
-            onRefresh: () async => reloadHistory(),
-            child: ListView(
-              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-              padding: const EdgeInsets.fromLTRB(18, 16, 18, 120),
-              children: [
-                Text('ALL CLIENTS', style: CkText.label),
-                const SizedBox(height: 6),
-                Text('Reports', style: CkText.h(26)),
-                const SizedBox(height: 14),
-                TextField(
-                  onChanged: (v) => setState(() => _q = v.toLowerCase()),
-                  decoration: const InputDecoration(hintText: 'Search client or report', prefixIcon: Icon(Icons.search_rounded)),
-                ),
-                FutureBuilder<List<ReportItem>>(
-                  future: history,
-                  builder: (ctx, s) {
-                    if (s.hasError) return ErrorBox(message: 'Couldn\'t load reports.', onRetry: reloadHistory);
-                    if (!s.hasData) return const SkeletonList(rows: 7);
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted) watch(s.data!);
-                    });
-                    final l = s.data!.where((e) => '${e.name} ${e.title}'.toLowerCase().contains(_q)).toList();
-                    if (l.isEmpty) {
-                      return const Padding(
+            onRefresh: () async {
+              reloadHistory();
+              setState(() => _credits = Api.post(Endpoints.credits, {'uID': Session.uid}));
+            },
+            child: FutureBuilder<List<ReportItem>>(
+              future: history,
+              builder: (ctx, s) {
+                final all = s.data ?? const <ReportItem>[];
+                if (s.hasData) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) watch(all);
+                  });
+                }
+                int count(ReportState? st) => st == null ? all.length : all.where((e) => e.state == st).length;
+                final l = all
+                    .where((e) => _state == null || e.state == _state)
+                    .where((e) => _type == null || e.source == _type)
+                    .where((e) => _q.isEmpty || '${e.name} ${e.title}'.toLowerCase().contains(_q))
+                    .toList();
+                final now = DateTime.now();
+                final today = DateTime(now.year, now.month, now.day);
+                final groups = <String, List<ReportItem>>{};
+                for (final e in l) {
+                  final c = e.created;
+                  final g = c == null
+                      ? 'Earlier'
+                      : !c.isBefore(today)
+                          ? 'Today'
+                          : c.isAfter(today.subtract(const Duration(days: 7)))
+                              ? 'This week'
+                              : 'Earlier';
+                  groups.putIfAbsent(g, () => []).add(e);
+                }
+                return ListView(
+                  physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 120),
+                  children: [
+                    Text('ALL CLIENTS', style: CkText.label),
+                    const SizedBox(height: 6),
+                    Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+                      Expanded(child: Text('Reports', style: CkText.h(26))),
+                      FutureBuilder<Map<String, dynamic>>(
+                        future: _credits,
+                        builder: (_, cs) {
+                          final v = num.tryParse('${cs.data?['Remaining_Credit'] ?? ''}');
+                          return Text(v == null ? '' : '${_nf.format(v)} CR', style: CkText.mono(12, color: CkColors.textSecondary));
+                        },
+                      ),
+                    ]),
+                    const SizedBox(height: 14),
+                    TextField(
+                      onChanged: (v) => setState(() => _q = v.trim().toLowerCase()),
+                      decoration: const InputDecoration(hintText: 'Search client or report', prefixIcon: Icon(Icons.search_rounded)),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 34,
+                      child: ListView(scrollDirection: Axis.horizontal, children: [
+                        _pill('All · ${count(null)}', _state == null, () => setState(() => _state = null)),
+                        _pill('Generating · ${count(ReportState.generating)}', _state == ReportState.generating, () => setState(() => _state = ReportState.generating)),
+                        _pill('Ready · ${count(ReportState.ready)}', _state == ReportState.ready, () => setState(() => _state = ReportState.ready)),
+                        _pill('Expired · ${count(ReportState.expired)}', _state == ReportState.expired, () => setState(() => _state = ReportState.expired)),
+                      ]),
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 34,
+                      child: ListView(scrollDirection: Axis.horizontal, children: [
+                        _pill('Any report', _type == null, () => setState(() => _type = null)),
+                        for (final e in const [('CKP', 'Planner'), ('CKPP', 'Plus'), ('CKPM', 'Max'), ('GV', 'Vibes')])
+                          _pill(e.$2, _type == e.$1, () => setState(() => _type = _type == e.$1 ? null : e.$1)),
+                      ]),
+                    ),
+                    if (s.hasError)
+                      ErrorBox(message: 'Couldn\'t load reports.', onRetry: reloadHistory)
+                    else if (!s.hasData)
+                      const SkeletonList(rows: 6)
+                    else if (l.isEmpty)
+                      const Padding(
                           padding: EdgeInsets.only(top: 14),
-                          child: EmptyBox(icon: Icons.description_outlined, title: 'No reports', body: 'Reports you generate will show here.'));
-                    }
-                    return Column(children: [for (final e in l) ReportRow(e, key: ValueKey(e.key), showClient: true)]);
-                  },
-                ),
-              ],
+                          child: EmptyBox(icon: Icons.description_outlined, title: 'No reports', body: 'Nothing matches these filters.'))
+                    else
+                      for (final g in const ['Today', 'This week', 'Earlier'])
+                        if (groups[g] != null) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(top: 18, bottom: 2),
+                            child: Text('${g.toUpperCase()} · ${groups[g]!.length}', style: CkText.label),
+                          ),
+                          for (final e in groups[g]!) ReportRow(e, key: ValueKey(e.key), showClient: true),
+                        ],
+                  ],
+                );
+              },
             ),
           ),
         ),
