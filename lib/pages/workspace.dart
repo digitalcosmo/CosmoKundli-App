@@ -410,11 +410,15 @@ class _WorkspacePageState extends State<WorkspacePage> {
                     _moveTo(_dragPos, _pack(_items, _stackWidth));
                   });
                 }
-                ..onLongPressEnd = (_) => setState(() {
-                      _dragging = null;
-                      _save();
-                    })
-                ..onLongPressCancel = () => setState(() => _dragging = null),
+                ..onLongPressEnd = (_) {
+                  setState(() {
+                    _dragging = null;
+                    _save();
+                  });
+                }
+                ..onLongPressCancel = () {
+                  setState(() => _dragging = null);
+                },
             ),
           },
         ),
@@ -477,11 +481,13 @@ class _WorkspacePageState extends State<WorkspacePage> {
               }
             });
                 }
-                ..onEnd = (_) => setState(() {
-                      _resizing = null;
-                      _resizeRect = null;
-                      _save();
-                    }),
+                ..onEnd = (_) {
+                  setState(() {
+                    _resizing = null;
+                    _resizeRect = null;
+                    _save();
+                  });
+                },
             ),
           },
           child: SizedBox(
