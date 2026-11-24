@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -291,7 +292,7 @@ List<ReportItem> reportsFor(List<ReportItem> all, Client? c) {
 class ReportPdf {
   static final _cache = <String, Uint8List>{};
 
-  static Future<String> _link(ReportItem it) async {
+  static Future<String> link(ReportItem it) async {
     final r = await Api.post(Endpoints.reportViewLink, {
       'uID': int.tryParse(Session.uid) ?? Session.uid,
       'Source': it.source,
@@ -317,7 +318,7 @@ class ReportPdf {
     if (await f.exists() && await f.length() > 1000) {
       return _cache[it.key] = await f.readAsBytes();
     }
-    final link = await _link(it);
+    final link = await ReportPdf.link(it);
     final res = await Dio().get<String>(link, options: Options(responseType: ResponseType.plain));
     final html = res.data ?? '';
     if (html.trim().isEmpty) throw Exception('Empty report page');
@@ -327,39 +328,20 @@ class ReportPdf {
   }
 }
 
-enum _PdfAction { open, share, download }
+enum _PdfAction { open, share }
 
+/// Reports open in Chrome (Print → Save as PDF there), as on the website.
+/// Share sends the report's view link.
 Future<void> _runPdf(BuildContext context, ReportItem it, _PdfAction a) async {
-  final nav = Navigator.of(context, rootNavigator: true);
-  var shown = false;
-  // Only show the "preparing" sheet if it isn't already cached.
-  final quick = ReportPdf.build(it);
-  final done = await Future.any([quick.then((_) => true), Future.delayed(const Duration(milliseconds: 250), () => false)]);
-  if (!done && context.mounted) {
-    shown = true;
-    showDialog(
-      context: context,
-      useRootNavigator: true,
-      barrierDismissible: false,
-      builder: (_) => const _PreparingDialog(),
-    );
-  }
   try {
-    final bytes = await quick;
-    if (shown) nav.pop();
-    shown = false;
-    if (!context.mounted) return;
-    switch (a) {
-      case _PdfAction.open:
-        await Navigator.of(context).push(CupertinoPageRoute(builder: (_) => PdfViewPage(title: it.title, sub: it.name, bytes: bytes, fileName: it.fileName)));
-      case _PdfAction.share:
-        await Printing.sharePdf(bytes: bytes, filename: it.fileName);
-      case _PdfAction.download:
-        await savePdf(context, bytes, it.fileName);
+    final link = await ReportPdf.link(it);
+    if (a == _PdfAction.open) {
+      await openLink(link);
+    } else {
+      await SharePlus.instance.share(ShareParams(text: '${it.title} · ${it.name}\n$link', subject: it.title));
     }
   } catch (e) {
-    if (shown) nav.pop();
-    if (context.mounted) toast(context, 'Couldn\'t prepare the PDF. ${e is Exception ? e.toString().replaceFirst('Exception: ', '') : ''}', error: true);
+    if (context.mounted) toast(context, e.toString().replaceFirst('Exception: ', ''), error: true);
   }
 }
 
@@ -370,25 +352,6 @@ Future<void> savePdf(BuildContext context, Uint8List bytes, String name) async {
   } catch (_) {
     if (context.mounted) toast(context, 'Couldn\'t save the file.', error: true);
   }
-}
-
-class _PreparingDialog extends StatelessWidget {
-  const _PreparingDialog();
-  @override
-  Widget build(BuildContext context) => PopScope(
-        canPop: false,
-        child: Center(
-          child: Glass(
-            width: 230,
-            padding: const EdgeInsets.all(20),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const SizedBox(width: 26, height: 26, child: CircularProgressIndicator(strokeWidth: 2.4, color: CkColors.cyan)),
-              const SizedBox(height: 14),
-              Text('Preparing PDF…', style: CkText.h(15)),
-            ]),
-          ),
-        ),
-      );
 }
 
 /// In-app PDF viewer with Share and Download.
@@ -509,7 +472,7 @@ class ReportRow extends StatelessWidget {
           ReportState.ready => Row(mainAxisSize: MainAxisSize.min, children: [
               _iconBtn(Icons.ios_share_rounded, 'Share', () => _runPdf(context, it, _PdfAction.share)),
               const SizedBox(width: 6),
-              _iconBtn(Icons.download_rounded, 'Download', () => _runPdf(context, it, _PdfAction.download), filled: true),
+              _iconBtn(Icons.open_in_new_rounded, 'Open', () => _runPdf(context, it, _PdfAction.open), filled: true),
             ]),
           ReportState.generating => Row(mainAxisSize: MainAxisSize.min, children: [
               const _Pulse(),
