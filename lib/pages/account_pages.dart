@@ -408,7 +408,10 @@ class _DisplayPageState extends State<DisplayPage> {
 
   /// Tap on a page's text jumps to the field that fills it.
   void _tapPage(int i, Offset local, Size size) {
-    if (i == 1 || i == 2) return _upload(i == 1);
+    if (i == 1 || i == 2) {
+      _upload(i == 1);
+      return;
+    }
     if (i == 0) return _focus(_fName);
     final y = local.dy / size.height;
     if (y < .41) return _focus(_fName);
