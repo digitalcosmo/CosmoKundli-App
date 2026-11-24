@@ -189,6 +189,14 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    // Keep the greeting name current from the profile.
+    Api.post(Endpoints.profileDetails, {'uID': Session.uid}).then((r) {
+      final n = '${r['Name'] ?? ''}'.trim();
+      if (n.isNotEmpty && n != 'null' && n != Session.prefs.getString('ck_user_name')) {
+        Session.prefs.setString('ck_user_name', n);
+        if (mounted) setState(() {});
+      }
+    }).catchError((_) {});
     _tick = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) setState(() => _now = DateTime.now());
     });
