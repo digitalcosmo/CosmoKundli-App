@@ -196,6 +196,7 @@ class ClientPage extends StatelessWidget {
   final EdgeInsets padding;
   final bool animate;
   final Widget? floating;
+  final Widget? pinned;
   const ClientPage(
       {super.key,
       required this.title,
@@ -204,6 +205,7 @@ class ClientPage extends StatelessWidget {
       this.onRefresh,
       this.animate = true,
       this.floating,
+      this.pinned,
       this.padding = const EdgeInsets.fromLTRB(14, 0, 14, 120)});
 
   Future<void> _details(BuildContext context) async {
@@ -298,6 +300,7 @@ class ClientPage extends StatelessWidget {
               onSwitch: () => _details(context),
               onMore: () => _menu(context),
             ),
+            if (pinned != null) Padding(padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, 8), child: pinned!),
             Expanded(
               child: Stack(children: [
                 Positioned.fill(child: onRefresh == null ? list : RefreshIndicator(onRefresh: onRefresh!, child: list)),
@@ -313,7 +316,7 @@ class ClientPage extends StatelessWidget {
 }
 
 void pushModule(BuildContext context, Widget page) =>
-    Navigator.of(context).push(CupertinoPageRoute(builder: (_) => page));
+    Navigator.of(context).push(CkRoute(builder: (_) => page));
 
 class _SwitchSheet extends StatefulWidget {
   @override

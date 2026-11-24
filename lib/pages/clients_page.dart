@@ -86,8 +86,7 @@ class _ClientsPageState extends State<ClientsPage> {
   final _scroll = ScrollController();
   final _keys = <String, GlobalKey>{};
   String _q = '';
-  int _nameSort = 1; // 0 off, 1 A–Z, 2 Z–A
-  int _recent = 0; // 0 off, 1 newest, 2 oldest (by date added)
+  String _sort = 'az'; // az, za, new, old
   int _gender = 0; // 0 all, 1 female, 2 male
   String? _year;
   String? _place;
@@ -102,76 +101,98 @@ class _ClientsPageState extends State<ClientsPage> {
       if (_place != null && e.city.trim() != _place) return false;
       return true;
     }).toList();
-    if (_recent != 0) {
-      int id(Client c) => int.tryParse(c.mId) ?? 0;
-      l.sort((a, b) => _recent == 1 ? id(b).compareTo(id(a)) : id(a).compareTo(id(b)));
-    } else if (_nameSort != 0) {
-      l.sort((a, b) => _nameSort == 1 ? a.name.toLowerCase().compareTo(b.name.toLowerCase()) : b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+    int id(Client c) => int.tryParse(c.mId) ?? 0;
+    switch (_sort) {
+      case 'za':
+        l.sort((a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+      case 'new':
+        l.sort((a, b) => id(b).compareTo(id(a)));
+      case 'old':
+        l.sort((a, b) => id(a).compareTo(id(b)));
+      default:
+        l.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     }
     return l;
   }
 
-  Future<void> _pickFrom(String title, List<String> options, String? current, ValueChanged<String?> set) async {
-    final r = await showModalBottomSheet<String>(
-      useRootNavigator: true,
-      context: context,
-      isScrollControlled: true,
-      builder: (s) => SafeArea(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .6),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Padding(padding: const EdgeInsets.fromLTRB(18, 16, 18, 6), child: Text(title, style: CkText.h(17))),
-            Flexible(
-              child: ListView(shrinkWrap: true, children: [
-                ListTile(title: const Text('Any'), trailing: current == null ? const Icon(Icons.check_rounded, color: CkColors.cyan) : null, onTap: () => Navigator.pop(s, '')),
-                for (final o in options)
-                  ListTile(title: Text(o), trailing: current == o ? const Icon(Icons.check_rounded, color: CkColors.cyan) : null, onTap: () => Navigator.pop(s, o)),
-              ]),
-            ),
-          ]),
-        ),
-      ),
-    );
-    if (r != null) setState(() => set(r.isEmpty ? null : r));
-  }
+  static const _sorts = [
+    SortOption('az', 'Name A–Z', ascending: true),
+    SortOption('za', 'Name Z–A', ascending: false),
+    SortOption('new', 'Recently added', ascending: false),
+    SortOption('old', 'Oldest added', ascending: true),
+  ];
 
-  Widget _pill(String label, String value, bool on, VoidCallback onTap, {bool menu = false}) => Pressable(
-        scale: .95,
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: CkMotion.fast,
-          margin: const EdgeInsets.only(right: 6),
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-          decoration: BoxDecoration(
-            color: on ? CkColors.cyanTint : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: on ? CkColors.cyanStroke : CkColors.panelStroke),
+  Widget _chip(IconData icon, String text, VoidCallback clear) => Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: Pressable(
+          onTap: clear,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(8, 5, 6, 5),
+            decoration: BoxDecoration(color: CkColors.cyanTint, borderRadius: BorderRadius.circular(8), border: Border.all(color: CkColors.cyanStroke)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(icon, size: 13, color: CkColors.cyan),
+              const SizedBox(width: 4),
+              Text(text, style: CkText.mono(11.5)),
+              const SizedBox(width: 4),
+              const Icon(Icons.close_rounded, size: 13, color: CkColors.textSecondary),
+            ]),
           ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Text(label, style: TextStyle(fontSize: 12.5, color: on ? Colors.white : CkColors.textSecondary)),
-            const SizedBox(width: 6),
-            Text(value, style: CkText.mono(11, color: on ? CkColors.cyan : CkColors.labelMono)),
-            if (menu) const Icon(Icons.keyboard_arrow_down_rounded, size: 15, color: CkColors.labelMono),
-          ]),
         ),
       );
 
   Widget _filters(List<Client> all) {
     final years = {for (final c in all) if (c.birth != null) '${c.birth!.year}'}.toList()..sort((a, b) => b.compareTo(a));
     final places = {for (final c in all) if (c.city.trim().isNotEmpty) c.city.trim()}.toList()..sort();
-    return SizedBox(
-      height: 34,
-      child: ListView(scrollDirection: Axis.horizontal, children: [
-        _pill('Name', const ['—', 'A–Z', 'Z–A'][_nameSort], _nameSort != 0 && _recent == 0, () => setState(() {
-              _nameSort = (_nameSort + 1) % 3;
-              if (_nameSort != 0) _recent = 0;
-            })),
-        _pill('Recent', const ['—', 'Newest', 'Oldest'][_recent], _recent != 0, () => setState(() => _recent = (_recent + 1) % 3)),
-        _pill('Gender', const ['All', 'Female', 'Male'][_gender], _gender != 0, () => setState(() => _gender = (_gender + 1) % 3)),
-        _pill('Year', _year ?? 'Any', _year != null, () => _pickFrom('Birth year', years, _year, (v) => _year = v), menu: true),
-        _pill('Place', _place ?? 'Any', _place != null, () => _pickFrom('Birth place', places, _place, (v) => _place = v), menu: true),
+    final sortCur = _sorts.firstWhere((o) => o.value == _sort);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Expanded(
+          child: FilterDropdown<int>(
+            label: 'Gender',
+            value: _gender,
+            onChanged: (v) => setState(() => _gender = v),
+            options: [
+              FilterOption(0, 'All', count: all.length),
+              FilterOption(1, 'Female', count: all.where((e) => e.isFemale).length),
+              FilterOption(2, 'Male', count: all.where((e) => !e.isFemale && e.genderText.isNotEmpty).length),
+            ],
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: FilterDropdown<String?>(
+            label: 'Year',
+            value: _year,
+            defaultValue: null,
+            onChanged: (v) => setState(() => _year = v),
+            options: [const FilterOption(null, 'Any'), for (final y in years) FilterOption(y, y)],
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: FilterDropdown<String?>(
+            label: 'Place',
+            value: _place,
+            defaultValue: null,
+            onChanged: (v) => setState(() => _place = v),
+            options: [const FilterOption(null, 'Any'), for (final p in places) FilterOption(p, p)],
+          ),
+        ),
+        const SizedBox(width: 6),
+        SortButton<String>(value: _sort, options: _sorts, onChanged: (v) => setState(() => _sort = v)),
       ]),
-    );
+      if (_gender != 0 || _year != null || _place != null || _sort != 'az')
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Wrap(runSpacing: 6, children: [
+            if (_gender != 0) _chip(Icons.check_rounded, _gender == 1 ? 'Female' : 'Male', () => setState(() => _gender = 0)),
+            if (_year != null) _chip(Icons.check_rounded, _year!, () => setState(() => _year = null)),
+            if (_place != null) _chip(Icons.check_rounded, _place!, () => setState(() => _place = null)),
+            if (_sort != 'az')
+              _chip(sortCur.ascending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, sortCur.label, () => setState(() => _sort = 'az')),
+          ]),
+        ),
+    ]);
   }
 
   @override
@@ -332,7 +353,7 @@ class _ClientsPageState extends State<ClientsPage> {
                       ))
                     else
                       SliverPadding(
-                        padding: EdgeInsets.fromLTRB(18, 0, 30, widget.embedded ? 190 : 120),
+                        padding: EdgeInsets.fromLTRB(18, 0, 12, widget.embedded ? 190 : 120),
                         sliver: SliverList.builder(
                           itemCount: list.length,
                           itemBuilder: (c, i) {
@@ -408,57 +429,45 @@ class _ClientCard extends StatelessWidget {
   final VoidCallback onChanged;
   const _ClientCard({super.key, required this.client, required this.index, required this.onChanged});
   @override
-  Widget build(BuildContext context) => _maybeAnimate(
-        index,
-        Padding(
-          padding: const EdgeInsets.only(top: 9),
-          child: Pressable(
-            scale: .98,
-            onTap: () => openClient(client),
-            child: Glass(
-              radius: 16,
-              padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
-              child: Row(children: [
-                _Avatar(client),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      Flexible(child: Text(client.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))),
-                      if (client.genderText.isNotEmpty) ...[
-                        const SizedBox(width: 8),
-                        Text(client.genderText, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
-                      ],
-                    ]),
-                    const SizedBox(height: 4),
-                    Text(
-                      [
-                        client.birth == null ? client.dateText : DateFormat('dd-MM-yyyy').format(client.birth!),
-                        client.timeText,
-                        client.city,
-                      ].where((e) => e.trim().isNotEmpty).join(' · '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: CkText.mono(11.5, color: CkColors.textSecondary),
-                    ),
-                  ]),
-                ),
-                IconButton(
-                  tooltip: 'More for ${client.name}',
-                  onPressed: () => clientMenu(context, client, onChanged: onChanged),
-                  icon: const Icon(Icons.more_vert_rounded, color: CkColors.textSecondary),
+  Widget build(BuildContext context) => InkWell(
+        onTap: () => openClient(client),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(2, 12, 0, 12),
+          decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0x1F8CBEFF)))),
+          child: Row(children: [
+            _Avatar(client, size: 40),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Flexible(child: Text(client.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15))),
+                  if (client.genderText.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Text(client.genderText, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
+                  ],
+                ]),
+                const SizedBox(height: 3),
+                Text(
+                  [
+                    client.birth == null ? client.dateText : DateFormat('dd-MM-yyyy').format(client.birth!),
+                    client.timeText,
+                    client.city,
+                  ].where((e) => e.trim().isNotEmpty).join(' · '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: CkText.mono(11.5, color: CkColors.textSecondary),
                 ),
               ]),
             ),
-          ),
+            IconButton(
+              tooltip: 'More for ${client.name}',
+              onPressed: () => clientMenu(context, client, onChanged: onChanged),
+              icon: const Icon(Icons.more_vert_rounded, color: CkColors.textSecondary),
+            ),
+          ]),
         ),
       );
 }
-
-// Only the first screenful animates in; cards re-created while scrolling
-// appear instantly so the list never flickers.
-Widget _maybeAnimate(int index, Widget child) =>
-    index < 8 ? FadeSlideIn(index: index, child: child) : child;
 
 Future<void> editClient(BuildContext context, Client c) async {
   final saved = await Get.to(() => ClientFormPage(editId: c.mId));

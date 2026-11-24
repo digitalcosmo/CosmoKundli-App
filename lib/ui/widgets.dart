@@ -1217,3 +1217,120 @@ class UnfocusObserver extends NavigatorObserver {
   @override
   void didReplace({Route? newRoute, Route? oldRoute}) => _off();
 }
+
+// ───────────────────────── filter & sort bar
+
+class FilterOption<T> {
+  final T value;
+  final String label;
+  final int? count;
+  const FilterOption(this.value, this.label, {this.count});
+}
+
+/// Dropdown chip: "Status  Ready ▾". Tinted cyan when not on its default;
+/// the chosen option carries a ✓ in the menu.
+class FilterDropdown<T> extends StatelessWidget {
+  final String label;
+  final List<FilterOption<T>> options;
+  final T value;
+  final T? defaultValue;
+  final ValueChanged<T> onChanged;
+  const FilterDropdown({super.key, required this.label, required this.options, required this.value, this.defaultValue, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final on = value != (defaultValue ?? options.first.value);
+    final cur = options.firstWhere((o) => o.value == value, orElse: () => options.first);
+    return PopupMenuButton<T>(
+      tooltip: label,
+      position: PopupMenuPosition.under,
+      color: CkColors.navySheet,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: CkColors.panelStroke)),
+      onSelected: onChanged,
+      itemBuilder: (c) => [
+        for (final o in options)
+          PopupMenuItem<T>(
+            value: o.value,
+            child: Row(children: [
+              Expanded(
+                child: Text(o.label,
+                    style: TextStyle(fontSize: 14, fontWeight: o.value == value ? FontWeight.w600 : FontWeight.w400, color: o.value == value ? Colors.white : CkColors.textTertiary)),
+              ),
+              if (o.count != null) Text('${o.count}', style: CkText.mono(11, color: CkColors.labelMono)),
+              const SizedBox(width: 10),
+              SizedBox(width: 18, child: o.value == value ? const Icon(Icons.check_rounded, size: 18, color: CkColors.cyan) : null),
+            ]),
+          ),
+      ],
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: on ? CkColors.cyanTint : Colors.transparent,
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(color: on ? CkColors.cyanStroke : CkColors.panelStroke),
+        ),
+        child: Row(children: [
+          if (on) ...[const Icon(Icons.check_rounded, size: 15, color: CkColors.cyan), const SizedBox(width: 4)],
+          Text(label, style: const TextStyle(fontSize: 12.5, color: CkColors.labelMono)),
+          const SizedBox(width: 6),
+          Expanded(child: Text(cur.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+          const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: CkColors.textSecondary),
+        ]),
+      ),
+    );
+  }
+}
+
+class SortOption<T> {
+  final T value;
+  final String label;
+  final bool ascending;
+  const SortOption(this.value, this.label, {required this.ascending});
+}
+
+/// Square sort button showing ↑/↓ of the applied sort; menu marks it with ✓.
+class SortButton<T> extends StatelessWidget {
+  final List<SortOption<T>> options;
+  final T value;
+  final T? defaultValue;
+  final ValueChanged<T> onChanged;
+  const SortButton({super.key, required this.options, required this.value, this.defaultValue, required this.onChanged});
+  @override
+  Widget build(BuildContext context) {
+    final cur = options.firstWhere((o) => o.value == value, orElse: () => options.first);
+    final on = value != (defaultValue ?? options.first.value);
+    return PopupMenuButton<T>(
+      tooltip: 'Sort',
+      position: PopupMenuPosition.under,
+      color: CkColors.navySheet,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: CkColors.panelStroke)),
+      onSelected: onChanged,
+      itemBuilder: (c) => [
+        for (final o in options)
+          PopupMenuItem<T>(
+            value: o.value,
+            child: Row(children: [
+              Icon(o.ascending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, size: 16, color: o.value == value ? CkColors.cyan : CkColors.labelMono),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(o.label,
+                    style: TextStyle(fontSize: 14, fontWeight: o.value == value ? FontWeight.w600 : FontWeight.w400, color: o.value == value ? Colors.white : CkColors.textTertiary)),
+              ),
+              SizedBox(width: 18, child: o.value == value ? const Icon(Icons.check_rounded, size: 18, color: CkColors.cyan) : null),
+            ]),
+          ),
+      ],
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: on ? CkColors.cyanTint : Colors.transparent,
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(color: on ? CkColors.cyanStroke : CkColors.panelStroke),
+        ),
+        child: Icon(cur.ascending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, size: 18, color: on ? CkColors.cyan : CkColors.text),
+      ),
+    );
+  }
+}

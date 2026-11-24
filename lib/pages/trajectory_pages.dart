@@ -12,6 +12,7 @@ import '../ui/widgets.dart';
 import '../ui/zoom_chart.dart';
 import 'blueprint_pages.dart';
 import 'client_shell.dart';
+import 'clients_page.dart';
 
 ClientData get _data => ClientData.of(Session.client.value?.mId ?? '');
 
@@ -89,32 +90,63 @@ DateTime _move(DateTime t, _Step s, int dir) {
   }
 }
 
-class TransitPage extends StatefulWidget {
+/// Client Transit: the same screen as the Transit tool, opened with this
+/// client already chosen.
+class TransitPage extends StatelessWidget {
   const TransitPage({super.key});
   @override
-  State<TransitPage> createState() => _TransitPageState();
+  Widget build(BuildContext context) => ClientPage(
+        title: 'Transit',
+        children: [TransitBody(client: Session.client.value, lockClient: true)],
+      );
 }
 
-class _TransitPageState extends State<TransitPage> {
-  final _birth = _data.chart();
+/// Transit controls, chart and table, shared by the Transit tool (no client,
+/// optional compare) and a client's Transit page (client fixed).
+class TransitBody extends StatefulWidget {
+  final Client? client;
+  final bool lockClient;
+  final String? subtitleHint;
+  final Future<Client?> Function()? source; // mID used for the sky when no client
+  final ValueChanged<String>? onSubtitle;
+  const TransitBody({super.key, this.client, this.lockClient = false, this.subtitleHint, this.source, this.onSubtitle});
+  @override
+  State<TransitBody> createState() => TransitBodyState();
+}
+
+class TransitBodyState extends State<TransitBody> {
   DateTime _at = DateTime.now();
   _Step _step = _Step.d1;
   bool _live = true;
   Timer? _timer;
-  late Future<List<GrahPos>> _transit = _data.transit(_at);
+  Client? _cmp;
+  String? _srcId;
+  Future<List<GrahPos>>? _transit;
+  Future<List<GrahPos>>? _birth;
   List<GrahPos>? _last;
+
+  DateTime get at => _at;
 
   @override
   void initState() {
     super.initState();
-    _startLive();
-  }
-
-  void _startLive() {
-    _timer?.cancel();
-    if (_live) {
-      _timer = Timer.periodic(const Duration(minutes: 1), (_) => _set(DateTime.now(), keepLive: true));
+    _cmp = widget.client;
+    if (_cmp != null) {
+      _srcId = _cmp!.mId;
+      _birth = ClientData.of(_cmp!.mId).chart();
+      _load();
+    } else if (widget.source != null) {
+      widget.source!().then((c) {
+        if (!mounted || c == null) return;
+        setState(() {
+          _srcId = c.mId;
+          _load();
+        });
+      });
     }
+    _timer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (_live && mounted) _set(DateTime.now(), live: true);
+    });
   }
 
   @override
@@ -123,192 +155,374 @@ class _TransitPageState extends State<TransitPage> {
     super.dispose();
   }
 
-  void _set(DateTime t, {bool keepLive = false}) {
-    setState(() {
-      _at = t;
-      if (!keepLive) _live = false;
-      _transit = _data.transit(t)..then((v) => _last = v);
-    });
-    if (!keepLive) _timer?.cancel();
+  void _load() {
+    if (_srcId == null) return;
+    _transit = ClientData(_srcId!).transit(_at)..then((v) => _last = v).catchError((_) => <GrahPos>[]);
   }
 
-  Future<void> _pick() async {
+  void _set(DateTime t, {bool live = false}) => setState(() {
+        _at = t;
+        _live = live;
+        _load();
+      });
+
+  Future<void> pickTime() async {
     final d = await showDatePicker(context: context, initialDate: _at, firstDate: DateTime(1900), lastDate: DateTime(2200));
     if (d == null || !mounted) return;
     final t = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(_at));
     _set(DateTime(d.year, d.month, d.day, t?.hour ?? _at.hour, t?.minute ?? _at.minute));
   }
 
+  Future<void> _compare() async {
+    final c = await pickClientSheet(context);
+    if (c == null || !mounted) return;
+    setState(() {
+      _cmp = c;
+      _birth = ClientData.of(c.mId).chart();
+    });
+  }
+
+  String get whenText {
+    final now = DateTime.now();
+    final same = _at.year == now.year && _at.month == now.month && _at.day == now.day;
+    return '${same ? 'Today' : DateFormat('d MMM yyyy').format(_at)} · ${DateFormat('HH:mm').format(_at)}';
+  }
+
   @override
-  Widget build(BuildContext context) => ClientPage(
-        title: 'Transit',
-        padding: const EdgeInsets.fromLTRB(14, 0, 14, 120),
-        children: [
-          Row(children: [
-            Expanded(
-              child: Pressable(
-                onTap: _pick,
-                child: Container(
-                  height: 42,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(color: CkColors.cyanTint, borderRadius: BorderRadius.circular(12), border: Border.all(color: CkColors.cyanStroke)),
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        Expanded(
+          child: Text(_cmp == null ? 'Sky now' : 'With ${_cmp!.name}\'s chart',
+              maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, color: CkColors.textSecondary)),
+        ),
+        Pressable(
+          onTap: pickTime,
+          child: Container(
+            height: 36,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(color: CkColors.orangeTint, borderRadius: BorderRadius.circular(10), border: Border.all(color: CkColors.orangeStroke)),
+            child: Row(children: [
+              const Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFFFFD08A)),
+              const SizedBox(width: 6),
+              Text(whenText, style: CkText.mono(12, color: const Color(0xFFFFD08A))),
+            ]),
+          ),
+        ),
+      ]),
+      const SizedBox(height: 10),
+      FutureBuilder<List<dynamic>>(
+        future: Future.wait<List<GrahPos>>([_transit ?? Future.value(<GrahPos>[]), _birth ?? Future.value(<GrahPos>[])]),
+        builder: (c, s) {
+          if (_srcId == null) {
+            return const Padding(padding: EdgeInsets.all(40), child: Center(child: Text('Add a client first to read the sky.', style: CkText.muted)));
+          }
+          final t = s.hasData ? s.data![0] as List<GrahPos> : _last;
+          final birth = s.hasData ? s.data![1] as List<GrahPos> : const <GrahPos>[];
+          if (t == null || (t.isEmpty && !s.hasData)) return const SkeletonCard(height: 340);
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            RepaintBoundary(
+              child: Glass(
+                frost: false,
+                padding: const EdgeInsets.all(6),
+                child: Stack(children: [
+                  ZoomChart(child: KundliChart(birth, transit: t)),
+                  const Positioned(left: 10, top: 8, child: Text('Pinch to zoom', style: TextStyle(fontSize: 11, color: CkColors.textSecondary))),
+                ]),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(children: [
+              for (final st in _Step.values)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2.5),
+                    child: Pressable(
+                      onTap: () => setState(() => _step = st),
+                      child: AnimatedContainer(
+                        duration: CkMotion.fast,
+                        height: 38,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: _step == st ? CkColors.orangeTint : Colors.transparent,
+                          borderRadius: BorderRadius.circular(11),
+                          border: Border.all(color: _step == st ? CkColors.orangeStroke : CkColors.panelStroke),
+                        ),
+                        child: Text(_stepLabel[st]!, style: CkText.mono(12.5, color: _step == st ? const Color(0xFFFFD08A) : CkColors.textTertiary)),
+                      ),
+                    ),
+                  ),
+                ),
+            ]),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(
+                child: Pressable(
+                  onTap: () => _set(DateTime.now(), live: true),
+                  child: Glass(
+                    frost: false,
+                    height: 46,
+                    radius: 13,
+                    alignment: Alignment.center,
+                    stroke: _live ? const Color(0x8010B981) : CkColors.panelStroke,
+                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _live ? const Color(0xFF10B981) : CkColors.labelMono,
+                          boxShadow: _live ? const [BoxShadow(color: Color(0xFF10B981), blurRadius: 8)] : null,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text('Real time', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Glass(
+                  frost: false,
+                  height: 46,
+                  radius: 13,
                   child: Row(children: [
-                    const Icon(Icons.calendar_today_outlined, size: 15, color: CkColors.cyan),
-                    const SizedBox(width: 8),
-                    Text(DateFormat('dd-MM-yyyy · HH:mm').format(_at), style: CkText.mono(13)),
+                    IconButton(onPressed: () => _set(_move(_at, _step, -1)), icon: const Icon(Icons.chevron_left_rounded), tooltip: 'Step back'),
+                    Expanded(child: Text('STEP ${_stepLabel[_step]}', textAlign: TextAlign.center, style: CkText.mono(12, color: CkColors.textSecondary))),
+                    IconButton(onPressed: () => _set(_move(_at, _step, 1)), icon: const Icon(Icons.chevron_right_rounded), tooltip: 'Step forward'),
                   ]),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Pressable(
-              onTap: () {
-                setState(() => _live = true);
-                _set(DateTime.now(), keepLive: true);
-                _startLive();
-              },
-              child: Container(
-                height: 42,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: _live ? CkColors.cyanTint : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _live ? CkColors.cyanStroke : CkColors.panelStroke),
+            ]),
+            if (!widget.lockClient) ...[
+              const SizedBox(height: 10),
+              Pressable(
+                onTap: _compare,
+                child: Glass(
+                  stroke: _cmp == null ? CkColors.panelStroke : CkColors.cyanStroke,
+                  padding: EdgeInsets.fromLTRB(14, _cmp == null ? 12 : 8, _cmp == null ? 14 : 8, _cmp == null ? 12 : 8),
+                  child: Row(children: [
+                    const Icon(Icons.people_outline_rounded, size: 19, color: CkColors.cyan),
+                    const SizedBox(width: 10),
+                    if (_cmp == null) ...[
+                      const Expanded(child: Text('Compare with a client', style: TextStyle(fontSize: 14))),
+                      const Text('Choose ▾', style: TextStyle(fontSize: 12.5, color: CkColors.textSecondary)),
+                    ] else ...[
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(_cmp!.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                          Text(_cmp!.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: CkText.mono(11, color: CkColors.textSecondary)),
+                        ]),
+                      ),
+                      Pressable(
+                        onTap: () => openClient(_cmp!),
+                        child: Container(
+                          height: 34,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(color: CkColors.cyanTint, borderRadius: BorderRadius.circular(10), border: Border.all(color: CkColors.cyanStroke)),
+                          child: const Text('Open client', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500)),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Semantics(
+                        button: true,
+                        label: 'Remove client',
+                        child: Pressable(
+                          onTap: () => setState(() {
+                            _cmp = null;
+                            _birth = null;
+                          }),
+                          child: Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: CkColors.panelStroke)),
+                            child: const Icon(Icons.close_rounded, size: 17, color: CkColors.textTertiary),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ]),
                 ),
-                child: Row(children: [
-                  Container(width: 7, height: 7, decoration: BoxDecoration(shape: BoxShape.circle, color: _live ? CkColors.cyan : CkColors.labelMono)),
-                  const SizedBox(width: 6),
-                  Text('LIVE', style: CkText.mono(12, color: _live ? Colors.white : CkColors.textSecondary)),
-                ]),
               ),
-            ),
-          ]),
-          FutureBuilder<List<dynamic>>(
-            future: Future.wait([_birth, _transit]),
-            builder: (c, s) {
-              final birth = s.hasData ? s.data![0] as List<GrahPos> : null;
-              final tr = s.hasData ? s.data![1] as List<GrahPos> : _last;
-              if (s.hasError) return ErrorBox(message: 'Couldn\'t load the transit.', onRetry: () => _set(_at, keepLive: _live));
-              if (birth == null || tr == null) {
-                return const SkeletonCard(height: 360);
-              }
-              return Column(children: [
-                // Full-bleed: the chart breaks out of the page padding and
-                // uses the screen width minus a small safe margin.
-                LayoutBuilder(builder: (ctx, box) {
-                  final w = MediaQuery.of(ctx).size.width - 8;
-                  return SizedBox(
-                    height: w,
-                    child: OverflowBox(
-                      minWidth: w, maxWidth: w, minHeight: w, maxHeight: w,
-                      child: ZoomChart(child: KundliChart(birth, transit: tr)),
-                    ),
-                  );
-                }),
-                const SizedBox(height: 8),
-                Row(
-                  children: _Step.values
-                      .map((st) => Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 2.5),
-                              child: Pressable(
-                                onTap: () => setState(() => _step = st),
-                                child: AnimatedContainer(
-                                  duration: CkMotion.fast,
-                                  height: 36,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: st == _step ? CkColors.cyanTint : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: st == _step ? CkColors.cyanStroke : CkColors.panelStroke),
-                                  ),
-                                  child: Text(_stepLabel[st]!,
-                                      style: CkText.mono(12, color: st == _step ? Colors.white : CkColors.textSecondary)),
-                                ),
-                              ),
-                            ),
-                          ))
-                      .toList(),
+            ],
+            CoordTable(birth: birth, transit: t),
+          ]);
+        },
+      ),
+    ]);
+  }
+}
+
+/// Bottom sheet listing clients, with search.
+Future<Client?> pickClientSheet(BuildContext context) => showModalBottomSheet<Client>(
+      useRootNavigator: true,
+      context: context,
+      isScrollControlled: true,
+      builder: (s) => const _PickClient(),
+    );
+
+class _PickClient extends StatefulWidget {
+  const _PickClient();
+  @override
+  State<_PickClient> createState() => _PickClientState();
+}
+
+class _PickClientState extends State<_PickClient> {
+  final _f = fetchClients();
+  String _q = '';
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: SafeArea(
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * .7,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Compare with a client', style: CkText.h(18)),
+                const SizedBox(height: 12),
+                TextField(
+                  onChanged: (v) => setState(() => _q = v.trim().toLowerCase()),
+                  decoration: const InputDecoration(hintText: 'Search name, year, place', prefixIcon: Icon(Icons.search_rounded)),
                 ),
-                const SizedBox(height: 8),
-                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Pressable(
-                    onTap: () => _set(_move(_at, _step, -1)),
-                    child: const Glass(width: 64, height: 40, radius: 12, alignment: Alignment.center, child: Icon(Icons.chevron_left_rounded, size: 22)),
+                Expanded(
+                  child: FutureBuilder<List<Client>>(
+                    future: _f,
+                    builder: (c, s) {
+                      if (s.hasError) return const Center(child: Text('Couldn\'t load clients', style: CkText.muted));
+                      if (!s.hasData) return const SkeletonList(rows: 5);
+                      final l = s.data!.where((e) => _q.isEmpty || '${e.name} ${e.city} ${e.dobRaw}'.toLowerCase().contains(_q)).toList();
+                      return ListView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, children: [
+                        Padding(padding: const EdgeInsets.only(top: 14, bottom: 4), child: Text('${l.length} CLIENTS', style: CkText.label)),
+                        for (final cl in l)
+                          InkWell(
+                            onTap: () => Navigator.pop(context, cl),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 11),
+                              decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x1F8CBEFF)))),
+                              child: Row(children: [
+                                Container(
+                                  width: 34,
+                                  height: 34,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0x598CBEFF))),
+                                  child: Text(cl.initials, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                    Text(cl.name, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
+                                    Text(cl.subtitle, style: CkText.mono(11.5, color: CkColors.textSecondary)),
+                                  ]),
+                                ),
+                              ]),
+                            ),
+                          ),
+                      ]);
+                    },
                   ),
-                  const SizedBox(width: 8),
-                  Pressable(
-                    onTap: () => _set(_move(_at, _step, 1)),
-                    child: const Glass(width: 64, height: 40, radius: 12, alignment: Alignment.center, child: Icon(Icons.chevron_right_rounded, size: 22)),
-                  ),
-                ]),
-                _CoordTable(birth: birth, transit: tr),
-              ]);
-            },
+                ),
+              ]),
+            ),
           ),
-        ],
+        ),
       );
 }
 
-class _CoordTable extends StatelessWidget {
+class CoordTable extends StatelessWidget {
   final List<GrahPos> birth;
   final List<GrahPos> transit;
-  const _CoordTable({required this.birth, required this.transit});
+  const CoordTable({super.key, required this.birth, required this.transit});
 
-  Widget _pos(GrahPos? p) => p == null
-      ? const Text('—')
-      : Row(children: [
-          Flexible(child: Text(rashiName(p.rashi), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13))),
-          const SizedBox(width: 5),
-          Text(fmtDeg(p.degIn), style: CkText.mono(12.5)),
-          if (p.retro) const RetroBadge(),
+  Widget _cell(GrahPos? p, {bool tr = false}) => p == null
+      ? const Text('—', style: TextStyle(color: CkColors.textDim))
+      : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(rashiName(p.rashi), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, color: tr ? const Color(0xFFFFD08A) : CkColors.textSecondary)),
+          const SizedBox(height: 4),
+          Row(children: [
+            Text(fmtDegMin(p.degIn), style: CkText.mono(16, w: FontWeight.w600)),
+            if (p.retro) const RetroBadge(),
+          ]),
         ]);
 
+  Widget _grah(String id) => SizedBox(
+        width: 64,
+        child: Row(children: [
+          GrahDot(id, size: 8),
+          const SizedBox(width: 8),
+          Text(id, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+        ]),
+      );
+
   @override
-  Widget build(BuildContext context) => Glass(
-        margin: const EdgeInsets.only(top: 12),
-        radius: 18,
-        padding: const EdgeInsets.all(14),
-        child: Column(children: [
-          const CardTitle('GRAH Coordinates', Icons.table_chart_outlined),
-          Row(children: [
-            const SizedBox(width: 58, child: Text('GRAH', style: CkText.label)),
+  Widget build(BuildContext context) {
+    final hasBirth = birth.isNotEmpty;
+    GrahPos? find(List<GrahPos> l, String id) {
+      for (final p in l) {
+        if (p.id == id) return p;
+      }
+      return null;
+    }
+
+    const divider = BoxDecoration(border: Border(top: BorderSide(color: Color(0x1F8CBEFF))));
+    return Glass(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 4),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('GRAH Coordinates', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 12),
+        Row(children: [
+          const SizedBox(width: 64, child: Text('GRAH', style: CkText.label)),
+          const SizedBox(width: 12),
+          if (hasBirth) ...[
             const Expanded(child: Text('COSMOKUNDLI', style: CkText.label)),
+            const SizedBox(width: 12),
             Expanded(child: Text('TRANSIT', style: CkText.label.copyWith(color: const Color(0xFFFFB27A)))),
-          ]),
-          const SizedBox(height: 6),
-          ...kGrahOrder.map((id) {
-            GrahPos? b, t;
-            for (final p in birth) {
-              if (p.id == id) b = p;
-            }
-            for (final p in transit) {
-              if (p.id == id) t = p;
-            }
-            if (b == null && t == null) return const SizedBox();
-            return Container(
-              padding: const EdgeInsets.symmetric(vertical: 9),
-              decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x14FFFFFF)))),
+          ] else ...[
+            Expanded(child: Text('TRANSIT · NAKSHATRA', style: CkText.label.copyWith(color: const Color(0xFFFFB27A)))),
+            const Text('DEGREE', style: CkText.label),
+          ],
+        ]),
+        const SizedBox(height: 10),
+        for (final id in kGrahOrder)
+          if ((hasBirth && (find(birth, id) != null || find(transit, id) != null)) || (!hasBirth && id != 'As' && find(transit, id) != null))
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              decoration: divider,
               child: Row(children: [
-                SizedBox(
-                  width: 58,
-                  child: Row(children: [
-                    GrahDot(id, size: 8),
-                    const SizedBox(width: 7),
-                    Flexible(child: Text(id, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+                _grah(id),
+                const SizedBox(width: 12),
+                if (hasBirth) ...[
+                  Expanded(child: _cell(find(birth, id))),
+                  const SizedBox(width: 12),
+                  Expanded(child: _cell(find(transit, id), tr: true)),
+                ] else ...[
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(rashiName(find(transit, id)!.rashi), style: const TextStyle(fontSize: 13, color: Color(0xFFFFD08A))),
+                      const SizedBox(height: 3),
+                      Text(find(transit, id)!.nakshatra, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, color: CkColors.textSecondary)),
+                    ]),
+                  ),
+                  Row(children: [
+                    Text(fmtDegMin(find(transit, id)!.degIn), style: CkText.mono(16, w: FontWeight.w600)),
+                    SizedBox(width: 9, child: find(transit, id)!.retro ? const RetroBadge() : null),
                   ]),
-                ),
-                Expanded(child: _pos(b)),
-                Expanded(child: _pos(t)),
+                ],
               ]),
-            );
-          }),
-          const SizedBox(height: 6),
-          const Row(children: [
+            ),
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: divider,
+          child: const Row(children: [
             RetroBadge(),
             SizedBox(width: 6),
             Text('Retrograde (vakri)', style: TextStyle(fontSize: 11.5, color: CkColors.textSecondary)),
           ]),
-        ]),
-      );
+        ),
+      ]),
+    );
+  }
 }

@@ -107,7 +107,7 @@ class Glass extends StatelessWidget {
     this.height,
     this.shadow = true,
     this.alignment,
-    this.frost = true,
+    this.frost = false,
     this.liquid = false,
   });
 
@@ -159,7 +159,7 @@ class Glass extends StatelessWidget {
       margin: margin,
       decoration: shadow
           ? BoxDecoration(borderRadius: r, boxShadow: const [
-              BoxShadow(color: Color(0x26000000), blurRadius: 18, offset: Offset(0, 8)),
+              BoxShadow(color: Color(0x26000000), blurRadius: 12, offset: Offset(0, 6)),
             ])
           : null,
       child: body,
@@ -229,7 +229,7 @@ class FadeSlideIn extends StatefulWidget {
 class _FadeSlideInState extends State<FadeSlideIn>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 520));
+      vsync: this, duration: const Duration(milliseconds: 340));
   late final Animation<double> _t = CurvedAnimation(parent: _c, curve: kEase);
 
   @override
@@ -239,7 +239,7 @@ class _FadeSlideInState extends State<FadeSlideIn>
     if (i == 0) {
       _c.forward();
     } else {
-      Future.delayed(Duration(milliseconds: 55 * i), () {
+      Future.delayed(Duration(milliseconds: 35 * i), () {
         if (mounted) _c.forward();
       });
     }
@@ -430,4 +430,22 @@ class LiquidGlass extends StatelessWidget {
       );
     });
   }
+}
+
+/// Light page transition: a short fade with a slight scale, cheaper and
+/// smoother than a full-page slide over glass content.
+class CkRoute<T> extends PageRouteBuilder<T> {
+  CkRoute({required WidgetBuilder builder, super.settings})
+      : super(
+          transitionDuration: const Duration(milliseconds: 240),
+          reverseTransitionDuration: const Duration(milliseconds: 200),
+          pageBuilder: (c, a, b) => builder(c),
+          transitionsBuilder: (c, a, b, child) {
+            final t = CurvedAnimation(parent: a, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+            return FadeTransition(
+              opacity: t,
+              child: ScaleTransition(scale: Tween(begin: .97, end: 1.0).animate(t), child: child),
+            );
+          },
+        );
 }

@@ -34,8 +34,8 @@ class CosmoKundliApp extends StatelessWidget {
       theme: CkTheme.dark(),
       darkTheme: CkTheme.dark(),
       themeMode: ThemeMode.dark,
-      defaultTransition: Transition.cupertino,
-      transitionDuration: const Duration(milliseconds: 320),
+      defaultTransition: Transition.fadeIn,
+      transitionDuration: const Duration(milliseconds: 240),
       home: const SplashPage(),
       navigatorObservers: [UnfocusObserver()],
       builder: (context, child) => MediaQuery(

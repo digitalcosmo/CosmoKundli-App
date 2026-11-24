@@ -234,6 +234,17 @@ class _WorkspacePageState extends State<WorkspacePage> {
     }
   }
 
+  Future<void> _reset() async {
+    final ok = await confirm(context, 'Reset $_layout?',
+        'Modules, order and sizes go back to the default for this layout. Other layouts stay as they are.',
+        ok: 'Reset');
+    if (!ok) return;
+    setState(() {
+      _items = _defaultLayout(_layout);
+      _save();
+    });
+  }
+
   Future<void> _add() async {
     final id = await showModalBottomSheet<String>(
       useRootNavigator: true,
@@ -261,31 +272,7 @@ class _WorkspacePageState extends State<WorkspacePage> {
       title: 'Workspace',
       isRoot: true,
       animate: false,
-      floating: _edit && _items.isNotEmpty
-          ? Pressable(
-              onTap: _add,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-                decoration: BoxDecoration(
-                  color: CkColors.cyan,
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: const [BoxShadow(color: Color(0x665CE1FF), blurRadius: 22, offset: Offset(0, 8))],
-                ),
-                child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.add_rounded, color: Color(0xFF06204F), size: 20),
-                  SizedBox(width: 6),
-                  Text('Add module', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF06204F))),
-                ]),
-              ),
-            )
-          : null,
-      onRefresh: () async {
-        ClientData.of(mId).chart(refresh: true);
-        ClientData.of(mId).shadbal(refresh: true);
-        setState(() {});
-      },
-      children: [
-        // layouts + edit controls
+      pinned: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         SizedBox(
           height: 36,
           child: Row(children: [
@@ -302,7 +289,21 @@ class _WorkspacePageState extends State<WorkspacePage> {
               ),
             ),
             if (_edit) ...[
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
+              Semantics(
+                button: true,
+                label: 'Add module',
+                child: Pressable(
+                  onTap: _add,
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(color: CkColors.cyanTint, borderRadius: BorderRadius.circular(10), border: Border.all(color: CkColors.cyanStroke)),
+                    child: const Icon(Icons.add_rounded, size: 20, color: CkColors.cyan),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
               _Chip('Done', filled: true, onTap: () {
                 _save();
                 workspaceEditing.value = false;
@@ -312,10 +313,27 @@ class _WorkspacePageState extends State<WorkspacePage> {
         ),
         if (_edit)
           Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: Text('HOLD TO MOVE · DRAG CORNER TO RESIZE', style: CkText.label.copyWith(fontSize: 9.5)),
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(children: [
+              Expanded(child: Text('HOLD TO MOVE · DRAG ANY EDGE OR CORNER TO RESIZE', style: CkText.label.copyWith(fontSize: 9.5))),
+              GestureDetector(
+                onTap: _reset,
+                child: const Row(children: [
+                  Icon(Icons.restart_alt_rounded, size: 15, color: CkColors.textSecondary),
+                  SizedBox(width: 3),
+                  Text('Reset', style: TextStyle(fontSize: 12.5, color: CkColors.textSecondary)),
+                ]),
+              ),
+            ]),
           ),
-        const SizedBox(height: 12),
+      ]),
+      onRefresh: () async {
+        ClientData.of(mId).chart(refresh: true);
+        ClientData.of(mId).shadbal(refresh: true);
+        setState(() {});
+      },
+      children: [
+        const SizedBox(height: 4),
         LayoutBuilder(builder: (ctx, box) {
           _stackWidth = box.maxWidth;
           final rects = _pack(_items, box.maxWidth);
@@ -386,6 +404,93 @@ class _WorkspacePageState extends State<WorkspacePage> {
         }),
         const SizedBox(height: 16),
       ],
+    );
+  }
+
+  /// A resize handle at side (dx, dy): -1/0/1 for left/centre/right and
+  /// top/middle/bottom. Edges move only their own side of the tile.
+  Widget _handle(int i, List<Rect> rects, int dx, int dy) {
+    final corner = dx != 0 && dy != 0;
+    const hit = 34.0;
+    final bar = corner
+        ? Container(
+            width: 13,
+            height: 13,
+            decoration: BoxDecoration(
+              border: Border(
+                left: dx < 0 ? const BorderSide(color: CkColors.cyan, width: 2.5) : BorderSide.none,
+                right: dx > 0 ? const BorderSide(color: CkColors.cyan, width: 2.5) : BorderSide.none,
+                top: dy < 0 ? const BorderSide(color: CkColors.cyan, width: 2.5) : BorderSide.none,
+                bottom: dy > 0 ? const BorderSide(color: CkColors.cyan, width: 2.5) : BorderSide.none,
+              ),
+              borderRadius: BorderRadius.only(
+                topLeft: dx < 0 && dy < 0 ? const Radius.circular(7) : Radius.zero,
+                topRight: dx > 0 && dy < 0 ? const Radius.circular(7) : Radius.zero,
+                bottomLeft: dx < 0 && dy > 0 ? const Radius.circular(7) : Radius.zero,
+                bottomRight: dx > 0 && dy > 0 ? const Radius.circular(7) : Radius.zero,
+              ),
+            ),
+          )
+        : Container(
+            width: dx == 0 ? 28 : 5,
+            height: dy == 0 ? 28 : 5,
+            decoration: BoxDecoration(
+              color: CkColors.cyan,
+              borderRadius: BorderRadius.circular(3),
+              boxShadow: const [BoxShadow(color: Color(0x995CE1FF), blurRadius: 8)],
+            ),
+          );
+    return Positioned(
+      left: dx < 0 ? -hit / 2 + 3 : (dx == 0 ? 0 : null),
+      right: dx > 0 ? -hit / 2 + 3 : (dx == 0 ? 0 : null),
+      top: dy < 0 ? -hit / 2 + 3 : (dy == 0 ? 0 : null),
+      bottom: dy > 0 ? -hit / 2 + 3 : (dy == 0 ? 0 : null),
+      child: Align(
+        child: RawGestureDetector(
+          behavior: HitTestBehavior.opaque,
+          gestures: {
+            _EagerPan: GestureRecognizerFactoryWithHandlers<_EagerPan>(
+              () => _EagerPan(),
+              (r) => r
+                ..onStart = (_) {
+                  HapticFeedback.selectionClick();
+                  setState(() {
+                    _resizing = i;
+                    _resizeRect = rects[i];
+                  });
+                }
+                ..onUpdate = (d) {
+                  final r = _resizeRect!;
+                  final nr = Rect.fromLTRB(
+                    r.left + (dx < 0 ? d.delta.dx : 0),
+                    r.top + (dy < 0 ? d.delta.dy : 0),
+                    r.right + (dx > 0 ? d.delta.dx : 0),
+                    r.bottom + (dy > 0 ? d.delta.dy : 0),
+                  );
+                  final cw = (_stackWidth - _gap) / 2;
+                  final cols = dx == 0 ? _items[i].size.cols : (nr.width > cw * 1.45 ? 2 : 1);
+                  final rows = dy == 0 ? _items[i].size.rows : (nr.height > _unit * 1.45 ? 2 : 1);
+                  final ns = WSizeX.of(cols, rows);
+                  setState(() {
+                    _resizeRect = nr;
+                    if (ns != _items[i].size) {
+                      HapticFeedback.selectionClick();
+                      _items[i].size = ns;
+                    }
+                  });
+                }
+                ..onEnd = (_) {
+                  setState(() {
+                    _resizing = null;
+                    _resizeRect = null;
+                    _save();
+                  });
+                },
+            ),
+          },
+          child: SizedBox(width: dx == 0 ? 56 : hit, height: dy == 0 ? 56 : hit, child: Center(child: bar)),
+        ),
+      ),
     );
   }
 
@@ -475,67 +580,14 @@ class _WorkspacePageState extends State<WorkspacePage> {
           ),
         ),
       ),
-      // resize corner
-      Positioned(
-        right: -6,
-        bottom: -6,
-        child: RawGestureDetector(
-          behavior: HitTestBehavior.opaque,
-          gestures: {
-            _EagerPan: GestureRecognizerFactoryWithHandlers<_EagerPan>(
-              () => _EagerPan(),
-              (r) => r
-                ..onStart = (_) {
-            HapticFeedback.selectionClick();
-            setState(() {
-              _resizing = i;
-              _resizeRect = rects[i];
-            });
-                }
-                ..onUpdate = (d) {
-            final r = _resizeRect!;
-            final nr = Rect.fromLTRB(r.left, r.top, r.right + d.delta.dx, r.bottom + d.delta.dy);
-            final cw = (_stackWidth - _gap) / 2;
-            final cols = nr.width > cw * 1.45 ? 2 : 1;
-            final rows = nr.height > _unit * 1.45 ? 2 : 1;
-            final ns = WSizeX.of(cols, rows);
-            setState(() {
-              _resizeRect = nr;
-              if (ns != _items[i].size) {
-                HapticFeedback.selectionClick();
-                _items[i].size = ns;
-              }
-            });
-                }
-                ..onEnd = (_) {
-                  setState(() {
-                    _resizing = null;
-                    _resizeRect = null;
-                    _save();
-                  });
-                },
-            ),
-          },
-          child: SizedBox(
-            width: 36,
-            height: 36,
-            child: Align(
-              alignment: const Alignment(-.1, -.1),
-              child: Container(
-                width: 14,
-                height: 14,
-                decoration: const BoxDecoration(
-                  border: Border(
-                    right: BorderSide(color: CkColors.cyan, width: 2.5),
-                    bottom: BorderSide(color: CkColors.cyan, width: 2.5),
-                  ),
-                  borderRadius: BorderRadius.only(bottomRight: Radius.circular(8)),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+      // resize handles: four edges and four corners
+      // (top-left corner is the remove button)
+      for (final h in const [
+        (0, -1), (1, -1),
+        (-1, 0), (1, 0),
+        (-1, 1), (0, 1), (1, 1),
+      ])
+        _handle(i, rects, h.$1, h.$2),
     ]);
   }
 }

@@ -276,7 +276,7 @@ class _MelapakPageState extends State<MelapakPage> {
               Pressable(
                 onTap: () async {
                   final f = await Navigator.of(context).push<Future<Map<String, dynamic>>>(
-                      CupertinoPageRoute(builder: (_) => _NewPersonPage(clientId: _client.mId)));
+                      CkRoute(builder: (_) => _NewPersonPage(clientId: _client.mId)));
                   if (f != null) _open(f);
                 },
                 child: Container(
@@ -600,7 +600,7 @@ class _MelapakToolPageState extends State<MelapakToolPage> {
     final a = _a;
     if (a == null) return;
     final f = await Navigator.of(context)
-        .push<Future<Map<String, dynamic>>>(CupertinoPageRoute(builder: (_) => _NewPersonPage(clientId: a.mId)));
+        .push<Future<Map<String, dynamic>>>(CkRoute(builder: (_) => _NewPersonPage(clientId: a.mId)));
     if (f != null && mounted) pushModule(context, MelapakResultPage(future: f));
   }
 

@@ -641,7 +641,7 @@ class ClientReportsPage extends StatefulWidget {
 
 class _ClientReportsPageState extends State<ClientReportsPage> with _HistoryPoll {
   Future<void> _openGroup(ReportGroup g) async {
-    final made = await Navigator.of(context).push<bool>(CupertinoPageRoute(builder: (_) => ReportGroupPage(group: g)));
+    final made = await Navigator.of(context).push<bool>(CkRoute(builder: (_) => ReportGroupPage(group: g)));
     if (made == true) reloadHistory();
   }
 
@@ -877,7 +877,7 @@ class _ReportCard extends StatelessWidget {
             const SizedBox(height: 10),
             Row(children: [
               Pressable(
-                onTap: () => Navigator.of(context).push(CupertinoPageRoute(
+                onTap: () => Navigator.of(context).push(CkRoute(
                     builder: (_) => PdfViewPage(title: '${type.title} · sample', asset: type.sampleAsset, fileName: '${type.title} sample.pdf'))),
                 child: const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
@@ -1030,24 +1030,8 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
   String _q = '';
   ReportState? _state;
   String? _type;
+  String _sort = 'new';
   late Future<Map<String, dynamic>> _credits = Api.post(Endpoints.credits, {'uID': Session.uid});
-
-  Widget _pill(String t, bool on, VoidCallback tap) => Padding(
-        padding: const EdgeInsets.only(right: 6),
-        child: Pressable(
-          onTap: tap,
-          child: AnimatedContainer(
-            duration: CkMotion.fast,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            decoration: BoxDecoration(
-              color: on ? CkColors.cyanTint : Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: on ? CkColors.cyanStroke : CkColors.panelStroke),
-            ),
-            child: Text(t, style: CkText.mono(12, color: on ? Colors.white : CkColors.textSecondary)),
-          ),
-        ),
-      );
 
   @override
   Widget build(BuildContext context) => CkScaffold(
@@ -1073,6 +1057,22 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
                     .where((e) => _type == null || e.source == _type)
                     .where((e) => _q.isEmpty || '${e.name} ${e.title}'.toLowerCase().contains(_q))
                     .toList();
+                int byDate(ReportItem a, ReportItem b) {
+                  final c = (a.created ?? DateTime(0)).compareTo(b.created ?? DateTime(0));
+                  return c != 0 ? c : (int.tryParse(a.id) ?? 0).compareTo(int.tryParse(b.id) ?? 0);
+                }
+
+                switch (_sort) {
+                  case 'old':
+                    l.sort(byDate);
+                  case 'az':
+                    l.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+                  case 'za':
+                    l.sort((a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+                  default:
+                    l.sort((a, b) => byDate(b, a));
+                }
+                final grouped = _sort == 'new' || _sort == 'old';
                 final now = DateTime.now();
                 final today = DateTime(now.year, now.month, now.day);
                 final groups = <String, List<ReportItem>>{};
@@ -1110,24 +1110,47 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
                       decoration: const InputDecoration(hintText: 'Search client or report', prefixIcon: Icon(Icons.search_rounded)),
                     ),
                     const SizedBox(height: 10),
-                    SizedBox(
-                      height: 34,
-                      child: ListView(scrollDirection: Axis.horizontal, children: [
-                        _pill('All · ${count(null)}', _state == null, () => setState(() => _state = null)),
-                        _pill('Generating · ${count(ReportState.generating)}', _state == ReportState.generating, () => setState(() => _state = ReportState.generating)),
-                        _pill('Ready · ${count(ReportState.ready)}', _state == ReportState.ready, () => setState(() => _state = ReportState.ready)),
-                        _pill('Expired · ${count(ReportState.expired)}', _state == ReportState.expired, () => setState(() => _state = ReportState.expired)),
-                      ]),
-                    ),
-                    const SizedBox(height: 6),
-                    SizedBox(
-                      height: 34,
-                      child: ListView(scrollDirection: Axis.horizontal, children: [
-                        _pill('Any report', _type == null, () => setState(() => _type = null)),
-                        for (final e in const [('CKP', 'Planner'), ('CKPP', 'Plus'), ('CKPM', 'Max'), ('GV', 'Vibes')])
-                          _pill(e.$2, _type == e.$1, () => setState(() => _type = _type == e.$1 ? null : e.$1)),
-                      ]),
-                    ),
+                    Row(children: [
+                      Expanded(
+                        child: FilterDropdown<ReportState?>(
+                          label: 'Status',
+                          value: _state,
+                          defaultValue: null,
+                          onChanged: (v) => setState(() => _state = v),
+                          options: [
+                            FilterOption(null, 'All', count: count(null)),
+                            FilterOption(ReportState.generating, 'Generating', count: count(ReportState.generating)),
+                            FilterOption(ReportState.ready, 'Ready', count: count(ReportState.ready)),
+                            FilterOption(ReportState.expired, 'Expired', count: count(ReportState.expired)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilterDropdown<String?>(
+                          label: 'Report',
+                          value: _type,
+                          defaultValue: null,
+                          onChanged: (v) => setState(() => _type = v),
+                          options: [
+                            FilterOption(null, 'All', count: all.length),
+                            for (final e in const [('CKP', 'Planner'), ('CKPP', 'Planner Plus'), ('CKPM', 'Planner Max'), ('GV', 'GRAH Vibes')])
+                              FilterOption(e.$1, e.$2, count: all.where((x) => x.source == e.$1).length),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SortButton<String>(
+                        value: _sort,
+                        onChanged: (v) => setState(() => _sort = v),
+                        options: const [
+                          SortOption('new', 'Newest first', ascending: false),
+                          SortOption('old', 'Oldest first', ascending: true),
+                          SortOption('az', 'Client A–Z', ascending: true),
+                          SortOption('za', 'Client Z–A', ascending: false),
+                        ],
+                      ),
+                    ]),
                     if (s.hasError)
                       ErrorBox(message: 'Couldn\'t load reports.', onRetry: reloadHistory)
                     else if (!s.hasData)
@@ -1136,8 +1159,10 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
                       const Padding(
                           padding: EdgeInsets.only(top: 14),
                           child: EmptyBox(icon: Icons.description_outlined, title: 'No reports', body: 'Nothing matches these filters.'))
+                    else if (!grouped)
+                      for (final e in l) ReportRow(e, key: ValueKey(e.key), showClient: true)
                     else
-                      for (final g in const ['Today', 'This week', 'Earlier'])
+                      for (final g in _sort == 'old' ? const ['Earlier', 'This week', 'Today'] : const ['Today', 'This week', 'Earlier'])
                         if (groups[g] != null) ...[
                           Padding(
                             padding: const EdgeInsets.only(top: 18, bottom: 2),

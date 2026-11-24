@@ -124,7 +124,7 @@ class _LocationSheetState extends State<_LocationSheet> {
         Center(
           child: TextButton(
             onPressed: () async {
-              final ok = await Navigator.of(context).push<bool>(CupertinoPageRoute(builder: (_) => const CityPickerPage()));
+              final ok = await Navigator.of(context).push<bool>(CkRoute(builder: (_) => const CityPickerPage()));
               if (ok == true && context.mounted) Navigator.pop(context);
             },
             child: const Text('Choose a city instead', style: TextStyle(color: CkColors.textSecondary)),
@@ -734,7 +734,7 @@ class _PanchangNowPageState extends State<PanchangNowPage> {
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
-                onPressed: () => Navigator.of(context).push(CupertinoPageRoute(builder: (_) => const CityPickerPage())),
+                onPressed: () => Navigator.of(context).push(CkRoute(builder: (_) => const CityPickerPage())),
                 icon: const Icon(Icons.place_outlined, size: 16, color: CkColors.cyan),
                 label: const Text('Change place', style: TextStyle(color: CkColors.cyan, fontSize: 13)),
               ),
