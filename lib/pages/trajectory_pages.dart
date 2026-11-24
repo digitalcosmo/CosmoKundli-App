@@ -190,7 +190,7 @@ class _TransitPageState extends State<TransitPage> {
               final tr = s.hasData ? s.data![1] as List<GrahPos> : _last;
               if (s.hasError) return ErrorBox(message: 'Couldn\'t load the transit.', onRetry: () => _set(_at, keepLive: _live));
               if (birth == null || tr == null) {
-                return const SizedBox(height: 360, child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)));
+                return const SkeletonCard(height: 360);
               }
               return Column(children: [
                 // Full-bleed: the chart breaks out of the page padding and

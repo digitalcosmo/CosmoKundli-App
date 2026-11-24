@@ -122,7 +122,8 @@ class _Dock extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(12, 0, 12, bottom > 0 ? bottom : 14),
       child: Glass(
         radius: 20,
-        blur: 24,
+        blur: 22,
+        liquid: true,
         tint: const Color(0x40081840),
         height: 66,
         padding: const EdgeInsets.all(5),
@@ -332,7 +333,7 @@ class _SwitchSheetState extends State<_SwitchSheet> {
                 child: FutureBuilder<List<Client>>(
                   future: _f,
                   builder: (c, s) {
-                    if (!s.hasData) return const Center(child: CircularProgressIndicator(strokeWidth: 2.4));
+                    if (!s.hasData) return const SkeletonList(rows: 7);
                     final l = s.data!.where((e) => e.name.toLowerCase().contains(_q)).toList();
                     return ListView.builder(
                       itemCount: l.length,

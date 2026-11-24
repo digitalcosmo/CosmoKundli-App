@@ -21,8 +21,8 @@ class CkColors {
   static const Color cyanTint = Color(0x295CE1FF);
   static const Color cyanStroke = Color(0x735CE1FF);
   static const Color retro = Color(0xFFF5D90A);
-  static const Color panelTop = Color(0xC72856AA);
-  static const Color panelBottom = Color(0xD1123070);
+  static const Color panelTop = Color(0x9E2856AA);
+  static const Color panelBottom = Color(0xB3123070);
   static const Color panelStroke = Color(0x388CBEFF);
   static const Color field = Color(0x8C0A1E50);
   static const Color labelMono = Color(0xFF93A8CF);

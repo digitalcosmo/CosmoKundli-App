@@ -107,7 +107,15 @@ class Glass extends StatelessWidget {
     this.height,
     this.shadow = true,
     this.alignment,
+    this.frost = true,
+    this.liquid = false,
   });
+
+  /// Real backdrop blur behind the card.
+  final bool frost;
+
+  /// Refracting liquid-glass lens (dock, sheets, floating bars).
+  final bool liquid;
 
   @override
   Widget build(BuildContext context) {
@@ -130,12 +138,21 @@ class Glass extends StatelessWidget {
     // Real backdrop blur is expensive (one full-screen pass per card), so
     // only surfaces that float over moving content (dock, sheets) ask for
     // it. Cards get the same look from a tinted, pre-blurred background.
-    final body = blur > 0
-        ? ClipRRect(
-            borderRadius: r,
-            child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur), child: face))
-        : face;
+    // Cards: frosted blur through the page's shared BackdropGroup (one
+    // backdrop read for every card on screen, as in MyAcharyaji). Floating
+    // surfaces pass `liquid: true` for the refracting lens on top.
+    final Widget body;
+    if (liquid) {
+      body = LiquidGlass(radius: radius, blur: blur > 0 ? blur : 20, child: face);
+    } else if (frost) {
+      final f = ImageFilter.blur(sigmaX: blur > 0 ? blur : 14, sigmaY: blur > 0 ? blur : 14);
+      body = ClipRRect(
+        borderRadius: r,
+        child: BackdropGroup.of(context) != null ? BackdropFilter.grouped(filter: f, child: face) : BackdropFilter(filter: f, child: face),
+      );
+    } else {
+      body = face;
+    }
     return Container(
       width: width,
       height: height,
@@ -357,5 +374,60 @@ class GlassTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+
+/// Liquid-glass lens: blur + edge refraction through a fragment shader where
+/// the engine supports shader image filters (Impeller); plain blur elsewhere.
+class LiquidGlass extends StatelessWidget {
+  final Widget child;
+  final double radius;
+  final double blur;
+  final double depth;
+  const LiquidGlass({super.key, required this.child, this.radius = 20, this.blur = 20, this.depth = 9});
+
+  static FragmentProgram? program;
+  static Future<void> preload() async {
+    if (!ImageFilter.isShaderFilterSupported) return;
+    try {
+      program = await FragmentProgram.fromAsset('shaders/liquid_glass.frag');
+    } catch (_) {
+      program = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final blurF = ImageFilter.blur(sigmaX: blur, sigmaY: blur);
+    return LayoutBuilder(builder: (context, box) {
+      ImageFilter filter = blurF;
+      final prog = program;
+      final ro = context.findRenderObject();
+      if (prog != null && box.hasBoundedWidth && box.hasBoundedHeight) {
+        try {
+          final shader = prog.fragmentShader();
+          final dpr = MediaQuery.of(context).devicePixelRatio;
+          // The filter input covers the screen; place the lens where this
+          // widget sits (falls back to local coordinates on the first frame).
+          Offset o = Offset.zero;
+          if (ro is RenderBox && ro.hasSize) o = ro.localToGlobal(Offset.zero);
+          shader
+            ..setFloat(2, o.dx * dpr)
+            ..setFloat(3, o.dy * dpr)
+            ..setFloat(4, box.maxWidth * dpr)
+            ..setFloat(5, box.maxHeight * dpr)
+            ..setFloat(6, radius * dpr)
+            ..setFloat(7, depth * dpr);
+          filter = ImageFilter.compose(outer: ImageFilter.shader(shader), inner: blurF);
+        } catch (_) {
+          filter = blurF;
+        }
+      }
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: BackdropFilter(filter: filter, child: child),
+      );
+    });
   }
 }

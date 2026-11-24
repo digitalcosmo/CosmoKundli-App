@@ -96,6 +96,11 @@ class Endpoints {
   static const appIcon = 'App_Icon_Update';
   static const credits = 'Credit_Transactions';
   static const reportHistory = 'Report_History';
+  static const reportHistoryAll = 'Report_History_All';
+  static const reportViewLink = 'Report_View_Link';
+  static const reportPrices = 'Report_Prices';
+  static const plannerGenerate = 'CK_Planner_Generate';
+  static const vibesGenerate = 'Grah_Vibes_Generate';
   static const changePassword = 'Change_Password';
   static const cosmoPower3 = 'CosmoPower_3Month';
   static const cosmoPower6 = 'CosmoPower_6Month';

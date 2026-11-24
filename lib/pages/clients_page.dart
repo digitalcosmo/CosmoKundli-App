@@ -86,6 +86,93 @@ class _ClientsPageState extends State<ClientsPage> {
   final _scroll = ScrollController();
   final _keys = <String, GlobalKey>{};
   String _q = '';
+  int _nameSort = 1; // 0 off, 1 A–Z, 2 Z–A
+  int _recent = 0; // 0 off, 1 newest, 2 oldest (by date added)
+  int _gender = 0; // 0 all, 1 female, 2 male
+  String? _year;
+  String? _place;
+
+  List<Client> _apply(List<Client> all) {
+    final q = _q.toLowerCase();
+    var l = all.where((e) {
+      if (q.isNotEmpty && !(e.name.toLowerCase().contains(q) || e.city.toLowerCase().contains(q) || e.dateText.toLowerCase().contains(q))) return false;
+      if (_gender == 1 && !e.isFemale) return false;
+      if (_gender == 2 && (e.isFemale || e.genderText.isEmpty)) return false;
+      if (_year != null && '${e.birth?.year ?? ''}' != _year) return false;
+      if (_place != null && e.city.trim() != _place) return false;
+      return true;
+    }).toList();
+    if (_recent != 0) {
+      int id(Client c) => int.tryParse(c.mId) ?? 0;
+      l.sort((a, b) => _recent == 1 ? id(b).compareTo(id(a)) : id(a).compareTo(id(b)));
+    } else if (_nameSort != 0) {
+      l.sort((a, b) => _nameSort == 1 ? a.name.toLowerCase().compareTo(b.name.toLowerCase()) : b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+    }
+    return l;
+  }
+
+  Future<void> _pickFrom(String title, List<String> options, String? current, ValueChanged<String?> set) async {
+    final r = await showModalBottomSheet<String>(
+      useRootNavigator: true,
+      context: context,
+      isScrollControlled: true,
+      builder: (s) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .6),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(padding: const EdgeInsets.fromLTRB(18, 16, 18, 6), child: Text(title, style: CkText.h(17))),
+            Flexible(
+              child: ListView(shrinkWrap: true, children: [
+                ListTile(title: const Text('Any'), trailing: current == null ? const Icon(Icons.check_rounded, color: CkColors.cyan) : null, onTap: () => Navigator.pop(s, '')),
+                for (final o in options)
+                  ListTile(title: Text(o), trailing: current == o ? const Icon(Icons.check_rounded, color: CkColors.cyan) : null, onTap: () => Navigator.pop(s, o)),
+              ]),
+            ),
+          ]),
+        ),
+      ),
+    );
+    if (r != null) setState(() => set(r.isEmpty ? null : r));
+  }
+
+  Widget _pill(String label, String value, bool on, VoidCallback onTap, {bool menu = false}) => Pressable(
+        scale: .95,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: CkMotion.fast,
+          margin: const EdgeInsets.only(right: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+          decoration: BoxDecoration(
+            color: on ? CkColors.cyanTint : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: on ? CkColors.cyanStroke : CkColors.panelStroke),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Text(label, style: TextStyle(fontSize: 12.5, color: on ? Colors.white : CkColors.textSecondary)),
+            const SizedBox(width: 6),
+            Text(value, style: CkText.mono(11, color: on ? CkColors.cyan : CkColors.labelMono)),
+            if (menu) const Icon(Icons.keyboard_arrow_down_rounded, size: 15, color: CkColors.labelMono),
+          ]),
+        ),
+      );
+
+  Widget _filters(List<Client> all) {
+    final years = {for (final c in all) if (c.birth != null) '${c.birth!.year}'}.toList()..sort((a, b) => b.compareTo(a));
+    final places = {for (final c in all) if (c.city.trim().isNotEmpty) c.city.trim()}.toList()..sort();
+    return SizedBox(
+      height: 34,
+      child: ListView(scrollDirection: Axis.horizontal, children: [
+        _pill('Name', const ['—', 'A–Z', 'Z–A'][_nameSort], _nameSort != 0 && _recent == 0, () => setState(() {
+              _nameSort = (_nameSort + 1) % 3;
+              if (_nameSort != 0) _recent = 0;
+            })),
+        _pill('Recent', const ['—', 'Newest', 'Oldest'][_recent], _recent != 0, () => setState(() => _recent = (_recent + 1) % 3)),
+        _pill('Gender', const ['All', 'Female', 'Male'][_gender], _gender != 0, () => setState(() => _gender = (_gender + 1) % 3)),
+        _pill('Year', _year ?? 'Any', _year != null, () => _pickFrom('Birth year', years, _year, (v) => _year = v), menu: true),
+        _pill('Place', _place ?? 'Any', _place != null, () => _pickFrom('Birth place', places, _place, (v) => _place = v), menu: true),
+      ]),
+    );
+  }
 
   @override
   void initState() {
@@ -134,10 +221,7 @@ class _ClientsPageState extends State<ClientsPage> {
           future: _future,
           builder: (c, s) {
             final all = s.data ?? [];
-            final q = _q.toLowerCase();
-            final list = q.isEmpty
-                ? all
-                : all.where((e) => e.name.toLowerCase().contains(q) || e.city.toLowerCase().contains(q) || e.dateText.toLowerCase().contains(q)).toList();
+            final list = _apply(all);
             final recent = Session.recent.where((r) => all.isEmpty || all.any((a) => a.mId == r.mId)).toList();
             _keys.clear();
             final letters = <String>[];
@@ -196,7 +280,7 @@ class _ClientsPageState extends State<ClientsPage> {
                           ),
                           if (recent.isNotEmpty && _q.isEmpty) ...[
                             const SizedBox(height: 20),
-                            const Text('RECENTLY OPENED', style: CkText.label),
+                            Text('RECENTLY OPENED', style: CkText.label),
                             const SizedBox(height: 10),
                             SizedBox(
                               height: 82,
@@ -224,19 +308,14 @@ class _ClientsPageState extends State<ClientsPage> {
                               ),
                             ),
                           ],
-                          const SizedBox(height: 18),
-                          Row(children: [
-                            const Text('ALL CLIENTS', style: CkText.label),
-                            const Spacer(),
-                            if (s.hasData) Text('${all.length} · A–Z', style: CkText.muted.copyWith(fontSize: 12)),
-                          ]),
+                          const SizedBox(height: 12),
+                          _filters(all),
                           const SizedBox(height: 6),
                         ]),
                       ),
                     ),
                     if (s.connectionState != ConnectionState.done)
-                      const SliverToBoxAdapter(
-                          child: Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(strokeWidth: 2.4))))
+                      const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: 18), child: SkeletonList(rows: 8)))
                     else if (s.hasError)
                       SliverToBoxAdapter(
                           child: Padding(
@@ -270,7 +349,7 @@ class _ClientsPageState extends State<ClientsPage> {
                   ],
                 ),
               ),
-              if (letters.length > 4 && _q.isEmpty)
+              if (false)
                 Positioned(
                   right: 4,
                   top: 0,

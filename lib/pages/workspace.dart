@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -59,7 +60,8 @@ final kWorkspaceModules = <String, WModule>{
   'power': WModule('power', 'Power', 'BluePrint', WSize.s, (m, s) => _BarsW(m, s, flavor: false), () => const StrengthPage(flavor: false)),
   'flavor': WModule('flavor', 'Flavor', 'BluePrint', WSize.s, (m, s) => _BarsW(m, s, flavor: true), () => const StrengthPage(flavor: true)),
   'transit': WModule('transit', 'Transit', 'Trajectory', WSize.w, (m, s) => _TransitW(m, s), () => const TransitPage()),
-  'vibes': WModule('vibes', 'GRAH Vibes & Intensity', 'Trajectory', WSize.l, (m, s) => const _PendingW('GRAH Vibes & Intensity'), () => const _PendingPage('GRAH Vibes & Intensity')),
+  'vibes': WModule('vibes', 'GRAH Vibes', 'Trajectory', WSize.w, (m, s) => const _PendingW('GRAH Vibes', 'Monthly vibes for each GRAH'), () => const _PendingPage('GRAH Vibes', 'Monthly vibes for each GRAH')),
+  'intensity': WModule('intensity', 'GRAH Intensity', 'Trajectory', WSize.w, (m, s) => const _PendingW('GRAH Intensity', 'Daily intensity of each GRAH'), () => const _PendingPage('GRAH Intensity', 'Daily intensity of each GRAH')),
   'sentiments': WModule('sentiments', 'Sentiments', 'Predictions', WSize.w, (m, s) => _SentimentsW(m, s), () => const SentimentsPage()),
 };
 
@@ -79,7 +81,8 @@ List<WItem> _defaultLayout(String name) {
         WItem('power', WSize.s),
         WItem('flavor', WSize.s),
         WItem('transit', WSize.w),
-        WItem('vibes', WSize.l),
+        WItem('vibes', WSize.w),
+        WItem('intensity', WSize.w),
       ];
   }
 }
@@ -195,6 +198,25 @@ class _WorkspacePageState extends State<WorkspacePage> {
     return out;
   }
 
+  final _stackKey = GlobalKey();
+  double _stackWidth = 0;
+
+  Offset _toStack(Offset global) {
+    final box = _stackKey.currentContext?.findRenderObject() as RenderBox?;
+    return box == null ? global : box.globalToLocal(global);
+  }
+
+  void _autoScroll(Offset global) {
+    final pos = Scrollable.maybeOf(_stackKey.currentContext ?? context)?.position;
+    if (pos == null) return;
+    final h = MediaQuery.of(context).size.height;
+    const edge = 110.0;
+    double dy = 0;
+    if (global.dy < edge) dy = -(edge - global.dy) / 6;
+    if (global.dy > h - edge) dy = (global.dy - (h - edge)) / 6;
+    if (dy != 0) pos.jumpTo((pos.pixels + dy).clamp(pos.minScrollExtent, pos.maxScrollExtent));
+  }
+
   void _moveTo(Offset p, List<Rect> rects) {
     if (_dragging == null) return;
     for (var i = 0; i < rects.length; i++) {
@@ -270,10 +292,11 @@ class _WorkspacePageState extends State<WorkspacePage> {
         if (_edit)
           Padding(
             padding: const EdgeInsets.only(top: 10),
-            child: Text('DRAG ⠿ TO MOVE · DRAG THE CYAN CORNER TO RESIZE · − TO REMOVE', style: CkText.label.copyWith(fontSize: 9.5)),
+            child: Text('HOLD & DRAG TO MOVE · DRAG THE CYAN CORNER TO RESIZE · − TO REMOVE', style: CkText.label.copyWith(fontSize: 9.5)),
           ),
         const SizedBox(height: 12),
         LayoutBuilder(builder: (ctx, box) {
+          _stackWidth = box.maxWidth;
           final rects = _pack(_items, box.maxWidth);
           final h = rects.isEmpty ? 120.0 : rects.map((r) => r.bottom).reduce(math.max);
           if (_items.isEmpty) {
@@ -289,6 +312,7 @@ class _WorkspacePageState extends State<WorkspacePage> {
             );
           }
           return SizedBox(
+            key: _stackKey,
             height: h,
             child: Stack(clipBehavior: Clip.none, children: [
               for (var i = 0; i < _items.length; i++)
@@ -351,33 +375,48 @@ class _WorkspacePageState extends State<WorkspacePage> {
       ),
     );
     if (!_edit) {
-      return Pressable(scale: .985, onTap: () => pushModule(context, m.page()), child: body);
+      return GestureDetector(
+        onLongPress: () {
+          HapticFeedback.mediumImpact();
+          workspaceEditing.value = true;
+        },
+        child: Pressable(scale: .985, onTap: () => pushModule(context, m.page()), child: body),
+      );
     }
     return Stack(clipBehavior: Clip.none, children: [
       Positioned.fill(child: body),
-      // move handle (whole tile)
+      // Move: press and hold briefly, then drag. A quick swipe still scrolls
+      // the page, so long boards stay reachable in edit mode.
       Positioned.fill(
-        child: GestureDetector(
+        child: RawGestureDetector(
           behavior: HitTestBehavior.translucent,
-          onPanStart: (d) {
-            HapticFeedback.mediumImpact();
-            setState(() {
-              _dragging = i;
-              _grab = d.localPosition;
-              _dragPos = rects[i].topLeft + d.localPosition;
-            });
+          gestures: {
+            LongPressGestureRecognizer: GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
+              () => LongPressGestureRecognizer(duration: const Duration(milliseconds: 220)),
+              (r) => r
+                ..onLongPressStart = (d) {
+                  HapticFeedback.mediumImpact();
+                  final local = _toStack(d.globalPosition);
+                  setState(() {
+                    _dragging = i;
+                    _grab = local - rects[i].topLeft;
+                    _dragPos = local;
+                  });
+                }
+                ..onLongPressMoveUpdate = (d) {
+                  _autoScroll(d.globalPosition);
+                  setState(() {
+                    _dragPos = _toStack(d.globalPosition);
+                    _moveTo(_dragPos, _pack(_items, _stackWidth));
+                  });
+                }
+                ..onLongPressEnd = (_) => setState(() {
+                      _dragging = null;
+                      _save();
+                    })
+                ..onLongPressCancel = () => setState(() => _dragging = null),
+            ),
           },
-          onPanUpdate: (d) {
-            setState(() {
-              _dragPos += d.delta;
-              _moveTo(_dragPos, rects);
-            });
-          },
-          onPanEnd: (_) => setState(() {
-            _dragging = null;
-            _save();
-          }),
-          onPanCancel: () => setState(() => _dragging = null),
         ),
       ),
       Positioned(
@@ -410,20 +449,23 @@ class _WorkspacePageState extends State<WorkspacePage> {
       Positioned(
         right: -6,
         bottom: -6,
-        child: GestureDetector(
+        child: RawGestureDetector(
           behavior: HitTestBehavior.opaque,
-          onPanStart: (_) {
+          gestures: {
+            _EagerPan: GestureRecognizerFactoryWithHandlers<_EagerPan>(
+              () => _EagerPan(),
+              (r) => r
+                ..onStart = (_) {
             HapticFeedback.selectionClick();
             setState(() {
               _resizing = i;
               _resizeRect = rects[i];
             });
-          },
-          onPanUpdate: (d) {
+                }
+                ..onUpdate = (d) {
             final r = _resizeRect!;
             final nr = Rect.fromLTRB(r.left, r.top, r.right + d.delta.dx, r.bottom + d.delta.dy);
-            final full = (rects.map((e) => e.right).reduce(math.max));
-            final cw = (full - _gap) / 2;
+            final cw = (_stackWidth - _gap) / 2;
             final cols = nr.width > cw * 1.45 ? 2 : 1;
             final rows = nr.height > _unit * 1.45 ? 2 : 1;
             final ns = WSizeX.of(cols, rows);
@@ -434,15 +476,17 @@ class _WorkspacePageState extends State<WorkspacePage> {
                 _items[i].size = ns;
               }
             });
+                }
+                ..onEnd = (_) => setState(() {
+                      _resizing = null;
+                      _resizeRect = null;
+                      _save();
+                    }),
+            ),
           },
-          onPanEnd: (_) => setState(() {
-            _resizing = null;
-            _resizeRect = null;
-            _save();
-          }),
           child: SizedBox(
-            width: 30,
-            height: 30,
+            width: 36,
+            height: 36,
             child: Align(
               alignment: const Alignment(-.1, -.1),
               child: Container(
@@ -567,8 +611,7 @@ class _WHead extends StatelessWidget {
 class _Loading extends StatelessWidget {
   const _Loading();
   @override
-  Widget build(BuildContext context) => const Center(
-      child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: CkColors.cyan)));
+  Widget build(BuildContext context) => const Padding(padding: EdgeInsets.only(top: 4), child: Skeleton(height: double.infinity, radius: 10));
 }
 
 Widget _fail() => const Center(child: Text('Couldn\'t load', style: CkText.muted));
@@ -874,19 +917,17 @@ class _SentimentsW extends StatelessWidget {
 
 class _PendingW extends StatelessWidget {
   final String title;
-  const _PendingW(this.title);
+  final String what;
+  const _PendingW(this.title, this.what);
   @override
   Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         _WHead(title),
         Expanded(
           child: Center(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.schedule_rounded, color: CkColors.labelMono, size: 22),
-              const SizedBox(height: 8),
               Text('COMING SOON', style: CkText.label),
               const SizedBox(height: 4),
-              const Text('Monthly vibes per GRAH and daily intensity\nwill appear here once the API is live.',
-                  textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: CkColors.textSecondary)),
+              Text(what, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
             ]),
           ),
         ),
@@ -895,13 +936,23 @@ class _PendingW extends StatelessWidget {
 
 class _PendingPage extends StatelessWidget {
   final String title;
-  const _PendingPage(this.title);
+  final String what;
+  const _PendingPage(this.title, this.what);
   @override
   Widget build(BuildContext context) => ClientPage(title: title, children: [
-        Glass(padding: const EdgeInsets.all(16), height: 260, child: _PendingW(title)),
+        Glass(padding: const EdgeInsets.all(16), height: 220, child: _PendingW(title, what)),
       ]);
 }
 
 /// Rendered chart reused inside widgets (keeps SvgPicture import used here).
 Widget svgChart(String svg) => SvgPicture.string(svg, fit: BoxFit.contain);
 String transitSvg(List<GrahPos> b, List<GrahPos> t) => KundliSvg.transit(b, t);
+
+/// Pan recognizer that wins immediately, so the page never steals a resize.
+class _EagerPan extends PanGestureRecognizer {
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    super.addAllowedPointer(event);
+    resolvePointer(event.pointer, GestureDisposition.accepted);
+  }
+}

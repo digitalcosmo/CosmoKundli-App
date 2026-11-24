@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -200,7 +201,7 @@ class Segmented<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Glass(
         height: height,
-        radius: height / 2,
+        radius: 12,
         shadow: false,
         padding: const EdgeInsets.all(4),
         child: Row(
@@ -214,8 +215,9 @@ class Segmented<T> extends StatelessWidget {
                   curve: CkMotion.ease,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    gradient: sel ? CkColors.cta : null,
-                    borderRadius: BorderRadius.circular(height / 2),
+                    color: sel ? CkColors.cyanTint : null,
+                    border: sel ? Border.all(color: CkColors.cyanStroke) : null,
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(label(v),
                       style: TextStyle(
@@ -276,9 +278,7 @@ class LoadView<T> extends StatelessWidget {
         future: future,
         builder: (c, s) {
           if (s.connectionState != ConnectionState.done) {
-            return SizedBox(
-                height: minHeight,
-                child: const Center(child: CircularProgressIndicator(strokeWidth: 2.4)));
+            return minHeight >= 300 ? SkeletonCard(height: minHeight) : const SkeletonList(rows: 5);
           }
           if (s.hasError || !s.hasData) {
             return ErrorBox(
@@ -714,6 +714,11 @@ const kCkIcons = <String, String>{
   'GRAH Coordinates': 'grahcoordinates',
   'Degree': 'grahcoordinates',
   'GRAH Vibes & Intensity': 'situations',
+  'GRAH Vibes': 'situations',
+  'GRAH Intensity': 'triggerpoint',
+  'CK GRAH Vibes': 'situations',
+  'CK Planner Plus': 'ck_planner',
+  'CK Planner Max': 'ck_planner',
   'Panchang': 'cosmokundli',
   'Melapak': 'cosmoprakruti',
   'Power': 'cosmobal',
@@ -1052,4 +1057,111 @@ class GrahDot extends StatelessWidget {
       decoration: BoxDecoration(color: c, shape: BoxShape.circle, boxShadow: [BoxShadow(color: c.withOpacity(.6), blurRadius: 8)]),
     );
   }
+}
+
+/// Bootstrap Icons (the software's icon set), in a quiet outlined tile.
+class BiIcon extends StatelessWidget {
+  final String name;
+  final double size;
+  const BiIcon(this.name, {super.key, this.size = 18});
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 36,
+        height: 36,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: CkColors.cyanTint.withValues(alpha: .12),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: CkColors.panelStroke),
+        ),
+        child: SvgPicture.asset('assets/bi/$name.svg',
+            width: size, height: size, colorFilter: const ColorFilter.mode(CkColors.cyan, BlendMode.srcIn)),
+      );
+}
+
+// ───────────────────────── skeletons (MyAcharyaji style)
+
+/// Shimmering placeholder block.
+class Skeleton extends StatefulWidget {
+  final double height;
+  final double? width;
+  final double radius;
+  const Skeleton({super.key, required this.height, this.width, this.radius = 8});
+  @override
+  State<Skeleton> createState() => _SkeletonState();
+}
+
+class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1300))..repeat();
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) {
+          final t = _c.value * 2 - .5;
+          return Container(
+            height: widget.height,
+            width: widget.width,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(widget.radius),
+              gradient: LinearGradient(
+                begin: Alignment(-1 + t * 2 - .6, 0),
+                end: Alignment(-1 + t * 2 + .6, 0),
+                colors: const [Color(0x0FFFFFFF), Color(0x24FFFFFF), Color(0x0FFFFFFF)],
+              ),
+            ),
+          );
+        },
+      );
+}
+
+/// A panel of skeleton rows shaped like a list / table.
+class SkeletonList extends StatelessWidget {
+  final int rows;
+  final bool leading;
+  const SkeletonList({super.key, this.rows = 6, this.leading = true});
+  @override
+  Widget build(BuildContext context) => Glass(
+        margin: const EdgeInsets.only(top: 12),
+        padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
+        child: Column(children: [
+          for (var i = 0; i < rows; i++)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(children: [
+                if (leading) ...[const Skeleton(height: 32, width: 32, radius: 16), const SizedBox(width: 12)],
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Skeleton(height: 11, width: 90.0 + (i % 3) * 30),
+                    const SizedBox(height: 7),
+                    Skeleton(height: 9, width: 140.0 - (i % 2) * 30),
+                  ]),
+                ),
+                const Skeleton(height: 12, width: 44),
+              ]),
+            ),
+        ]),
+      );
+}
+
+/// A panel skeleton with a title bar and a large body (charts, cards).
+class SkeletonCard extends StatelessWidget {
+  final double height;
+  const SkeletonCard({super.key, this.height = 220});
+  @override
+  Widget build(BuildContext context) => Glass(
+        margin: const EdgeInsets.only(top: 12),
+        padding: const EdgeInsets.all(14),
+        height: height,
+        child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [Skeleton(height: 20, width: 20, radius: 6), SizedBox(width: 8), Skeleton(height: 12, width: 110)]),
+          SizedBox(height: 14),
+          Expanded(child: Skeleton(height: double.infinity, radius: 10)),
+        ]),
+      );
 }

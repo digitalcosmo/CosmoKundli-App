@@ -6,6 +6,7 @@ import 'core/session.dart';
 import 'pages/auth_pages.dart';
 import 'pages/app_shell.dart';
 import 'ui/ck_theme.dart';
+import 'ui/glass.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,6 +18,7 @@ Future<void> main() async {
     systemNavigationBarIconBrightness: Brightness.light,
   ));
   await Session.init();
+  await LiquidGlass.preload();
   runApp(const CosmoKundliApp());
 }
 
@@ -39,7 +41,7 @@ class CosmoKundliApp extends StatelessWidget {
         data: MediaQuery.of(context).copyWith(
           textScaler: MediaQuery.of(context).textScaler.clamp(maxScaleFactor: 1.15),
         ),
-        child: child!,
+        child: BackdropGroup(child: child!),
       ),
     );
   }

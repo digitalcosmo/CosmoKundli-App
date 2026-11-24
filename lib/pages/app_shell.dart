@@ -88,7 +88,9 @@ class _AppShellState extends State<AppShell> {
       onPopInvokedWithResult: (did, _) {
         if (!did) _go(0);
       },
-      child: Stack(children: [
+      child: Material(
+        type: MaterialType.transparency,
+        child: Stack(children: [
         IndexedStack(index: _index, children: [for (var i = 0; i < 4; i++) RepaintBoundary(child: _page(i))]),
         Positioned(
           left: 12,
@@ -97,7 +99,8 @@ class _AppShellState extends State<AppShell> {
           child: RepaintBoundary(
             child: Glass(
               radius: 20,
-              blur: 24,
+              blur: 22,
+              liquid: true,
               tint: const Color(0x40081840),
               height: 66,
               padding: const EdgeInsets.all(5),
@@ -143,6 +146,7 @@ class _AppShellState extends State<AppShell> {
           ),
         ),
       ]),
+      ),
     );
   }
 }
@@ -171,7 +175,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   late Future<List<GrahPos>?> _sky = _loadSky();
   late Future<Map<String, dynamic>> _credits = Api.post(Endpoints.credits, {'uID': Session.uid});
-  late Future<List<Map<String, dynamic>>> _reports = fetchReports();
+  late Future<List<ReportItem>> _reports = fetchReports();
   late Future<List<Client>> _clients = fetchClients();
   Timer? _tick;
   DateTime _now = DateTime.now();
@@ -427,12 +431,12 @@ class _HomePageState extends State<HomePage> {
         child: Glass(
           height: 108,
           padding: const EdgeInsets.all(14),
-          child: FutureBuilder<List<Map<String, dynamic>>>(
+          child: FutureBuilder<List<ReportItem>>(
             future: _reports,
             builder: (c, s) {
               final l = s.data ?? [];
-              final gen = l.where((e) => reportState(e) == ReportState.generating).length;
-              final ready = l.where((e) => reportState(e) == ReportState.ready).length;
+              final gen = l.where((e) => !e.ready && !e.failed).length;
+              final ready = l.where((e) => e.ready).length;
               return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('REPORTS', style: CkText.label),
                 const Spacer(),
@@ -656,7 +660,7 @@ class _SkyNowPageState extends State<SkyNowPage> {
                 if (_src == null && _f == null) {
                   return const Padding(padding: EdgeInsets.all(40), child: Center(child: Text('Add a client first to read the sky.', style: CkText.muted)));
                 }
-                if (t == null) return const SizedBox(height: 340, child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)));
+                if (t == null) return const SkeletonCard(height: 340);
                 final w = MediaQuery.of(context).size.width - 8;
                 return Column(children: [
                   SizedBox(

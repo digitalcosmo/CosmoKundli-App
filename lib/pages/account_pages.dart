@@ -66,19 +66,14 @@ class _AccountPageState extends State<AccountPage> {
     Api.post(Endpoints.credits, {'uID': Session.uid}),
   ]);
 
-  Widget _row(String t, IconData i, String d, Widget page, bool first) => InkWell(
+  Widget _row(String t, String i, String d, Widget page, bool first) => InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: () => Get.to(() => page),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
           decoration: BoxDecoration(border: first ? null : const Border(top: BorderSide(color: Color(0x14FFFFFF)))),
           child: Row(children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(color: CkColors.orangeTint, borderRadius: BorderRadius.circular(12), border: Border.all(color: CkColors.orangeStroke)),
-              child: Icon(i, size: 18, color: const Color(0xFFFFB27A)),
-            ),
+            BiIcon(i),
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -126,13 +121,13 @@ class _AccountPageState extends State<AccountPage> {
                   const SizedBox(height: 14),
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: CkColors.glassFill, borderRadius: BorderRadius.circular(18)),
+                    decoration: BoxDecoration(color: CkColors.field, borderRadius: BorderRadius.circular(12)),
                     child: Row(children: [
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           const Text('AVAILABLE CREDIT', style: CkText.label),
                           Text(cr['Remaining_Credit'] == null ? '—' : NumberFormat.decimalPattern('en_IN').format(num.tryParse('${cr['Remaining_Credit']}') ?? 0),
-                              style: CkText.h(24, color: const Color(0xFFF7A45E))),
+                              style: CkText.mono(24)),
                         ]),
                       ),
                       SizedBox(width: 120, child: PrimaryButton('Buy credit', height: 42, onTap: () => _buy(context))),
@@ -147,12 +142,11 @@ class _AccountPageState extends State<AccountPage> {
             radius: 18,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             child: Column(children: [
-              _row('Personal details', Icons.person_outline_rounded, 'Name, mobile, date of birth', const PersonalPage(), true),
-              _row('Display details', Icons.visibility_outlined, 'How you appear on client reports', const DisplayPage(), false),
-              _row('App details', Icons.phone_iphone_rounded, 'Your MyAcharyaji client app', const AppDetailsPage(), false),
-              _row('Credit transactions', Icons.account_balance_wallet_outlined, 'Balance and history', const CreditsPage(), false),
-              _row('Report history', Icons.history_rounded, 'Every report you generated', const HistoryPage(), false),
-              _row('Change password', Icons.lock_outline_rounded, '', const PasswordPage(), false),
+              _row('Personal details', 'person', 'Name, mobile, date of birth', const PersonalPage(), true),
+              _row('Display details', 'display', 'How you appear on client reports', const DisplayPage(), false),
+              _row('App details', 'app-indicator', 'Your MyAcharyaji client app', const AppDetailsPage(), false),
+              _row('Credit transactions', 'credit-card', 'Balance and history', const CreditsPage(), false),
+              _row('Change password', 'arrow-repeat', '', const PasswordPage(), false),
             ]),
           ),
           Glass(
@@ -160,12 +154,7 @@ class _AccountPageState extends State<AccountPage> {
             radius: 16,
             padding: const EdgeInsets.all(12),
             child: Row(children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(color: CkColors.orangeTint, borderRadius: BorderRadius.circular(12), border: Border.all(color: CkColors.orangeStroke)),
-                child: const Icon(Icons.translate_rounded, size: 18, color: Color(0xFFFFB27A)),
-              ),
+              const BiIcon('translate'),
               const SizedBox(width: 12),
               const Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -267,7 +256,7 @@ class _PersonalPageState extends State<PersonalPage> {
         title: 'Personal details',
         action: _loading ? null : PrimaryButton('Save changes', loading: _busy, onTap: _save),
         children: _loading
-            ? [const SizedBox(height: 200, child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)))]
+            ? [const SkeletonCard(height: 200)]
             : [
                 Glass(
                   radius: 18,
@@ -536,7 +525,7 @@ class _DisplayPageState extends State<DisplayPage> {
       title: 'Display details',
       action: _loading ? null : PrimaryButton('Save', loading: _busy, onTap: _save),
       children: _loading
-          ? [const SizedBox(height: 200, child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)))]
+          ? [const SkeletonCard(height: 200)]
           : [
               const Text('How you appear on every report you send.', style: CkText.muted),
               Glass(
@@ -786,7 +775,7 @@ class _AppDetailsPageState extends State<AppDetailsPage> {
         title: 'App details',
         action: _loading ? null : PrimaryButton('Save', loading: _busy, onTap: _save),
         children: _loading
-            ? [const SizedBox(height: 200, child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)))]
+            ? [const SkeletonCard(height: 200)]
             : [
                 const Text('What your clients see in their MyAcharyaji app.', style: CkText.muted),
                 Glass(

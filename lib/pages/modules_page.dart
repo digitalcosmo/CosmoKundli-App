@@ -8,7 +8,6 @@ import 'client_shell.dart';
 import 'predictions_pages.dart';
 import 'traditional_pages.dart';
 import 'trajectory_pages.dart';
-import 'workspace.dart';
 
 class _Mod {
   final String title;
@@ -28,8 +27,8 @@ final _groups = <String, List<_Mod>>{
   ],
   'Trajectory': [
     _Mod('Transit', 'Birth vs any moment', () => const TransitPage()),
-    _Mod('GRAH Vibes & Intensity', 'Monthly vibes · daily intensity', () => kWorkspaceModules['vibes']!.page()),
-    _Mod('GRAH Trigger', 'Coming soon'),
+    _Mod('GRAH Vibes', 'Coming soon'),
+    _Mod('GRAH Intensity', 'Coming soon'),
   ],
   'Predictions': [
     _Mod('Sentiments', 'Daily, month by month', () => const SentimentsPage()),

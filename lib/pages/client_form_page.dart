@@ -399,7 +399,7 @@ class _ClientFormPageState extends State<ClientFormPage> {
           ),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator(strokeWidth: 2.4))
+                ? const Padding(padding: EdgeInsets.all(16), child: SkeletonList(rows: 6, leading: false))
                 : Form(
                     key: _form,
                     child: ListView(
