@@ -16,6 +16,16 @@ class CkColors {
   static const Color green = Color(0xFF10B981);
   static const Color purple = Color(0xFF6C3CE1);
   static const Color linkBlue = Color(0xFF87BEFF);
+  // Instrument accent: data, selection, focus
+  static const Color cyan = Color(0xFF5CE1FF);
+  static const Color cyanTint = Color(0x295CE1FF);
+  static const Color cyanStroke = Color(0x735CE1FF);
+  static const Color retro = Color(0xFFF5D90A);
+  static const Color panelTop = Color(0xC72856AA);
+  static const Color panelBottom = Color(0xD1123070);
+  static const Color panelStroke = Color(0x388CBEFF);
+  static const Color field = Color(0x8C0A1E50);
+  static const Color labelMono = Color(0xFF93A8CF);
 
   // Space
   static const Color deepSpace = Color(0xFF0C2C68);
@@ -24,7 +34,7 @@ class CkColors {
 
   // Text
   static const Color text = Color(0xFFFFFFFF);
-  static const Color textSecondary = Color(0xFFC6C5D4);
+  static const Color textSecondary = Color(0xFFA9BADB);
   static const Color textTertiary = Color(0xFFDFE2EB);
   static const Color textMuted = Color(0x80FFFFFF);
   static const Color textDim = Color(0x59FFFFFF);

@@ -160,14 +160,18 @@ class _BlueprintSectionState extends State<BlueprintSection> {
                   children: planets
                       .map((p) => Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8),
-                            decoration: BoxDecoration(color: CkColors.glassFill, borderRadius: BorderRadius.circular(12)),
+                            decoration: BoxDecoration(color: CkColors.field, borderRadius: BorderRadius.circular(10)),
                             child: Row(children: [
-                              GrahDot(p.id, size: 8),
+                              GrahDot(p.id, size: 7),
                               const SizedBox(width: 6),
-                              SizedBox(width: 22, child: Text(p.id, style: TextStyle(fontWeight: FontWeight.w600, color: p.color, fontSize: 12.5))),
-                              Expanded(child: Text(rashiShort(p.rashi), style: const TextStyle(fontSize: 12.5))),
-                              Text(fmtDeg(p.degIn).split(' ').first, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5)),
-                              if (p.retro) const RetroBadge(),
+                              SizedBox(
+                                  width: 30,
+                                  child: Row(children: [
+                                    Text(p.id, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5)),
+                                    if (p.retro) const RetroBadge(),
+                                  ])),
+                              Expanded(child: Text(rashiShort(p.rashi), style: const TextStyle(fontSize: 12.5, color: CkColors.textSecondary))),
+                              Text(fmtDeg(p.degIn), style: CkText.mono(12)),
                             ]),
                           ))
                       .toList(),
@@ -381,7 +385,8 @@ class _CoordinatesPageState extends State<CoordinatesPage> {
                             child: Row(children: [
                               GrahDot(p.id, size: 10),
                               const SizedBox(width: 8),
-                              Text(p.id, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: p.color)),
+                              Text(p.id, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                              if (p.retro) const RetroBadge(),
                             ]),
                           )),
                     ]),
@@ -402,10 +407,7 @@ class _CoordinatesPageState extends State<CoordinatesPage> {
                             final deg = _abs ? '${p.longitude.toStringAsFixed(2)}°' : fmtDeg(p.degIn);
                             final cells = <Widget>[
                               Text(rashiName(p.rashi), style: const TextStyle(fontSize: 14.5)),
-                              Row(children: [
-                                Text(deg, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, fontFeatures: [FontFeature.tabularFigures()])),
-                                if (p.retro) const RetroBadge(),
-                              ]),
+                              Text(deg, style: CkText.mono(14)),
                               Text(tatva(p.rashi), style: const TextStyle(fontSize: 14.5)),
                               Text(swabhav(p.rashi), style: const TextStyle(fontSize: 14.5)),
                               Text(swami(p.rashi), style: const TextStyle(fontSize: 14.5)),

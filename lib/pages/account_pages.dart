@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/api.dart';
+import '../core/countries.dart';
 import '../core/session.dart';
 import '../main.dart';
 import '../ui/ck_theme.dart';
@@ -20,7 +21,8 @@ class AccountFrame extends StatelessWidget {
   final String title;
   final List<Widget> children;
   final Widget? action;
-  const AccountFrame({super.key, required this.title, required this.children, this.action});
+  final bool embedded;
+  const AccountFrame({super.key, required this.title, required this.children, this.action, this.embedded = false});
   @override
   Widget build(BuildContext context) => CkScaffold(
         body: SafeArea(
@@ -28,15 +30,18 @@ class AccountFrame extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 8, 14, 6),
               child: Row(children: [
-                CircleBtn(Icons.arrow_back_ios_new_rounded, label: 'Back', onTap: () => Get.back()),
-                const SizedBox(width: 12),
-                Expanded(child: Text(title, style: CkText.h(22))),
+                if (!embedded) ...[
+                  CircleBtn(Icons.arrow_back_ios_new_rounded, label: 'Back', onTap: () => Get.back()),
+                  const SizedBox(width: 12),
+                ] else
+                  const SizedBox(width: 4),
+                Expanded(child: Text(title, style: CkText.h(embedded ? 26 : 22))),
               ]),
             ),
             Expanded(
               child: ListView(
                 physics: const BouncingScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(16, 6, 16, action == null ? 30 : 110),
+                padding: EdgeInsets.fromLTRB(16, 6, 16, action == null ? (embedded ? 120 : 30) : 110),
                 children: [for (var i = 0; i < children.length; i++) i < 7 ? FadeSlideIn(index: i, child: children[i]) : children[i]],
               ),
             ),
@@ -49,7 +54,8 @@ class AccountFrame extends StatelessWidget {
 }
 
 class AccountPage extends StatefulWidget {
-  const AccountPage({super.key});
+  final bool embedded;
+  const AccountPage({super.key, this.embedded = false});
   @override
   State<AccountPage> createState() => _AccountPageState();
 }
@@ -87,6 +93,7 @@ class _AccountPageState extends State<AccountPage> {
 
   @override
   Widget build(BuildContext context) => AccountFrame(
+        embedded: widget.embedded,
         title: 'Account',
         children: [
           FutureBuilder<List<Map<String, dynamic>>>(
@@ -103,7 +110,7 @@ class _AccountPageState extends State<AccountPage> {
                     Container(
                       width: 58,
                       height: 58,
-                      decoration: BoxDecoration(gradient: CkColors.cta, borderRadius: BorderRadius.circular(21)),
+                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0x668CBEFF))),
                       alignment: Alignment.center,
                       child: Text(name.isEmpty ? '' : name.trim().split(' ').map((e) => e.isEmpty ? '' : e[0]).take(2).join().toUpperCase(),
                           style: CkText.h(20)),
@@ -211,6 +218,7 @@ class _PersonalPageState extends State<PersonalPage> {
   final _name = TextEditingController();
   final _mobile = TextEditingController();
   final _email = TextEditingController();
+  Country _country = kCountries.first;
   String _gender = 'Male';
   DateTime? _dob;
   bool _loading = true, _busy = false;
@@ -220,7 +228,9 @@ class _PersonalPageState extends State<PersonalPage> {
     super.initState();
     Api.post(Endpoints.profileDetails, {'uID': Session.uid}).then((r) {
       _name.text = '${r['Name'] ?? ''}';
-      _mobile.text = '${r['Mobile'] ?? ''}';
+      final ph = splitPhone('${r['Mobile'] ?? ''}');
+      _country = ph.$1;
+      _mobile.text = ph.$2;
       _email.text = '${r['Email'] ?? ''}';
       _gender = '${r['Gender'] ?? ''}'.toLowerCase().startsWith('f') ? 'Female' : 'Male';
       for (final f in ['yyyy-MM-dd', 'dd-MM-yyyy']) {
@@ -264,7 +274,8 @@ class _PersonalPageState extends State<PersonalPage> {
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Field('Name', controller: _name, required: true),
-                    Field('Mobile number', controller: _mobile, keyboard: TextInputType.phone),
+                    const SizedBox(height: 12),
+                    PhoneField(country: _country, controller: _mobile, onCountry: (c) => setState(() => _country = c)),
                     const SizedBox(height: 12),
                     const Text('GENDER', style: CkText.label),
                     const SizedBox(height: 6),
@@ -299,6 +310,8 @@ class _DisplayPageState extends State<DisplayPage> {
   final _address = TextEditingController();
   final _email = TextEditingController();
   String _front = '', _back = '';
+  Country _country = kCountries.first;
+  final _fName = FocusNode(), _fMobile = FocusNode(), _fMessage = FocusNode(), _fAddress = FocusNode(), _fEmail = FocusNode();
   bool _loading = true, _busy = false, _uploading = false;
   int _page = 0;
   final _pc = PageController(viewportFraction: .78);
@@ -308,7 +321,9 @@ class _DisplayPageState extends State<DisplayPage> {
     super.initState();
     Api.post(Endpoints.displayDetails, {'uID': Session.uid}).then((r) {
       _name.text = '${r['Name'] ?? ''}';
-      _mobile.text = '${r['Mobile'] ?? ''}';
+      final ph = splitPhone('${r['Mobile'] ?? ''}');
+      _country = ph.$1;
+      _mobile.text = ph.$2;
       _message.text = '${r['Message'] ?? ''}';
       _address.text = '${r['Address'] ?? ''}';
       _email.text = '${r['Email'] ?? ''}';
@@ -354,7 +369,7 @@ class _DisplayPageState extends State<DisplayPage> {
         'name': _name.text.trim(),
         'message': _message.text.trim(),
         'address': _address.text.trim(),
-        'mobile': _mobile.text.trim(),
+        'mobile': _mobile.text.trim().isEmpty ? '' : '+${_country.code} ${_mobile.text.trim()}',
         'email': _email.text.trim(),
       });
       if (mounted) toast(context, Api.msg(r, Api.ok(r) ? 'Saved' : 'Couldn\'t save'), error: !Api.ok(r));
@@ -362,6 +377,45 @@ class _DisplayPageState extends State<DisplayPage> {
       if (mounted) toast(context, 'Couldn\'t reach the server.', error: true);
     }
     if (mounted) setState(() => _busy = false);
+  }
+
+  Future<void> _remove(bool front) async {
+    final ok = await confirm(context, 'Remove ${front ? 'front' : 'back'} inner page?',
+        'Reports will be generated without this page.', ok: 'Remove', danger: true);
+    if (!ok) return;
+    setState(() => _uploading = true);
+    try {
+      final r = await Api.post('Display_Image_Remove', {'uID': Session.uid, 'type': front ? 'front' : 'back'});
+      if (!mounted) return;
+      if (Api.ok(r)) {
+        setState(() => front ? _front = '' : _back = '');
+        toast(context, Api.msg(r, 'Page removed'));
+      } else {
+        toast(context, Api.msg(r, 'Couldn\'t remove the page'), error: true);
+      }
+    } catch (_) {
+      if (mounted) toast(context, 'Removing pages isn\'t available yet.', error: true);
+    }
+    if (mounted) setState(() => _uploading = false);
+  }
+
+  void _focus(FocusNode f) {
+    f.requestFocus();
+    Future.delayed(const Duration(milliseconds: 350), () {
+      if (f.context != null) Scrollable.ensureVisible(f.context!, duration: CkMotion.base, curve: CkMotion.ease, alignment: .3);
+    });
+  }
+
+  /// Tap on a page's text jumps to the field that fills it.
+  void _tapPage(int i, Offset local, Size size) {
+    if (i == 1 || i == 2) return _upload(i == 1);
+    if (i == 0) return _focus(_fName);
+    final y = local.dy / size.height;
+    if (y < .41) return _focus(_fName);
+    if (y < .5) return _focus(_fMessage);
+    if (y < .56) return _focus(_fMobile);
+    if (y < .61) return _focus(_fEmail);
+    _focus(_fAddress);
   }
 
   static const _labels = ['1 · Title', '2 · Front inner', 'Back inner', 'Last'];
@@ -377,7 +431,31 @@ class _DisplayPageState extends State<DisplayPage> {
     Widget child;
     switch (i) {
       case 0:
-        child = Image.asset('assets/images/report_title.png', fit: BoxFit.cover);
+        // The consultant's name replaces the template's grey placeholder.
+        child = LayoutBuilder(builder: (c, box) {
+          final w = box.maxWidth, h = box.maxHeight;
+          return Stack(fit: StackFit.expand, children: [
+            Image.asset('assets/images/report_title.png', fit: BoxFit.fill),
+            Positioned(
+              left: w * .21,
+              right: w * .21,
+              top: h * .232,
+              height: h * .044,
+              child: Container(
+                color: const Color(0xFF0D1F53),
+                alignment: Alignment.center,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(_name.text.isEmpty ? 'Consultant\'s Name' : _name.text,
+                      style: GoogleFonts.poppins(
+                          fontSize: w * .048,
+                          fontWeight: FontWeight.w600,
+                          color: _name.text.isEmpty ? Colors.white54 : Colors.white)),
+                ),
+              ),
+            ),
+          ]);
+        });
         break;
       case 1:
       case 2:
@@ -433,7 +511,7 @@ class _DisplayPageState extends State<DisplayPage> {
             Image.asset('assets/images/report_last.jpg', fit: BoxFit.fill),
             centred(.383, _name.text, 'Consultant Name', st(5.9, FontWeight.w600, ls: .07)),
             centred(.437, _message.text, 'Consultant Message', st(3.55, FontWeight.w500, ls: .07)),
-            left(.538, _mobile.text, 'Display Number'),
+            left(.538, _mobile.text.isEmpty ? '' : '+${_country.code} ${_mobile.text}', 'Display Number'),
             left(.585, _email.text, 'Display E-mail'),
             left(.638, _address.text, 'Display Address', lines: 2),
           ]);
@@ -474,9 +552,14 @@ class _DisplayPageState extends State<DisplayPage> {
                         duration: CkMotion.base,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 6),
-                          child: GestureDetector(
-                            onTap: (i == 1 || i == 2) ? () => _upload(i == 1) : null,
-                            child: AspectRatio(aspectRatio: 1 / 1.414, child: _pageView(i)),
+                          child: AspectRatio(
+                            aspectRatio: 1 / 1.414,
+                            child: LayoutBuilder(
+                              builder: (c, box) => GestureDetector(
+                                onTapUp: (d) => _tapPage(i, d.localPosition, box.biggest),
+                                child: _pageView(i),
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -493,7 +576,7 @@ class _DisplayPageState extends State<DisplayPage> {
                               width: i == _page ? 18 : 6,
                               height: 6,
                               decoration: BoxDecoration(
-                                  color: i == _page ? CkColors.orangeSoft : Colors.white.withOpacity(.3), borderRadius: BorderRadius.circular(3)),
+                                  color: i == _page ? CkColors.cyan : Colors.white.withOpacity(.3), borderRadius: BorderRadius.circular(3)),
                             )),
                   ),
                   Padding(
@@ -503,18 +586,36 @@ class _DisplayPageState extends State<DisplayPage> {
                       Text(cap.$2, style: CkText.muted.copyWith(fontSize: 12)),
                       if (_page == 1 || _page == 2) ...[
                         const SizedBox(height: 10),
-                        Pressable(
-                          onTap: _uploading ? null : () => _upload(_page == 1),
-                          child: Container(
-                            height: 44,
-                            decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: CkColors.orangeStroke)),
-                            alignment: Alignment.center,
-                            child: _uploading
-                                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                                : Text('${(_page == 1 ? _front : _back).isEmpty ? 'Choose' : 'Change'} ${_page == 1 ? 'front' : 'back'} inner image',
-                                    style: const TextStyle(color: Color(0xFFFFB27A), fontWeight: FontWeight.w600)),
+                        Row(children: [
+                          Expanded(
+                            child: Pressable(
+                              onTap: _uploading ? null : () => _upload(_page == 1),
+                              child: Container(
+                                height: 44,
+                                decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: CkColors.cyanStroke), color: CkColors.cyanTint),
+                                alignment: Alignment.center,
+                                child: _uploading
+                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                                    : Text((_page == 1 ? _front : _back).isEmpty ? 'Upload' : 'Change',
+                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                              ),
+                            ),
                           ),
-                        ),
+                          if ((_page == 1 ? _front : _back).isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Pressable(
+                                onTap: _uploading ? null : () => _remove(_page == 1),
+                                child: Container(
+                                  height: 44,
+                                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0x99FF8A8A))),
+                                  alignment: Alignment.center,
+                                  child: const Text('Remove', style: TextStyle(color: Color(0xFFFF8A8A), fontWeight: FontWeight.w600)),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ]),
                       ],
                     ]),
                   ),
@@ -535,21 +636,41 @@ class _DisplayPageState extends State<DisplayPage> {
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 3),
                             child: Column(children: [
-                              Container(
-                                width: 64,
-                                height: 90,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(9),
-                                  border: Border.all(color: i == _page ? CkColors.orangeSoft : Colors.transparent, width: 2),
+                              Stack(clipBehavior: Clip.none, children: [
+                                Container(
+                                  width: 64,
+                                  height: 90,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(9),
+                                    border: Border.all(color: i == _page ? CkColors.cyan : Colors.transparent, width: 2),
+                                  ),
+                                  child: _pageView(i, thumb: true),
                                 ),
-                                child: _pageView(i, thumb: true),
-                              ),
+                                if ((i == 1 && _front.isNotEmpty) || (i == 2 && _back.isNotEmpty))
+                                  Positioned(
+                                    top: -7,
+                                    right: -7,
+                                    child: GestureDetector(
+                                      onTap: () => _remove(i == 1),
+                                      child: Container(
+                                        width: 22,
+                                        height: 22,
+                                        decoration: BoxDecoration(
+                                          color: CkColors.deepSpace,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: const Color(0xCCFF8A8A)),
+                                        ),
+                                        child: const Icon(Icons.close_rounded, size: 13, color: Color(0xFFFF8A8A)),
+                                      ),
+                                    ),
+                                  ),
+                              ]),
                               const SizedBox(height: 5),
                               Text(_labels[i],
                                   style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: i == _page ? FontWeight.w600 : FontWeight.w500,
-                                      color: i == _page ? const Color(0xFFF7A45E) : CkColors.textSecondary)),
+                                      color: i == _page ? CkColors.cyan : CkColors.textSecondary)),
                             ]),
                           ),
                         ),
@@ -563,11 +684,19 @@ class _DisplayPageState extends State<DisplayPage> {
                 radius: 18,
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                 child: Column(children: [
-                  Field('Display name', controller: _name),
-                  Field('Mobile', controller: _mobile, keyboard: TextInputType.phone),
-                  Field('Message', controller: _message),
-                  Field('Address', controller: _address, maxLines: 2),
-                  Field('Email', controller: _email, keyboard: TextInputType.emailAddress),
+                  Field('Consultant name', controller: _name, focusNode: _fName),
+                  Field('Message', controller: _message, focusNode: _fMessage),
+                  const SizedBox(height: 12),
+                  PhoneField(
+                    country: _country,
+                    controller: _mobile,
+                    label: 'Number',
+                    required: false,
+                    focusNode: _fMobile,
+                    onCountry: (c) => setState(() => _country = c),
+                  ),
+                  Field('Email', controller: _email, keyboard: TextInputType.emailAddress, focusNode: _fEmail),
+                  Field('Address', controller: _address, maxLines: 2, focusNode: _fAddress),
                 ]),
               ),
             ],
@@ -734,8 +863,8 @@ class _AppDetailsPageState extends State<AppDetailsPage> {
                   radius: 18,
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Field('App name', controller: _appName, readOnly: true),
-                    Field('App code', controller: _code, readOnly: true),
+                    Field('App name', controller: _appName, readOnly: true, suffix: const Icon(Icons.lock_outline_rounded, size: 17, color: CkColors.labelMono)),
+                    Field('App code', controller: _code, readOnly: true, suffix: const Icon(Icons.lock_outline_rounded, size: 17, color: CkColors.labelMono)),
                     Field('About you', controller: _desc, maxLines: 5, hint: 'Describe your practice for your clients…'),
                     const SizedBox(height: 14),
                     const Text('APP ICON', style: CkText.label),

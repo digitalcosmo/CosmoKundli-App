@@ -145,18 +145,40 @@ class _TransitPageState extends State<TransitPage> {
         padding: const EdgeInsets.fromLTRB(14, 0, 14, 120),
         children: [
           Row(children: [
-            const Text('Pinch to zoom', style: TextStyle(fontSize: 11.5, color: CkColors.textMuted)),
-            const Spacer(),
+            Expanded(
+              child: Pressable(
+                onTap: _pick,
+                child: Container(
+                  height: 42,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(color: CkColors.cyanTint, borderRadius: BorderRadius.circular(12), border: Border.all(color: CkColors.cyanStroke)),
+                  child: Row(children: [
+                    const Icon(Icons.calendar_today_outlined, size: 15, color: CkColors.cyan),
+                    const SizedBox(width: 8),
+                    Text(DateFormat('dd-MM-yyyy · HH:mm').format(_at), style: CkText.mono(13)),
+                  ]),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
             Pressable(
-              onTap: _pick,
+              onTap: () {
+                setState(() => _live = true);
+                _set(DateTime.now(), keepLive: true);
+                _startLive();
+              },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(color: CkColors.orangeTint, borderRadius: BorderRadius.circular(20), border: Border.all(color: CkColors.orangeStroke)),
+                height: 42,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: _live ? CkColors.cyanTint : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _live ? CkColors.cyanStroke : CkColors.panelStroke),
+                ),
                 child: Row(children: [
-                  const Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFFFFB27A)),
+                  Container(width: 7, height: 7, decoration: BoxDecoration(shape: BoxShape.circle, color: _live ? CkColors.cyan : CkColors.labelMono)),
                   const SizedBox(width: 6),
-                  Text(DateFormat('dd MMM yyyy · HH:mm').format(_at),
-                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFFFFB27A))),
+                  Text('LIVE', style: CkText.mono(12, color: _live ? Colors.white : CkColors.textSecondary)),
                 ]),
               ),
             ),
@@ -196,15 +218,12 @@ class _TransitPageState extends State<TransitPage> {
                                   height: 36,
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
-                                    color: st == _step ? CkColors.orangeTint : CkColors.glassFill,
-                                    borderRadius: BorderRadius.circular(18),
-                                    border: Border.all(color: st == _step ? CkColors.orangeStroke : CkColors.glassStroke),
+                                    color: st == _step ? CkColors.cyanTint : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: st == _step ? CkColors.cyanStroke : CkColors.panelStroke),
                                   ),
                                   child: Text(_stepLabel[st]!,
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 12.5,
-                                          color: st == _step ? const Color(0xFFFFB27A) : CkColors.text)),
+                                      style: CkText.mono(12, color: st == _step ? Colors.white : CkColors.textSecondary)),
                                 ),
                               ),
                             ),
@@ -212,48 +231,15 @@ class _TransitPageState extends State<TransitPage> {
                       .toList(),
                 ),
                 const SizedBox(height: 8),
-                Row(children: [
-                  Expanded(
-                    child: Pressable(
-                      onTap: () {
-                        setState(() => _live = true);
-                        _set(DateTime.now(), keepLive: true);
-                        _startLive();
-                      },
-                      child: Glass(
-                        height: 42,
-                        radius: 21,
-                        shadow: false,
-                        alignment: Alignment.center,
-                        stroke: _live ? const Color(0x8010B981) : CkColors.glassStroke,
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(Icons.circle, size: 9, color: _live ? CkColors.green : CkColors.textMuted),
-                          const SizedBox(width: 7),
-                          const Text('Real time', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                        ]),
-                      ),
-                    ),
+                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Pressable(
+                    onTap: () => _set(_move(_at, _step, -1)),
+                    child: const Glass(width: 64, height: 40, radius: 12, alignment: Alignment.center, child: Icon(Icons.chevron_left_rounded, size: 22)),
                   ),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: Glass(
-                      height: 42,
-                      radius: 21,
-                      shadow: false,
-                      child: Row(children: [
-                        Expanded(
-                            child: IconButton(
-                                tooltip: 'Back ${_stepLabel[_step]}',
-                                onPressed: () => _set(_move(_at, _step, -1)),
-                                icon: const Icon(Icons.chevron_left_rounded))),
-                        Text(_stepLabel[_step]!, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        Expanded(
-                            child: IconButton(
-                                tooltip: 'Forward ${_stepLabel[_step]}',
-                                onPressed: () => _set(_move(_at, _step, 1)),
-                                icon: const Icon(Icons.chevron_right_rounded))),
-                      ]),
-                    ),
+                  Pressable(
+                    onTap: () => _set(_move(_at, _step, 1)),
+                    child: const Glass(width: 64, height: 40, radius: 12, alignment: Alignment.center, child: Icon(Icons.chevron_right_rounded, size: 22)),
                   ),
                 ]),
                 _CoordTable(birth: birth, transit: tr),
@@ -274,7 +260,7 @@ class _CoordTable extends StatelessWidget {
       : Row(children: [
           Flexible(child: Text(rashiName(p.rashi), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13))),
           const SizedBox(width: 5),
-          Text('${p.degIn.floor()}°', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(fmtDeg(p.degIn), style: CkText.mono(12.5)),
           if (p.retro) const RetroBadge(),
         ]);
 
@@ -286,7 +272,7 @@ class _CoordTable extends StatelessWidget {
         child: Column(children: [
           const CardTitle('GRAH Coordinates', Icons.table_chart_outlined),
           Row(children: [
-            const SizedBox(width: 92, child: Text('GRAH', style: CkText.label)),
+            const SizedBox(width: 58, child: Text('GRAH', style: CkText.label)),
             const Expanded(child: Text('COSMOKUNDLI', style: CkText.label)),
             Expanded(child: Text('TRANSIT', style: CkText.label.copyWith(color: const Color(0xFFFFB27A)))),
           ]),
@@ -305,11 +291,11 @@ class _CoordTable extends StatelessWidget {
               decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x14FFFFFF)))),
               child: Row(children: [
                 SizedBox(
-                  width: 92,
+                  width: 58,
                   child: Row(children: [
                     GrahDot(id, size: 8),
                     const SizedBox(width: 7),
-                    Flexible(child: Text(kGrahNames[id]!, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+                    Flexible(child: Text(id, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
                   ]),
                 ),
                 Expanded(child: _pos(b)),

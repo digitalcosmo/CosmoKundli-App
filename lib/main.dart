@@ -4,7 +4,7 @@ import 'package:get/get.dart';
 
 import 'core/session.dart';
 import 'pages/auth_pages.dart';
-import 'pages/clients_page.dart';
+import 'pages/app_shell.dart';
 import 'ui/ck_theme.dart';
 
 Future<void> main() async {
@@ -45,5 +45,5 @@ class CosmoKundliApp extends StatelessWidget {
   }
 }
 
-void goHome() => Get.offAll(() => const ClientsPage());
+void goHome() => Get.offAll(() => const AppShell());
 void goLogin() => Get.offAll(() => const LoginPage());

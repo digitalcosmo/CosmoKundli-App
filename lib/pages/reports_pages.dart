@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/api.dart';
 import '../core/session.dart';
@@ -130,4 +131,229 @@ class _PlannerPageState extends State<PlannerPage> {
           ),
         ],
       );
+}
+
+// ───────────────────────── Reports tab (client) & app-level list
+
+enum ReportState { generating, ready, failed }
+
+ReportState reportState(Map<String, dynamic> e) {
+  final st = '${e['Status'] ?? e['status'] ?? ''}'.toLowerCase();
+  final link = '${e['Download_Link'] ?? ''}'.trim();
+  if (st.contains('fail') || st.contains('error') || st.contains('reject')) return ReportState.failed;
+  if (link.isNotEmpty && link != 'null') return ReportState.ready;
+  if (st.contains('complete') || st.contains('done') || st.contains('success')) return ReportState.ready;
+  return ReportState.generating;
+}
+
+class ReportRow extends StatelessWidget {
+  final Map<String, dynamic> e;
+  final bool showClient;
+  final VoidCallback? onRetry;
+  const ReportRow(this.e, {super.key, this.showClient = false, this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final st = reportState(e);
+    final link = '${e['Download_Link'] ?? ''}'.trim();
+    final type = '${e['Type'] ?? e['Report'] ?? 'CK Planner'}';
+    final name = '${e['Name'] ?? ''}';
+    final date = '${e['Date'] ?? e['created_at'] ?? e['Created'] ?? ''}';
+    final col = st == ReportState.ready ? const Color(0xFF5EE38A) : st == ReportState.failed ? const Color(0xFFF59E0B) : CkColors.cyan;
+    final label = st == ReportState.ready ? 'READY' : st == ReportState.failed ? 'FAILED' : 'GENERATING';
+    return Glass(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(13),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Image.asset('assets/icons/ck_planner.png', width: 26, height: 26),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(showClient && name.isNotEmpty ? '$name · $type' : type,
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 3),
+              Row(children: [
+                if (st == ReportState.generating) const _Pulse(),
+                Text(label, style: CkText.mono(10.5, color: col)),
+                if (date.isNotEmpty && date != 'null') Text('  ·  $date', style: CkText.mono(10.5, color: CkColors.labelMono)),
+              ]),
+            ]),
+          ),
+        ]),
+        if (st == ReportState.generating)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text('Being prepared. Pull down to refresh.', style: TextStyle(fontSize: 12, color: CkColors.textSecondary)),
+          ),
+        if (st == ReportState.ready && link.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Row(children: [
+              Expanded(child: GhostButton('Open PDF', icon: Icons.picture_as_pdf_outlined, onTap: () => openLink(link))),
+              const SizedBox(width: 8),
+              Expanded(child: GhostButton('Share', icon: Icons.ios_share_rounded, onTap: () => openLink(link))),
+            ]),
+          ),
+        if (st == ReportState.failed && onRetry != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: GhostButton('Retry', icon: Icons.refresh_rounded, onTap: onRetry),
+          ),
+      ]),
+    );
+  }
+}
+
+class _Pulse extends StatefulWidget {
+  const _Pulse();
+  @override
+  State<_Pulse> createState() => _PulseState();
+}
+
+class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..repeat(reverse: true);
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+        opacity: Tween(begin: .25, end: 1.0).animate(_c),
+        child: Container(
+          width: 7,
+          height: 7,
+          margin: const EdgeInsets.only(right: 6),
+          decoration: const BoxDecoration(color: CkColors.cyan, shape: BoxShape.circle),
+        ),
+      );
+}
+
+Future<List<Map<String, dynamic>>> fetchReports() async {
+  final r = await Api.post(Endpoints.reportHistory, {'uID': Session.uid});
+  return Api.list(r, ['list']);
+}
+
+class ClientReportsPage extends StatefulWidget {
+  const ClientReportsPage({super.key});
+  @override
+  State<ClientReportsPage> createState() => _ClientReportsPageState();
+}
+
+class _ClientReportsPageState extends State<ClientReportsPage> {
+  late Future<List<Map<String, dynamic>>> _f = fetchReports();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Session.client.value;
+    return ClientPage(
+      title: 'Reports',
+      isRoot: true,
+      onRefresh: () async => setState(() => _f = fetchReports()),
+      children: [
+        Text('NEW REPORT', style: CkText.label),
+        const SizedBox(height: 8),
+        Pressable(
+          scale: .985,
+          onTap: () => pushModule(context, const PlannerPage()),
+          child: Glass(
+            padding: const EdgeInsets.all(14),
+            child: Row(children: [
+              Image.asset('assets/icons/ck_planner.png', width: 30, height: 30),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('CK Planner', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                  SizedBox(height: 2),
+                  Text('Sentiments & Situations, 3 · 6 · 12 months', style: TextStyle(fontSize: 12, color: CkColors.textSecondary)),
+                ]),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: CkColors.labelMono),
+            ]),
+          ),
+        ),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(2, 8, 2, 0),
+          child: Text('CK BluePrint, CK Trajectory and CK Profile will appear here as they launch.',
+              style: TextStyle(fontSize: 11.5, color: CkColors.labelMono)),
+        ),
+        const SizedBox(height: 18),
+        Text('THIS CLIENT · HISTORY', style: CkText.label),
+        FutureBuilder<List<Map<String, dynamic>>>(
+          future: _f,
+          builder: (ctx, s) {
+            if (s.hasError) return ErrorBox(message: 'Couldn\'t load reports.', onRetry: () => setState(() => _f = fetchReports()));
+            if (!s.hasData) return const Padding(padding: EdgeInsets.all(30), child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)));
+            final name = (c?.name ?? '').toLowerCase().trim();
+            final l = s.data!.where((e) => '${e['Name'] ?? ''}'.toLowerCase().trim() == name).toList();
+            if (l.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.only(top: 10),
+                child: EmptyBox(icon: Icons.description_outlined, title: 'No reports yet', body: 'Reports you generate for this client appear here.'),
+              );
+            }
+            return Column(children: [for (final e in l) ReportRow(e, onRetry: () => pushModule(context, const PlannerPage()))]);
+          },
+        ),
+      ],
+    );
+  }
+}
+
+/// App-level Reports tab: every report across clients.
+class AllReportsPage extends StatefulWidget {
+  const AllReportsPage({super.key});
+  @override
+  State<AllReportsPage> createState() => _AllReportsPageState();
+}
+
+class _AllReportsPageState extends State<AllReportsPage> {
+  late Future<List<Map<String, dynamic>>> _f = fetchReports();
+  String _q = '';
+  @override
+  Widget build(BuildContext context) => CkScaffold(
+        body: SafeArea(
+          bottom: false,
+          child: RefreshIndicator(
+            onRefresh: () async => setState(() => _f = fetchReports()),
+            child: ListView(
+              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 120),
+              children: [
+                Text('ALL CLIENTS', style: CkText.label),
+                const SizedBox(height: 6),
+                Text('Reports', style: CkText.h(26)),
+                const SizedBox(height: 14),
+                TextField(
+                  onChanged: (v) => setState(() => _q = v.toLowerCase()),
+                  decoration: const InputDecoration(hintText: 'Search client or report', prefixIcon: Icon(Icons.search_rounded)),
+                ),
+                FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _f,
+                  builder: (ctx, s) {
+                    if (s.hasError) return ErrorBox(message: 'Couldn\'t load reports.', onRetry: () => setState(() => _f = fetchReports()));
+                    if (!s.hasData) return const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)));
+                    final l = s.data!.where((e) => '${e['Name']} ${e['Type']}'.toLowerCase().contains(_q)).toList();
+                    if (l.isEmpty) {
+                      return const Padding(
+                          padding: EdgeInsets.only(top: 14),
+                          child: EmptyBox(icon: Icons.description_outlined, title: 'No reports', body: 'Reports you generate will show here.'));
+                    }
+                    return Column(children: [
+                      for (var i = 0; i < l.length; i++) i < 7 ? FadeSlideIn(index: i, child: ReportRow(l[i], showClient: true)) : ReportRow(l[i], showClient: true)
+                    ]);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+}
+
+Future<void> openLink(String link) async {
+  final u = Uri.tryParse(link);
+  if (u != null) await launchUrl(u, mode: LaunchMode.externalApplication);
 }

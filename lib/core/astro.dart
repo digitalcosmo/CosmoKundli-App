@@ -80,7 +80,7 @@ double parseDegree(dynamic v) {
 String fmtDeg(double d) {
   final deg = d.floor();
   final min = ((d - deg) * 60).round().clamp(0, 59);
-  return '${deg.toString().padLeft(2, '0')}° ${min.toString().padLeft(2, '0')}′';
+  return '${deg.toString().padLeft(2, '0')}°${min.toString().padLeft(2, '0')}′';
 }
 
 /// GRAH id from "Su", "Sun", "Surya", "Lagan", "सूर्य (R)" …

@@ -66,7 +66,7 @@ class _SpacePainter extends CustomPainter {
           ..shader = const RadialGradient(
             center: Alignment(-.6, -1.0),
             radius: 1.5,
-            colors: [Color(0xFF2159B8), Color(0xFF15408F), Color(0xFF0C2C68), Color(0xFF09214F)],
+            colors: [Color(0xFF2563C4), Color(0xFF164292), Color(0xFF0E2E6C), Color(0xFF0A2252)],
             stops: [0, .38, .72, 1],
           ).createShader(rect));
 

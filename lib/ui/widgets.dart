@@ -15,7 +15,9 @@ import 'glass.dart';
 class CkText {
   static TextStyle h(double size, {Color color = CkColors.text, FontWeight w = FontWeight.w600}) =>
       GoogleFonts.inter(fontSize: size, fontWeight: w, color: color, height: 1.2, letterSpacing: size > 20 ? -.4 : -.1);
-  static const label = TextStyle(fontSize: 11, letterSpacing: .8, fontWeight: FontWeight.w600, color: CkColors.textSecondary);
+  static const label = TextStyle(fontFamily: 'JetBrainsMono', fontSize: 10.5, letterSpacing: 1.2, fontWeight: FontWeight.w500, color: CkColors.labelMono);
+  static TextStyle mono(double size, {Color color = CkColors.text, FontWeight w = FontWeight.w500}) =>
+      TextStyle(fontFamily: 'JetBrainsMono', fontSize: size, fontWeight: w, color: color, height: 1.25);
   static const muted = TextStyle(fontSize: 12.5, color: CkColors.textSecondary);
 }
 
@@ -154,7 +156,9 @@ class Field extends StatelessWidget {
       this.readOnly = false,
       this.onTap,
       this.validator,
-      this.formatters});
+      this.formatters,
+      this.focusNode});
+  final FocusNode? focusNode;
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(top: 12),
@@ -165,6 +169,7 @@ class Field extends StatelessWidget {
           const SizedBox(height: 6),
           TextFormField(
             controller: controller,
+            focusNode: focusNode,
             obscureText: obscure,
             keyboardType: keyboard,
             maxLines: maxLines,
@@ -172,7 +177,7 @@ class Field extends StatelessWidget {
             onTap: onTap,
             inputFormatters: formatters,
             style: const TextStyle(color: CkColors.text, fontSize: 15),
-            cursorColor: CkColors.orangeSoft,
+            cursorColor: CkColors.cyan,
             validator: validator ??
                 (required ? (v) => (v == null || v.trim().isEmpty) ? '$label is required' : null : null),
             decoration: InputDecoration(
@@ -707,6 +712,10 @@ const kCkIcons = <String, String>{
   'CK BluePrint': 'blueprint',
   'CosmoKundli': 'cosmokundli',
   'GRAH Coordinates': 'grahcoordinates',
+  'Degree': 'grahcoordinates',
+  'GRAH Vibes & Intensity': 'situations',
+  'Panchang': 'cosmokundli',
+  'Melapak': 'cosmoprakruti',
   'Power': 'cosmobal',
   'Flavor': 'cosmoprakruti',
   'Power & Flavor': 'cosmobal',
@@ -1020,14 +1029,13 @@ class GrahBarChart extends StatelessWidget {
 }
 
 /// Small "R" retrograde badge.
+/// Retrograde mark: a small superscript capital R.
 class RetroBadge extends StatelessWidget {
   const RetroBadge({super.key});
   @override
-  Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.only(left: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-        decoration: BoxDecoration(color: const Color(0x38FF3B3B), borderRadius: BorderRadius.circular(5)),
-        child: const Text('R', style: TextStyle(color: Color(0xFFFF9A9A), fontSize: 10.5, fontWeight: FontWeight.w600)),
+  Widget build(BuildContext context) => Transform.translate(
+        offset: const Offset(1, -6),
+        child: const Text('R', style: TextStyle(color: CkColors.retro, fontSize: 9, fontWeight: FontWeight.w700, height: 1)),
       );
 }
 

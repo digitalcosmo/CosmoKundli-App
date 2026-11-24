@@ -92,6 +92,7 @@ class Session {
     }
   }
 
+  static SharedPreferences get prefs => _p;
   static String get uid => _p.getString(SPKeys.uID) ?? '';
   static bool get loggedIn => (_p.getBool(SPKeys.isLoggedIn) ?? false) && uid.isNotEmpty;
 

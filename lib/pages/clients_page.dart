@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 
 import '../core/api.dart';
 import '../core/session.dart';
@@ -11,7 +12,8 @@ import 'client_form_page.dart';
 import 'client_shell.dart';
 
 class ClientsPage extends StatefulWidget {
-  const ClientsPage({super.key});
+  final bool embedded;
+  const ClientsPage({super.key, this.embedded = false});
   @override
   State<ClientsPage> createState() => _ClientsPageState();
 }
@@ -93,11 +95,6 @@ class _ClientsPageState extends State<ClientsPage> {
 
   void _reload() => setState(() => _future = fetchClients());
 
-  String get _greeting {
-    final h = DateTime.now().hour;
-    return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-  }
-
   void _jump(String letter) {
     final k = _keys[letter];
     if (k?.currentContext != null) {
@@ -109,20 +106,19 @@ class _ClientsPageState extends State<ClientsPage> {
   Widget build(BuildContext context) {
     return CkScaffold(
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 8),
+        padding: EdgeInsets.only(bottom: widget.embedded ? 74 : 8),
         child: Pressable(
           onTap: () async {
             final r = await Get.to(() => const ClientFormPage());
             if (r != null) _reload();
           },
           child: Container(
-            height: 56,
-            padding: const EdgeInsets.symmetric(horizontal: 22),
+            height: 50,
+            padding: const EdgeInsets.symmetric(horizontal: 18),
             decoration: BoxDecoration(
-              gradient: CkColors.cta,
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: const Color(0x66FFFFFF)),
-              boxShadow: const [BoxShadow(color: Color(0x66F56720), blurRadius: 24, offset: Offset(0, 8))],
+              gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFF07E22)]),
+              borderRadius: BorderRadius.circular(15),
+              boxShadow: const [BoxShadow(color: Color(0x66F07E22), blurRadius: 24, offset: Offset(0, 8))],
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               const Icon(Icons.add_rounded, color: Colors.white),
@@ -163,12 +159,12 @@ class _ClientsPageState extends State<ClientsPage> {
                           Row(children: [
                             Expanded(
                               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text(_greeting, style: CkText.muted.copyWith(fontSize: 13)),
-                                const SizedBox(height: 2),
-                                Text('Clients', style: CkText.h(28)),
+                                Text(s.hasData ? '${all.length} CLIENTS' : 'CLIENTS', style: CkText.label),
+                                const SizedBox(height: 6),
+                                Text('Clients', style: CkText.h(26)),
                               ]),
                             ),
-                            Pressable(
+                            if (!widget.embedded) Pressable(
                               onTap: () => Get.to(() => const AccountPage()),
                               child: Container(
                                 width: 46,
@@ -257,7 +253,7 @@ class _ClientsPageState extends State<ClientsPage> {
                       ))
                     else
                       SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(18, 0, 30, 120),
+                        padding: EdgeInsets.fromLTRB(18, 0, 30, widget.embedded ? 190 : 120),
                         sliver: SliverList.builder(
                           itemCount: list.length,
                           itemBuilder: (c, i) {
@@ -318,12 +314,11 @@ class _Avatar extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(size * .35),
-        color: col.withValues(alpha: .16),
-        border: Border.all(color: col.withValues(alpha: .55)),
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0x598CBEFF)),
       ),
       alignment: Alignment.center,
-      child: Text(c.initials, style: CkText.h(size * .32).copyWith(color: Color.lerp(col, Colors.white, .55))),
+      child: Text(c.initials, style: CkText.h(size * .3).copyWith(color: Color.lerp(col, Colors.white, .75))),
     );
   }
 }
@@ -357,17 +352,22 @@ class _ClientCard extends StatelessWidget {
                       ],
                     ]),
                     const SizedBox(height: 4),
-                    Wrap(spacing: 10, runSpacing: 2, children: [
-                      Text(client.dateText, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
-                      if (client.timeText.isNotEmpty) Text(client.timeText, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
-                      if (client.city.isNotEmpty) Text(client.city, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
-                    ]),
+                    Text(
+                      [
+                        client.birth == null ? client.dateText : DateFormat('dd-MM-yyyy').format(client.birth!),
+                        client.timeText,
+                        client.city,
+                      ].where((e) => e.trim().isNotEmpty).join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: CkText.mono(11.5, color: CkColors.textSecondary),
+                    ),
                   ]),
                 ),
                 IconButton(
                   tooltip: 'More for ${client.name}',
                   onPressed: () => clientMenu(context, client, onChanged: onChanged),
-                  icon: const Icon(Icons.more_horiz_rounded, color: CkColors.textSecondary),
+                  icon: const Icon(Icons.more_vert_rounded, color: CkColors.textSecondary),
                 ),
               ]),
             ),
@@ -380,3 +380,8 @@ class _ClientCard extends StatelessWidget {
 // appear instantly so the list never flickers.
 Widget _maybeAnimate(int index, Widget child) =>
     index < 8 ? FadeSlideIn(index: index, child: child) : child;
+
+Future<void> editClient(BuildContext context, Client c) async {
+  final saved = await Get.to(() => ClientFormPage(editId: c.mId));
+  if (saved != null) Session.client.value = Session.client.value;
+}
