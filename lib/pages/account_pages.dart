@@ -262,7 +262,7 @@ class _PersonalPageState extends State<PersonalPage> {
                   radius: 18,
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Field('Name', controller: _name, required: true),
+                    Field('Name', controller: _name, required: true, maxLength: 50),
                     const SizedBox(height: 12),
                     PhoneField(country: _country, controller: _mobile, onCountry: (c) => setState(() => _country = c)),
                     const SizedBox(height: 12),
@@ -676,8 +676,8 @@ class _DisplayPageState extends State<DisplayPage> {
                 radius: 18,
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                 child: Column(children: [
-                  Field('Consultant name', controller: _name, focusNode: _fName),
-                  Field('Message', controller: _message, focusNode: _fMessage),
+                  Field('Consultant name', controller: _name, focusNode: _fName, maxLength: 28),
+                  Field('Message', controller: _message, focusNode: _fMessage, maxLength: 40),
                   const SizedBox(height: 12),
                   PhoneField(
                     country: _country,
@@ -687,8 +687,8 @@ class _DisplayPageState extends State<DisplayPage> {
                     focusNode: _fMobile,
                     onCountry: (c) => setState(() => _country = c),
                   ),
-                  Field('Email', controller: _email, keyboard: TextInputType.emailAddress, focusNode: _fEmail),
-                  Field('Address', controller: _address, maxLines: 2, focusNode: _fAddress),
+                  Field('Email', controller: _email, keyboard: TextInputType.emailAddress, focusNode: _fEmail, maxLength: 40),
+                  Field('Address', controller: _address, maxLines: 2, focusNode: _fAddress, maxLength: 80),
                 ]),
               ),
             ],
@@ -857,7 +857,7 @@ class _AppDetailsPageState extends State<AppDetailsPage> {
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Field('App name', controller: _appName, readOnly: true, suffix: const Icon(Icons.lock_outline_rounded, size: 17, color: CkColors.labelMono)),
                     Field('App code', controller: _code, readOnly: true, suffix: const Icon(Icons.lock_outline_rounded, size: 17, color: CkColors.labelMono)),
-                    Field('About you', controller: _desc, maxLines: 5, hint: 'Describe your practice for your clients…'),
+                    Field('About you', controller: _desc, maxLines: 5, maxLength: 600, hint: 'Describe your practice for your clients…'),
                     const SizedBox(height: 14),
                     const Text('APP ICON', style: CkText.label),
                     const SizedBox(height: 8),

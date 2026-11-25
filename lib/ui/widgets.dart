@@ -158,8 +158,12 @@ class Field extends StatelessWidget {
       this.onTap,
       this.validator,
       this.formatters,
-      this.focusNode});
+      this.focusNode,
+      this.maxLength});
   final FocusNode? focusNode;
+
+  /// Character limit, shown as a live counter (n / max) under the field.
+  final int? maxLength;
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(top: 12),
@@ -177,6 +181,12 @@ class Field extends StatelessWidget {
             readOnly: readOnly,
             onTap: onTap,
             inputFormatters: formatters,
+            maxLength: maxLength,
+            maxLengthEnforcement: MaxLengthEnforcement.enforced,
+            buildCounter: maxLength == null
+                ? null
+                : (c, {required currentLength, required isFocused, maxLength}) => Text('$currentLength / $maxLength',
+                    style: CkText.mono(10.5, color: currentLength >= (maxLength ?? 0) ? const Color(0xFFF5B66B) : CkColors.labelMono)),
             style: const TextStyle(color: CkColors.text, fontSize: 15),
             cursorColor: CkColors.cyan,
             validator: validator ??
