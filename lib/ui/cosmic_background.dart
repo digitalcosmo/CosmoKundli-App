@@ -13,11 +13,16 @@ class CosmicBackground extends StatefulWidget {
 }
 
 class _CosmicBackgroundState extends State<CosmicBackground> with TickerProviderStateMixin {
+  // Every background runs on one shared clock, so two pages show the scene
+  // in exactly the same position and swapping pages never makes it jump.
+  static final _clock = Stopwatch()..start();
+  static double _phase(int periodMs) => (_clock.elapsedMilliseconds % periodMs) / periodMs;
+
   late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(seconds: 120))..repeat();
-  // Slow breathing auras behind the glass (MyAcharyaji: 18 s, reversing).
+      AnimationController(vsync: this, duration: const Duration(seconds: 120), value: _phase(120000))..repeat();
+  // Slow breathing auras behind the glass: 18 s out, 18 s back.
   late final AnimationController _aura =
-      AnimationController(vsync: this, duration: const Duration(seconds: 18))..repeat(reverse: true);
+      AnimationController(vsync: this, duration: const Duration(seconds: 36), value: _phase(36000))..repeat();
   static final List<_Star> _stars = _makeStars();
   late final _painter = _SpacePainter(_c, _stars, _AuraPainter(_aura), Listenable.merge([_c, _aura]));
 
@@ -27,6 +32,22 @@ class _CosmicBackgroundState extends State<CosmicBackground> with TickerProvider
         90,
         (_) => _Star(r.nextDouble(), r.nextDouble(), .4 + r.nextDouble() * 1.1, r.nextDouble() * math.pi * 2,
             2 + r.nextInt(5)));
+  }
+
+  // Coming back on screen (tab switched back, page above popped): jump to
+  // the shared clock so this page matches the one it replaces.
+  bool _was = true;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final on = TickerMode.of(context);
+    if (on && !_was) {
+      _c.value = _phase(120000);
+      _aura.value = _phase(36000);
+      _c.repeat();
+      _aura.repeat();
+    }
+    _was = on;
   }
 
   @override
@@ -194,7 +215,8 @@ class _AuraPainter {
               .createShader(Rect.fromCircle(center: Offset.zero, radius: r)));
       }
     }
-    final v = Curves.easeInOut.transform(t.value);
+    final tri = t.value < .5 ? t.value * 2 : 2 - t.value * 2; // there and back
+    final v = Curves.easeInOut.transform(tri);
     final at = [
       Offset(80 + 40 * v, 110 + 60 * v),
       Offset(s.width + 20 - 30 * v, s.height * .62 + 50 * v),
