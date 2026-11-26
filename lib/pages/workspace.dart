@@ -1279,7 +1279,7 @@ class _DailyW extends StatelessWidget {
 
   static String _fmt(double v, bool signed) {
     final r = v.round();
-    return signed && r > 0 ? '+$r' : '$r';
+    return signed && r > 0 ? '+$r%' : '$r%';
   }
 
   @override

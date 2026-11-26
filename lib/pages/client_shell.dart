@@ -156,7 +156,18 @@ class _Dock extends StatelessWidget {
               top: 0,
               bottom: 0,
               width: w,
-              child: Align(
+              child: Stack(children: [
+                Positioned.fill(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0x145CE1FF),
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: const [BoxShadow(color: Color(0x225CE1FF), blurRadius: 14)],
+                    ),
+                  ),
+                ),
+                Align(
                 alignment: Alignment.topCenter,
                 child: Container(
                   width: 24,
@@ -168,6 +179,7 @@ class _Dock extends StatelessWidget {
                   ),
                 ),
               ),
+              ]),
             ),
             Row(
               children: List.generate(_tabs.length, (i) {

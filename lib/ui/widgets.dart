@@ -1319,6 +1319,7 @@ class FilterDropdown<T> extends StatelessWidget {
             color: on ? CkColors.cyanTint : Colors.transparent,
             borderRadius: BorderRadius.circular(11),
             border: Border.all(color: on ? CkColors.cyanStroke : CkColors.panelStroke),
+            boxShadow: on ? [BoxShadow(color: CkColors.cyan.withValues(alpha: .22), blurRadius: 14)] : null,
           ),
           child: Row(children: [
             if (on) ...[const Icon(Icons.check_rounded, size: 15, color: CkColors.cyan), const SizedBox(width: 4)],
@@ -1416,6 +1417,7 @@ class SortButton<T> extends StatelessWidget {
           color: on ? CkColors.cyanTint : Colors.transparent,
           borderRadius: BorderRadius.circular(11),
           border: Border.all(color: on ? CkColors.cyanStroke : CkColors.panelStroke),
+          boxShadow: on ? [BoxShadow(color: CkColors.cyan.withValues(alpha: .22), blurRadius: 14)] : null,
         ),
         child: Icon(cur.ascending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, size: 18, color: on ? CkColors.cyan : CkColors.text),
       ),

@@ -117,44 +117,72 @@ class _AppShellState extends State<AppShell> {
               tint: const Color(0x40081840),
               height: 66,
               padding: const EdgeInsets.all(5),
-              child: Row(children: [
-                for (var i = 0; i < _items.length; i++)
-                  Expanded(
-                    child: Semantics(
-                      selected: i == _index,
-                      button: true,
-                      label: _items[i].$2,
-                      child: Pressable(
-                        scale: .92,
-                        onTap: () => _go(i),
-                        child: Stack(alignment: Alignment.center, children: [
-                          AnimatedOpacity(
-                            duration: CkMotion.base,
-                            opacity: i == _index ? 1 : 0,
-                            child: Align(
-                              alignment: Alignment.topCenter,
-                              child: Container(
-                                width: 24,
-                                height: 2,
-                                decoration: BoxDecoration(
-                                  color: CkColors.cyan,
-                                  borderRadius: BorderRadius.circular(2),
-                                  boxShadow: const [BoxShadow(color: Color(0xCC5CE1FF), blurRadius: 10)],
-                                ),
-                              ),
-                            ),
+              child: LayoutBuilder(builder: (c, box) {
+                final w = box.maxWidth / _items.length;
+                return Stack(children: [
+                  // sliding selection: soft lens plus a glowing top line
+                  AnimatedPositioned(
+                    duration: CkMotion.slow,
+                    curve: kEase,
+                    left: w * _index,
+                    top: 0,
+                    bottom: 0,
+                    width: w,
+                    child: Stack(children: [
+                      Positioned.fill(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0x145CE1FF),
+                            borderRadius: BorderRadius.circular(15),
+                            boxShadow: const [BoxShadow(color: Color(0x225CE1FF), blurRadius: 14)],
                           ),
-                          Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                            Icon(_items[i].$1, size: 22, color: i == _index ? CkColors.cyan : CkColors.textSecondary),
-                            const SizedBox(height: 3),
-                            Text(_items[i].$2,
-                                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w500, color: i == _index ? Colors.white : CkColors.textSecondary)),
-                          ]),
-                        ]),
+                        ),
                       ),
-                    ),
+                      Align(
+                        alignment: Alignment.topCenter,
+                        child: Container(
+                          width: 24,
+                          height: 2,
+                          decoration: BoxDecoration(
+                            color: CkColors.cyan,
+                            borderRadius: BorderRadius.circular(2),
+                            boxShadow: const [BoxShadow(color: Color(0xCC5CE1FF), blurRadius: 10)],
+                          ),
+                        ),
+                      ),
+                    ]),
                   ),
-              ]),
+                  Row(children: [
+                    for (var i = 0; i < _items.length; i++)
+                      Expanded(
+                        child: Semantics(
+                          selected: i == _index,
+                          button: true,
+                          label: _items[i].$2,
+                          child: Pressable(
+                            scale: .92,
+                            onTap: () => _go(i),
+                            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                              AnimatedScale(
+                                scale: i == _index ? 1.08 : 1,
+                                duration: CkMotion.base,
+                                curve: kEase,
+                                child: Icon(_items[i].$1, size: 22, color: i == _index ? CkColors.cyan : CkColors.textSecondary),
+                              ),
+                              const SizedBox(height: 3),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(_items[i].$2,
+                                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w500, color: i == _index ? Colors.white : CkColors.textSecondary)),
+                              ),
+                            ]),
+                          ),
+                        ),
+                      ),
+                  ]),
+                ]);
+              }),
             ),
           ),
         ),

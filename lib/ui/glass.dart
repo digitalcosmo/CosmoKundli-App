@@ -18,7 +18,8 @@ class CkBackground extends StatelessWidget {
         color: CkColors.deepSpace,
         child: Stack(fit: StackFit.expand, children: [
           const CosmicBackground(),
-          child,
+          // Every glass card on this screen shares one blur pass.
+          BackdropGroup(child: child),
         ]),
       );
 }
@@ -107,7 +108,7 @@ class Glass extends StatelessWidget {
     this.height,
     this.shadow = true,
     this.alignment,
-    this.frost = false,
+    this.frost = true,
     this.liquid = false,
   });
 
