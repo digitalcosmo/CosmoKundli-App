@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
 import 'api.dart';
@@ -193,19 +195,33 @@ class ClientData {
   }
 
   static const kDims = ['Career', 'Finance', 'Health', 'Social', 'Love'];
-  final _fiveD = <String, Future<Map<DateTime, Map<String, double>>>>{};
+  final _fiveD = <String, FiveDLoad>{};
 
   /// Sentiments 5D for a whole month, built from Star_Power_Report, which
   /// gives one dimension for one ISO week per call (5 dimensions x ~5 weeks).
-  Future<Map<DateTime, Map<String, double>>> sentiments5D(DateTime month) {
+  /// Streams: the page shows each week as it arrives, with progress.
+  FiveDLoad sentiments5DLive(DateTime month, {bool retryFailed = false}) {
     final k = '${month.year}-${month.month}';
-    return _fiveD[k] ??= _load5D(month).catchError((Object e) {
-      _fiveD.remove(k);
-      throw e;
-    });
+    final cur = _fiveD[k];
+    if (cur != null && !(retryFailed && cur.failed.isNotEmpty)) return cur;
+    final l = cur ?? FiveDLoad(month);
+    _fiveD[k] = l;
+    _run5D(l, only: cur?.failed.toList());
+    return l;
   }
 
-  Future<Map<DateTime, Map<String, double>>> _load5D(DateTime month) async {
+  Future<Map<DateTime, Map<String, double>>> sentiments5D(DateTime month) async {
+    final l = sentiments5DLive(month);
+    await l.done;
+    if (l.data.isEmpty) {
+      _fiveD.remove('${month.year}-${month.month}');
+      throw Exception('No 5D data');
+    }
+    return l.data;
+  }
+
+  Future<void> _run5D(FiveDLoad l, {List<(String, DateTime)>? only}) async {
+    final month = l.month;
     final first = DateTime(month.year, month.month, 1);
     final last = DateTime(month.year, month.month + 1, 0);
     final mondays = <DateTime>[];
@@ -221,34 +237,52 @@ class ClientData {
 
     const keys = ['Moday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     const alt = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    final out = <DateTime, Map<String, double>>{};
-    final calls = <Future<void>>[];
-    for (final dim in kDims) {
-      for (final mon in mondays) {
-        final w = isoWeek(mon);
-        calls.add(() async {
-          final Map<String, dynamic> r;
-          try {
-            r = await Api.post(Endpoints.starPowerReport, {'mID': mId, 'Type': dim, 'Weeknumber': '${w.$1}', 'Year': '${w.$2}'});
-          } catch (_) {
-            return;
-          }
-          final l = Api.list(r, ['list']);
-          if (l.isEmpty) return;
-          final row = l.first;
+    final jobs = only ?? [for (final dim in kDims) for (final mon in mondays) (dim, mon)];
+    l.total = only == null ? jobs.length : l.total;
+    if (only != null) {
+      l.failed.clear();
+      l.finished -= jobs.length;
+    }
+    l.loading = true;
+    l.notify();
+    await Future.wait(jobs.map((j) async {
+      final (dim, mon) = j;
+      final w = isoWeek(mon);
+      try {
+        final r = await Api.post(Endpoints.starPowerReport, {'mID': mId, 'Type': dim, 'Weeknumber': '${w.$1}', 'Year': '${w.$2}'});
+        final rows = Api.list(r, ['list']);
+        if (rows.isNotEmpty) {
+          final row = rows.first;
           for (var k = 0; k < 7; k++) {
             final d = mon.add(Duration(days: k));
             if (d.month != month.month) continue;
             final v = row[keys[k]] ?? row[alt[k]];
             final n = v is num ? v.toDouble() : double.tryParse('$v');
             if (n == null) continue;
-            out.putIfAbsent(DateTime(d.year, d.month, d.day), () => {})[dim] = n;
+            l.data.putIfAbsent(DateTime(d.year, d.month, d.day), () => {})[dim] = n;
           }
-        }());
+        }
+      } catch (_) {
+        l.failed.add(j);
       }
-    }
-    await Future.wait(calls);
-    if (out.isEmpty) throw Exception('No 5D data');
-    return out;
+      l.finished++;
+      l.notify();
+    }));
+    l.loading = false;
+    l.notify();
+    if (!l._done.isCompleted) l._done.complete();
   }
+}
+
+/// One month of Sentiments 5D loading in pieces.
+class FiveDLoad extends ChangeNotifier {
+  final DateTime month;
+  FiveDLoad(this.month);
+  final data = <DateTime, Map<String, double>>{};
+  final failed = <(String, DateTime)>{};
+  int total = 0, finished = 0;
+  bool loading = true;
+  final _done = Completer<void>();
+  Future<void> get done => _done.future;
+  void notify() => notifyListeners();
 }

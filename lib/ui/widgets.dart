@@ -95,7 +95,7 @@ class PrimaryButton extends StatelessWidget {
             gradient: CkColors.cta,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: const Color(0x66FFFFFF)),
-            boxShadow: const [BoxShadow(color: Color(0x55F56720), blurRadius: 22, offset: Offset(0, 8))],
+            boxShadow: const [BoxShadow(color: Color(0x5AF56720), blurRadius: 30, offset: Offset(0, 10))],
           ),
           alignment: Alignment.center,
           child: loading
@@ -542,7 +542,7 @@ class StatTile extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(upper(label), style: CkText.label.copyWith(fontSize: 9.5)),
             const SizedBox(height: 2),
-            FittedBox(fit: BoxFit.scaleDown, child: Text(value, style: CkText.h(19, color: color))),
+            FittedBox(fit: BoxFit.scaleDown, child: CountUpText(value, style: CkText.h(19, color: color))),
             Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, color: CkColors.textSecondary)),
           ]),
         ),
@@ -1957,4 +1957,57 @@ class Skels {
             ),
         ]),
       );
+}
+
+
+/// Text whose first number counts up from 0 (e.g. "+42%", "72% · 31").
+class CountUpText extends StatelessWidget {
+  final String text;
+  final TextStyle? style;
+  const CountUpText(this.text, {super.key, this.style});
+  static final _re = RegExp(r'^(\D*?)([+-]?\d+(?:\.\d+)?)(.*)$', dotAll: true);
+  @override
+  Widget build(BuildContext context) {
+    final m = _re.firstMatch(text);
+    final n = m == null ? null : double.tryParse(m.group(2)!);
+    if (m == null || n == null) return Text(text, style: style);
+    final dec = m.group(2)!.contains('.') ? m.group(2)!.split('.').last.length : 0;
+    final plus = m.group(2)!.startsWith('+');
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: n),
+      duration: const Duration(milliseconds: 1100),
+      curve: kEase,
+      builder: (_, v, __) => Text('${m.group(1)}${plus && v > 0 ? '+' : ''}${v.toStringAsFixed(dec)}${m.group(3)}', style: style),
+    );
+  }
+}
+
+
+/// Sentiments 5D colour: a plain low -> high scale (no zones). Values may be
+/// 0..100 or signed -100..100; [signed] picks the range.
+Color fiveDColor(double v, {bool signed = false}) {
+  final t = signed ? ((v + 100) / 200).clamp(0.0, 1.0) : (v / 100).clamp(0.0, 1.0);
+  const a = Color(0xFF283C8C), m = Color(0xFF3C96FF), b = Color(0xFF73F4C4);
+  return t < .5 ? Color.lerp(a, m, t * 2)! : Color.lerp(m, b, (t - .5) * 2)!;
+}
+
+/// "Low ▬▬▬ High" legend for [fiveDColor].
+class FiveDLegend extends StatelessWidget {
+  const FiveDLegend({super.key});
+  @override
+  Widget build(BuildContext context) => Row(children: [
+        const Text('Low', style: TextStyle(fontSize: 11, color: CkColors.textSecondary)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Container(
+            height: 6,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(3),
+              gradient: LinearGradient(colors: [fiveDColor(0), fiveDColor(50), fiveDColor(100)]),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        const Text('High', style: TextStyle(fontSize: 11, color: CkColors.textSecondary)),
+      ]);
 }

@@ -414,36 +414,33 @@ class Sentiments5DPage extends StatefulWidget {
 
 class _Sentiments5DPageState extends State<Sentiments5DPage> {
   DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
-  late Future<Map<DateTime, Map<String, double>>> _f = _data.sentiments5D(_month);
+  late FiveDLoad _l = _data.sentiments5DLive(_month);
   String _dim = ClientData.kDims.first;
   DateTime? _sel;
 
   void _setMonth(DateTime m) => setState(() {
         _month = m;
         _sel = null;
-        _f = _data.sentiments5D(m);
+        _l = _data.sentiments5DLive(m);
       });
 
-  Widget _stat(String label, MapEntry<DateTime, double>? e) {
-    final z = e == null ? null : zoneOf(e.value);
-    return Expanded(
-      child: Glass(
-        radius: 14,
-        shadow: false,
-        padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label.toUpperCase(), style: CkText.label.copyWith(fontSize: 9.5)),
-          const SizedBox(height: 3),
-          if (e != null)
-            Row(children: [
-              ZoneArrows(z!, size: 13),
-              const SizedBox(width: 4),
-              Text('${e.value.round()}% · ${e.key.day}', style: CkText.mono(15, color: z.color)),
-            ]),
-        ]),
-      ),
-    );
-  }
+  bool get _signed => _l.data.values.any((d) => d.values.any((v) => v < 0));
+  String _pct(double v) => '${_signed && v > 0 ? '+' : ''}${v.round()}%';
+
+  Widget _stat(String label, MapEntry<DateTime, double>? e) => Expanded(
+        child: Glass(
+          radius: 18,
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label.toUpperCase(), style: CkText.label.copyWith(fontSize: 9.5)),
+            const SizedBox(height: 3),
+            if (e == null)
+              const Skeleton(width: 70, height: 16, radius: 4)
+            else
+              CountUpText('${_pct(e.value)} · ${e.key.day}', style: CkText.mono(15, color: fiveDColor(e.value, signed: _signed))),
+          ]),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) => ClientPage(
@@ -451,123 +448,171 @@ class _Sentiments5DPageState extends State<Sentiments5DPage> {
         children: [
           MonthBar(month: _month, onChanged: _setMonth),
           const SizedBox(height: 10),
-          Row(children: [
-            for (final d in ClientData.kDims)
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2.5),
-                  child: Pressable(
-                    onTap: () => setState(() => _dim = d),
-                    child: AnimatedContainer(
-                      duration: CkMotion.fast,
-                      height: 36,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: _dim == d ? CkColors.cyanTint : Colors.transparent,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: _dim == d ? CkColors.cyanStroke : CkColors.panelStroke),
-                      ),
-                      child: Text(d, style: TextStyle(fontSize: 12, color: _dim == d ? Colors.white : CkColors.textSecondary)),
-                    ),
-                  ),
-                ),
-              ),
-          ]),
-          FutureBuilder<Map<DateTime, Map<String, double>>>(
-            future: _f,
-            builder: (c, s) {
-              if (s.hasError) return Padding(padding: const EdgeInsets.only(top: 12), child: ErrorBox(message: 'Couldn\'t load Sentiments 5D.', onRetry: () => _setMonth(_month)));
-              if (!s.hasData) {
-                return Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Column(children: [
-                    const Text('Loading 5 dimensions for the month…', style: TextStyle(fontSize: 12, color: CkColors.textDim)),
-                    Skels.calendar(),
-                  ]),
-                );
-              }
-              final m = s.data!;
+          Segmented<String>(values: ClientData.kDims, selected: _dim, label: (d) => d, onChanged: (d) => setState(() => _dim = d), height: 40),
+          ListenableBuilder(
+            listenable: _l,
+            builder: (c, _) {
+              final l = _l;
+              final m = l.data;
               final days = m.keys.toList()..sort();
               final series = [for (final d in days) if (m[d]![_dim] != null) MapEntry(d, m[d]![_dim]!)];
-              final best = series.isEmpty ? null : series.reduce((a, b) => a.value >= b.value ? a : b);
-              final worst = series.isEmpty ? null : series.reduce((a, b) => a.value <= b.value ? a : b);
+              final best = series.isEmpty || l.loading ? null : series.reduce((a, b) => a.value >= b.value ? a : b);
+              final worst = series.isEmpty || l.loading ? null : series.reduce((a, b) => a.value <= b.value ? a : b);
               final now = DateTime.now();
               final today = DateTime(now.year, now.month, now.day);
               final sel = _sel ?? (m.containsKey(today) ? today : (days.isEmpty ? null : days.first));
               final first = DateTime(_month.year, _month.month, 1);
               final count = DateTime(_month.year, _month.month + 1, 0).day;
               final lead = first.weekday - 1;
+              final signed = _signed;
               return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                const SizedBox(height: 10),
-                Row(children: [_stat('Best day', best), const SizedBox(width: 7), _stat('Weakest', worst)]),
-                Glass(
-                  margin: const EdgeInsets.only(top: 10),
-                  padding: const EdgeInsets.all(12),
-                  child: GridView.count(
-                    crossAxisCount: 7,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 5,
-                    crossAxisSpacing: 5,
-                    children: [
-                      for (final w in const ['M', 'T', 'W', 'T', 'F', 'S', 'S']) Center(child: Text(w, style: CkText.label)),
-                      for (var i = 0; i < lead; i++) const SizedBox(),
-                      for (var dd = 1; dd <= count; dd++)
-                        () {
-                          final date = DateTime(_month.year, _month.month, dd);
-                          final v = m[date]?[_dim];
-                          final z = v == null ? null : zoneOf(v);
-                          final isToday = date == today;
-                          final isSel = date == sel;
-                          return Pressable(
-                            onTap: v == null ? null : () => setState(() => _sel = date),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: z == null ? CkColors.field : z.color.withValues(alpha: .18),
-                                borderRadius: BorderRadius.circular(9),
-                                border: Border.all(
-                                  color: isSel || isToday ? CkColors.cyan : (z?.color.withValues(alpha: .45) ?? CkColors.panelStroke),
-                                  width: isSel ? 2 : 1.2,
+                // progress while weeks stream in
+                AnimatedSize(
+                  duration: CkMotion.base,
+                  curve: kEase,
+                  child: l.loading
+                      ? Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Row(children: [
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(2),
+                                child: LinearProgressIndicator(
+                                  value: l.total == 0 ? null : l.finished / l.total,
+                                  minHeight: 3,
+                                  color: CkColors.cyan,
+                                  backgroundColor: const Color(0x14FFFFFF),
                                 ),
                               ),
-                              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                Text('$dd', style: CkText.mono(9.5, color: isToday ? CkColors.cyan : CkColors.textSecondary)),
-                                Text(v == null ? '–' : '${v.round()}', style: CkText.mono(12.5, w: FontWeight.w600, color: z?.color ?? CkColors.textDim)),
-                              ]),
                             ),
-                          );
-                        }(),
-                    ],
+                            const SizedBox(width: 10),
+                            Text('Loading… ${l.finished} of ${l.total}', style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
+                          ]),
+                        )
+                      : l.failed.isNotEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: Row(children: [
+                                Expanded(child: Text('${l.failed.length} of ${l.total} pieces didn\'t load', style: const TextStyle(fontSize: 12, color: CkColors.textSecondary))),
+                                Pressable(
+                                  onTap: () => setState(() => _l = _data.sentiments5DLive(_month, retryFailed: true)),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(color: CkColors.cyanTint, borderRadius: BorderRadius.circular(10), border: Border.all(color: CkColors.cyanStroke)),
+                                    child: const Text('Retry missing', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                                  ),
+                                ),
+                              ]),
+                            )
+                          : const SizedBox(width: double.infinity),
+                ),
+                const SizedBox(height: 12),
+                Row(children: [_stat('Best day', best), const SizedBox(width: 8), _stat('Weakest', worst)]),
+                SwipeArea(
+                  canSwipe: (_) => true,
+                  onSwipe: (d) => _setMonth(DateTime(_month.year, _month.month + d)),
+                  child: Glass(
+                    margin: const EdgeInsets.only(top: 14),
+                    padding: const EdgeInsets.all(14),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      Text('${_dim.toUpperCase()} · DAY BY DAY', style: CkText.label),
+                      const SizedBox(height: 10),
+                      GridView.count(
+                        key: ValueKey('${_month.year}-${_month.month}-$_dim'),
+                        crossAxisCount: 7,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: 6,
+                        crossAxisSpacing: 6,
+                        children: [
+                          for (final w in const ['M', 'T', 'W', 'T', 'F', 'S', 'S']) Center(child: Text(w, style: CkText.label)),
+                          for (var i = 0; i < lead; i++) const SizedBox(),
+                          for (var dd = 1; dd <= count; dd++)
+                            () {
+                              final date = DateTime(_month.year, _month.month, dd);
+                              final v = m[date]?[_dim];
+                              final isToday = date == today;
+                              final isSel = date == sel;
+                              if (v == null) {
+                                // still loading: shimmer; loaded but empty: dim
+                                return Stack(children: [
+                                  if (l.loading) const Positioned.fill(child: Skeleton(height: 40, radius: 11)),
+                                  Center(child: Text('$dd', style: CkText.mono(10.5, color: CkColors.textDim))),
+                                ]);
+                              }
+                              final col = fiveDColor(v, signed: signed);
+                              return PopIn(
+                                delay: Duration(milliseconds: 12 * dd),
+                                child: Pressable(
+                                  onTap: () => setState(() => _sel = date),
+                                  child: AnimatedContainer(
+                                    duration: CkMotion.base,
+                                    decoration: BoxDecoration(
+                                      color: col.withValues(alpha: .9),
+                                      borderRadius: BorderRadius.circular(11),
+                                      border: isSel
+                                          ? Border.all(color: Colors.white, width: 2)
+                                          : isToday
+                                              ? Border.all(color: Colors.white.withValues(alpha: .6), width: 1.2)
+                                              : null,
+                                      boxShadow: isSel ? [BoxShadow(color: col.withValues(alpha: .6), blurRadius: 12)] : null,
+                                    ),
+                                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                      Text('$dd', style: CkText.mono(11, w: FontWeight.w700, color: const Color(0xFF06204F))),
+                                      Text(_pct(v), style: CkText.mono(9, color: const Color(0xCC06204F))),
+                                    ]),
+                                  ),
+                                ),
+                              );
+                            }(),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      const FiveDLegend(),
+                    ]),
                   ),
                 ),
                 if (sel != null && m[sel] != null)
                   Glass(
-                    margin: const EdgeInsets.only(top: 10),
-                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+                    margin: const EdgeInsets.only(top: 14),
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('${DateFormat('EEE · d MMM').format(sel).toUpperCase()}${sel == today ? ' · TODAY' : ''} · ALL 5 DIMENSIONS', style: CkText.label),
-                      const SizedBox(height: 4),
-                      for (final d in ClientData.kDims)
-                        if (m[sel]![d] != null)
+                      Text('${DateFormat('EEE · d MMM').format(sel).toUpperCase()}${sel == today ? ' · TODAY' : ''} · ALL 5', style: CkText.label),
+                      const SizedBox(height: 6),
+                      for (var i = 0; i < ClientData.kDims.length; i++)
+                        if (m[sel]![ClientData.kDims[i]] != null)
                           () {
+                            final d = ClientData.kDims[i];
                             final v = m[sel]![d]!;
-                            final z = zoneOf(v);
-                            return Container(
-                              padding: const EdgeInsets.symmetric(vertical: 9),
-                              decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x1F8CBEFF)))),
+                            final col = fiveDColor(v, signed: signed);
+                            final frac = signed ? ((v + 100) / 200) : v / 100;
+                            return Padding(
+                              key: ValueKey('$sel$d'),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
                               child: Row(children: [
-                                SizedBox(width: 64, child: Text(d, style: TextStyle(fontSize: 13, fontWeight: d == _dim ? FontWeight.w600 : FontWeight.w400))),
+                                SizedBox(width: 66, child: Text(d, style: TextStyle(fontSize: 13.5, fontWeight: d == _dim ? FontWeight.w600 : FontWeight.w400))),
                                 Expanded(
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: LinearProgressIndicator(value: (v / 100).clamp(0, 1), minHeight: 7, color: z.color, backgroundColor: const Color(0x268CBEFF)),
+                                  child: Container(
+                                    height: 10,
+                                    decoration: BoxDecoration(color: const Color(0x14FFFFFF), borderRadius: BorderRadius.circular(5)),
+                                    child: GrowIn(
+                                      value: frac.clamp(0.0, 1.0),
+                                      delay: Duration(milliseconds: 90 * i),
+                                      builder: (t) => FractionallySizedBox(
+                                        alignment: Alignment.centerLeft,
+                                        widthFactor: t,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(5),
+                                            gradient: LinearGradient(colors: [col.withValues(alpha: .6), col]),
+                                            boxShadow: [BoxShadow(color: col.withValues(alpha: .35), blurRadius: 8)],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                SizedBox(width: 44, child: Text('${v.round()}%', textAlign: TextAlign.right, style: CkText.mono(12.5))),
-                                const SizedBox(width: 8),
-                                ZoneArrows(z, size: 13),
-                                const SizedBox(width: 4),
-                                SizedBox(width: 66, child: Text(z.name, style: TextStyle(fontSize: 11.5, color: z.color))),
+                                SizedBox(width: 48, child: Align(alignment: Alignment.centerRight, child: CountUpText(_pct(v), style: CkText.mono(13)))),
                               ]),
                             );
                           }(),

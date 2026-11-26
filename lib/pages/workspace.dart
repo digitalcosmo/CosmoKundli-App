@@ -75,7 +75,7 @@ final kWorkspaceModules = <String, WModule>{
   'intensity': const WModule('intensity', 'GRAH Intensity', 'Coming soon', 'Trajectory', WSize.w, null, null),
   'sentiments': WModule('sentiments', 'Sentiments', 'Daily, month by month', 'Predictions', WSize.w, (m, s) => _DailyW(m, s, signed: true), () => const SentimentsPage()),
   'situations': WModule('situations', 'Situations', '7 zones, month by month', 'Predictions', WSize.w, (m, s) => _DailyW(m, s, signed: false), () => const SituationsPage()),
-  'sentiments5d': WModule('sentiments5d', 'Sentiments 5D', 'Career, Finance, Health, Social, Love', 'Predictions', WSize.s, null, () => const Sentiments5DPage()),
+  'sentiments5d': WModule('sentiments5d', 'Sentiments 5D', 'Career, Finance, Health, Social, Love', 'Predictions', WSize.w, (m, s) => _FiveDW(m, s), () => const Sentiments5DPage()),
   'panchang': WModule('panchang', 'Panchang', 'At the moment of birth', 'Traditional', WSize.w, (m, s) => _PanchangW(m, s), () => const PanchangPage()),
   'melapak': WModule('melapak', 'Melapak', 'Match with a partner', 'Traditional', WSize.w, (m, s) => _MelapakW(m, s), () => const MelapakPage()),
 };
@@ -1481,6 +1481,183 @@ Widget _skelDaily(int n, bool signed) => LayoutBuilder(builder: (c, b) {
         SizedBox(height: 16, child: Row(children: [for (var i = 0; i < n; i++) const Expanded(child: Center(child: Skeleton(width: 12, height: 7, radius: 3)))])),
       ]);
     });
+
+/// Sentiments 5D for days around today, one dimension at a time (picked
+/// from the small chip in the header, remembered per user).
+/// Small: yesterday · today · tomorrow. Tall: 5 days. Wide: 10. Large: 17 + stats.
+class _FiveDW extends StatefulWidget {
+  final String mId;
+  final WSize size;
+  const _FiveDW(this.mId, this.size);
+  @override
+  State<_FiveDW> createState() => _FiveDWState();
+}
+
+class _FiveDWState extends State<_FiveDW> {
+  static String get _key => 'ws_u${Session.uid}_5ddim';
+  late String _dim = Session.prefs.getString(_key) ?? ClientData.kDims.first;
+  late final DateTime _today = () {
+    final n = DateTime.now();
+    return DateTime(n.year, n.month, n.day);
+  }();
+
+  (int, int) get _span => switch (widget.size) { WSize.s => (1, 1), WSize.t => (2, 2), WSize.w => (6, 3), WSize.l => (13, 3) };
+
+  List<FiveDLoad> _loads() {
+    final (b, a) = _span;
+    final from = _today.subtract(Duration(days: b)), to = _today.add(Duration(days: a));
+    final d = ClientData.of(widget.mId);
+    final out = <FiveDLoad>[];
+    for (var m = DateTime(from.year, from.month); !m.isAfter(DateTime(to.year, to.month)); m = DateTime(m.year, m.month + 1)) {
+      out.add(d.sentiments5DLive(m));
+    }
+    return out;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loads = _loads();
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _WHead('Sentiments 5D',
+          trailing: PopupMenuButton<String>(
+            initialValue: _dim,
+            color: CkColors.navySheet,
+            position: PopupMenuPosition.under,
+            onSelected: (v) => setState(() {
+              _dim = v;
+              Session.prefs.setString(_key, v);
+            }),
+            itemBuilder: (c) => [for (final d in ClientData.kDims) PopupMenuItem(value: d, child: Text(d))],
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: CkColors.cyanStroke)),
+              child: Text('${_dim.toUpperCase()} ▾', style: CkText.mono(10, color: CkColors.cyan)),
+            ),
+          )),
+      const SizedBox(height: 8),
+      Expanded(
+        child: ListenableBuilder(
+          listenable: Listenable.merge(loads),
+          builder: (c, _) {
+            final (b, a) = _span;
+            final days = [for (var i = -b; i <= a; i++) _today.add(Duration(days: i))];
+            final vals = <MapEntry<DateTime, double?>>[];
+            var signed = false;
+            for (final l in loads) {
+              for (final v in l.data.values) {
+                if (v.values.any((x) => x < 0)) signed = true;
+              }
+            }
+            for (final d in days) {
+              double? v;
+              for (final l in loads) {
+                v ??= l.data[d]?[_dim];
+              }
+              vals.add(MapEntry(d, v));
+            }
+            final loading = loads.any((l) => l.loading);
+            if (vals.every((e) => e.value == null)) {
+              if (loading) return _skelDaily(days.length, false);
+              return const Center(child: Text('No data for these days', style: CkText.muted));
+            }
+            String pct(double v) => '${signed && v > 0 ? '+' : ''}${v.round()}%';
+            final chart = LayoutBuilder(builder: (c, box) {
+              const lab = 16.0, top = 18.0;
+              final few = days.length <= 3;
+              final h = box.maxHeight - lab;
+              final bw = few ? 18.0 : (days.length <= 5 ? 14.0 : 10.0);
+              return Column(children: [
+                SizedBox(
+                  height: h,
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    for (var i = 0; i < vals.length; i++)
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 1),
+                          decoration: vals[i].key == _today
+                              ? BoxDecoration(color: const Color(0x145CE1FF), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0x595CE1FF)))
+                              : null,
+                          child: vals[i].value == null
+                              ? (loading ? const Align(alignment: Alignment.bottomCenter, child: Skeleton(width: 10, height: 30, radius: 3)) : const SizedBox())
+                              : GrowIn(
+                                  value: 1,
+                                  delay: Duration(milliseconds: 50 * i),
+                                  builder: (k) {
+                                    final v = vals[i].value!;
+                                    final frac = signed ? (v + 100) / 200 : v / 100;
+                                    final bh = (h - top - 4) * frac.clamp(0.0, 1.0) * k;
+                                    final col = fiveDColor(v, signed: signed);
+                                    return Stack(children: [
+                                      Positioned(
+                                        left: 0,
+                                        right: 0,
+                                        bottom: 0,
+                                        height: math.max(bh, 3),
+                                        child: Center(
+                                          child: Container(
+                                            width: bw,
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [col, col.withValues(alpha: .35)]),
+                                              borderRadius: const BorderRadius.vertical(top: Radius.circular(3), bottom: Radius.circular(1)),
+                                              boxShadow: [BoxShadow(color: col.withValues(alpha: .35), blurRadius: 8)],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        left: 0,
+                                        right: 0,
+                                        bottom: bh + 2,
+                                        child: Text(pct(v * k), textAlign: TextAlign.center, style: CkText.mono(few ? 11 : 9, color: Colors.white)),
+                                      ),
+                                    ]);
+                                  },
+                                ),
+                        ),
+                      ),
+                  ]),
+                ),
+                SizedBox(
+                  height: lab,
+                  child: Row(children: [
+                    for (final e in vals)
+                      Expanded(
+                        child: Center(
+                          child: Text(few && e.key == _today ? 'Today' : '${e.key.day}',
+                              style: CkText.mono(9.5, color: e.key == _today ? CkColors.cyan : CkColors.labelMono)),
+                        ),
+                      ),
+                  ]),
+                ),
+              ]);
+            });
+            if (widget.size != WSize.l) return chart;
+            final known = [for (final e in vals) if (e.value != null) MapEntry(e.key, e.value!)];
+            final best = known.reduce((x, y) => y.value > x.value ? y : x);
+            final worst = known.reduce((x, y) => y.value < x.value ? y : x);
+            final avg = known.map((e) => e.value).reduce((x, y) => x + y) / known.length;
+            Widget stat(String k, double v) => Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(9, 6, 9, 6),
+                    decoration: BoxDecoration(color: const Color(0x0FFFFFFF), borderRadius: BorderRadius.circular(9)),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(k.toUpperCase(), style: CkText.label.copyWith(fontSize: 8.5)),
+                      const SizedBox(height: 2),
+                      CountUpText(pct(v), style: CkText.mono(14, color: fiveDColor(v, signed: signed))),
+                    ]),
+                  ),
+                );
+            return Column(children: [
+              Row(children: [stat('Best', best.value), const SizedBox(width: 6), stat('Weakest', worst.value), const SizedBox(width: 6), stat('Average', avg)]),
+              const SizedBox(height: 10),
+              Expanded(child: chart),
+            ]);
+          },
+        ),
+      ),
+    ]);
+  }
+}
 
 /// Birth-moment Panchang (client's birth place).
 class _PanchangW extends StatelessWidget {
