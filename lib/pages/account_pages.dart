@@ -181,8 +181,7 @@ class _AccountPageState extends State<AccountPage> {
           // long-press: hidden switch for Flutter's frame-time graph (testing)
           GestureDetector(
             onLongPress: () {
-              perfOverlay.value = !perfOverlay.value;
-              toast(context, perfOverlay.value ? 'Frame graph on' : 'Frame graph off');
+              showPerfSheet(context);
             },
             child: GhostButton('Log out', icon: Icons.logout_rounded, color: const Color(0xFFFF8A8A), onTap: () async {
               if (await confirm(context, 'Log out?', 'You can sign in again any time.', ok: 'Log out', danger: true)) {

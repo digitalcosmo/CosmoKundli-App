@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'ck_theme.dart';
 import 'cosmic_background.dart';
+import 'widgets.dart' show perfOff;
 
 const String kCkBackground = 'assets/images/ck_bg.jpg';
 
@@ -158,7 +159,7 @@ class Glass extends StatelessWidget {
     final Widget body;
     if (liquid) {
       body = LiquidGlass(radius: radius, blur: blur > 0 ? blur : 20, child: face);
-    } else if (frost) {
+    } else if (frost && !perfOff(4)) {
       final f = ImageFilter.blur(sigmaX: blur > 0 ? blur : 14, sigmaY: blur > 0 ? blur : 14);
       body = ClipRRect(
         borderRadius: r,
@@ -425,7 +426,7 @@ class LiquidGlass extends StatelessWidget {
       ImageFilter filter = blurF;
       final prog = program;
       final ro = context.findRenderObject();
-      if (prog != null && box.hasBoundedWidth && box.hasBoundedHeight) {
+      if (prog != null && !perfOff(1) && box.hasBoundedWidth && box.hasBoundedHeight) {
         try {
           final shader = prog.fragmentShader();
           final dpr = MediaQuery.of(context).devicePixelRatio;

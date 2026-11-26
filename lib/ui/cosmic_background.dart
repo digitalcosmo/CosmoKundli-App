@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'widgets.dart' show perfOff;
 
 /// Deep-space scene behind every page: navy depth, slowly turning orbit
 /// rings, a large blue sphere and a small amber planet drifting, and a
@@ -59,7 +60,8 @@ class _CosmicBackgroundState extends State<CosmicBackground> with TickerProvider
 
   @override
   Widget build(BuildContext context) {
-    final still = MediaQuery.of(context).disableAnimations;
+    final still = MediaQuery.of(context).disableAnimations || perfOff(2);
+    if (!still && TickerMode.of(context) && !_c.isAnimating) { _c.repeat(); _aura.repeat(); }
     if (still && _c.isAnimating) _c.stop();
     if (still && _aura.isAnimating) _aura.stop();
     return Stack(fit: StackFit.expand, children: [

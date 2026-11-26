@@ -2032,3 +2032,34 @@ class FiveDLegend extends StatelessWidget {
 
 /// Hidden testing switch: Flutter's frame-time graph over the app.
 final perfOverlay = ValueNotifier<bool>(false);
+
+/// Test-only switches for measuring what costs frame time (hidden sheet on
+/// long-press of Log out). Bits: 1 dock refraction off, 2 background still,
+/// 4 card blur off. Nothing here is on by default.
+final perfFlags = ValueNotifier<int>(0);
+bool perfOff(int bit) => perfFlags.value & bit != 0;
+
+void showPerfSheet(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: const Color(0xF2101634),
+    builder: (c) => SafeArea(
+      child: ListenableBuilder(
+        listenable: Listenable.merge([perfOverlay, perfFlags]),
+        builder: (c, _) {
+          Widget sw(String t, bool v, void Function(bool) f) =>
+              SwitchListTile(title: Text(t), value: v, onChanged: (x) { f(x); WidgetsBinding.instance.reassembleApplication(); });
+          void flip(int bit, bool on) => perfFlags.value = on ? perfFlags.value | bit : perfFlags.value & ~bit;
+          return Column(mainAxisSize: MainAxisSize.min, children: [
+            const Padding(padding: EdgeInsets.all(16), child: Text('Speed test (only for testing)')),
+            sw('Frame graph', perfOverlay.value, (v) => perfOverlay.value = v),
+            sw('Dock refraction OFF', perfOff(1), (v) => flip(1, v)),
+            sw('Background animation OFF', perfOff(2), (v) => flip(2, v)),
+            sw('Card blur OFF', perfOff(4), (v) => flip(4, v)),
+            const SizedBox(height: 8),
+          ]);
+        },
+      ),
+    ),
+  );
+}
