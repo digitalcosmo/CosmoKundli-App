@@ -1242,57 +1242,129 @@ class FilterOption<T> {
   const FilterOption(this.value, this.label, {this.count});
 }
 
-/// Dropdown chip: "Status  Ready ▾". Tinted cyan when not on its default;
-/// the chosen option carries a ✓ in the menu.
+/// Multi-select dropdown chip: "Status  Ready ▾". The top "All" row clears
+/// the selection; each option toggles a checkbox and the menu stays open.
+/// Tinted cyan with ✓ when anything is picked; ✕ on the chip clears it.
 class FilterDropdown<T> extends StatelessWidget {
   final String label;
   final List<FilterOption<T>> options;
-  final T value;
-  final T? defaultValue;
-  final ValueChanged<T> onChanged;
-  const FilterDropdown({super.key, required this.label, required this.options, required this.value, this.defaultValue, required this.onChanged});
+  final Set<T> values;
+  final ValueChanged<Set<T>> onChanged;
+  final String allLabel;
+  final int? allCount;
+  const FilterDropdown({super.key, required this.label, required this.options, required this.values, required this.onChanged, this.allLabel = 'All', this.allCount});
+
+  Widget _row(String text, bool on, {int? count, bool radio = false}) => SizedBox(
+        width: 220,
+        child: Row(children: [
+          Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              color: on ? CkColors.cyan : Colors.transparent,
+              borderRadius: BorderRadius.circular(radio ? 9 : 5),
+              border: Border.all(color: on ? CkColors.cyan : const Color(0x808CBEFF), width: 1.5),
+            ),
+            child: on ? const Icon(Icons.check_rounded, size: 13, color: Color(0xFF06204F)) : null,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 14, fontWeight: on ? FontWeight.w600 : FontWeight.w400, color: on ? Colors.white : CkColors.textTertiary)),
+          ),
+          if (count != null) Text('$count', style: CkText.mono(11, color: CkColors.labelMono)),
+        ]),
+      );
 
   @override
   Widget build(BuildContext context) {
-    final on = value != (defaultValue ?? options.first.value);
-    final cur = options.firstWhere((o) => o.value == value, orElse: () => options.first);
-    return PopupMenuButton<T>(
-      tooltip: label,
-      position: PopupMenuPosition.under,
-      color: CkColors.navySheet,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: CkColors.panelStroke)),
-      onSelected: onChanged,
-      itemBuilder: (c) => [
+    final on = values.isNotEmpty;
+    final picked = options.where((o) => values.contains(o.value)).toList();
+    final text = picked.isEmpty ? allLabel : (picked.length == 1 ? picked.first.label : '${picked.length} selected');
+    return MenuAnchor(
+      alignmentOffset: const Offset(0, 6),
+      style: MenuStyle(
+        backgroundColor: const WidgetStatePropertyAll(CkColors.navySheet),
+        maximumSize: const WidgetStatePropertyAll(Size(280, 300)),
+        shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: CkColors.panelStroke))),
+        padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 6)),
+      ),
+      menuChildren: [
+        MenuItemButton(
+          closeOnActivate: true,
+          onPressed: () => onChanged(<T>{}),
+          child: _row(allLabel, !on, count: allCount, radio: true),
+        ),
+        const Divider(height: 8, color: CkColors.panelStroke),
         for (final o in options)
-          PopupMenuItem<T>(
-            value: o.value,
-            child: Row(children: [
-              Expanded(
-                child: Text(o.label,
-                    style: TextStyle(fontSize: 14, fontWeight: o.value == value ? FontWeight.w600 : FontWeight.w400, color: o.value == value ? Colors.white : CkColors.textTertiary)),
-              ),
-              if (o.count != null) Text('${o.count}', style: CkText.mono(11, color: CkColors.labelMono)),
-              const SizedBox(width: 10),
-              SizedBox(width: 18, child: o.value == value ? const Icon(Icons.check_rounded, size: 18, color: CkColors.cyan) : null),
-            ]),
+          MenuItemButton(
+            closeOnActivate: false,
+            onPressed: () {
+              final next = {...values};
+              if (!next.remove(o.value)) next.add(o.value);
+              onChanged(next);
+            },
+            child: _row(o.label, values.contains(o.value), count: o.count),
           ),
       ],
-      child: Container(
-        height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: on ? CkColors.cyanTint : Colors.transparent,
-          borderRadius: BorderRadius.circular(11),
-          border: Border.all(color: on ? CkColors.cyanStroke : CkColors.panelStroke),
+      builder: (c, ctl, _) => GestureDetector(
+        onTap: () => ctl.isOpen ? ctl.close() : ctl.open(),
+        child: Container(
+          height: 40,
+          padding: const EdgeInsets.only(left: 12, right: 8),
+          decoration: BoxDecoration(
+            color: on ? CkColors.cyanTint : Colors.transparent,
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(color: on ? CkColors.cyanStroke : CkColors.panelStroke),
+          ),
+          child: Row(children: [
+            if (on) ...[const Icon(Icons.check_rounded, size: 15, color: CkColors.cyan), const SizedBox(width: 4)],
+            Text(label, style: const TextStyle(fontSize: 12.5, color: CkColors.labelMono)),
+            const SizedBox(width: 6),
+            Expanded(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+            if (on)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onChanged(<T>{}),
+                child: const Padding(padding: EdgeInsets.all(4), child: Icon(Icons.close_rounded, size: 16, color: CkColors.cyan)),
+              )
+            else
+              const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: CkColors.textSecondary),
+          ]),
         ),
-        child: Row(children: [
-          if (on) ...[const Icon(Icons.check_rounded, size: 15, color: CkColors.cyan), const SizedBox(width: 4)],
-          Text(label, style: const TextStyle(fontSize: 12.5, color: CkColors.labelMono)),
-          const SizedBox(width: 6),
-          Expanded(child: Text(cur.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
-          const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: CkColors.textSecondary),
-        ]),
       ),
+    );
+  }
+}
+
+/// Row of active-filter chips under a filter bar; tapping a chip clears it.
+class ActiveFilters extends StatelessWidget {
+  final List<(IconData, String, VoidCallback)> chips;
+  const ActiveFilters(this.chips, {super.key});
+  @override
+  Widget build(BuildContext context) {
+    if (chips.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Wrap(spacing: 6, runSpacing: 6, children: [
+        for (final (icon, text, clear) in chips)
+          Pressable(
+            onTap: clear,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(8, 5, 6, 5),
+              decoration: BoxDecoration(color: CkColors.cyanTint, borderRadius: BorderRadius.circular(8), border: Border.all(color: CkColors.cyanStroke)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(icon, size: 13, color: CkColors.cyan),
+                const SizedBox(width: 4),
+                Text(text, style: CkText.mono(11.5)),
+                const SizedBox(width: 4),
+                const Icon(Icons.close_rounded, size: 13, color: CkColors.textSecondary),
+              ]),
+            ),
+          ),
+      ]),
     );
   }
 }

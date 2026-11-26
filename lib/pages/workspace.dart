@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -17,6 +18,7 @@ import '../ui/widgets.dart';
 import 'blueprint_pages.dart';
 import 'client_shell.dart';
 import 'predictions_pages.dart';
+import 'traditional_pages.dart';
 import 'trajectory_pages.dart';
 
 /// Widget sizes on the 2-column workspace grid.
@@ -29,137 +31,109 @@ extension WSizeX on WSize {
   static WSize of(int cols, int rows) => cols == 2 ? (rows == 2 ? WSize.l : WSize.w) : (rows == 2 ? WSize.t : WSize.s);
 }
 
+/// A card on the grid: module id, size and its top-left cell.
 class WItem {
   final String id;
   WSize size;
-  WItem(this.id, this.size);
-  Map<String, dynamic> toJson() => {'id': id, 'size': size.name};
+  int col;
+  int row;
+  WItem(this.id, this.size, [this.col = -1, this.row = -1]);
+  WItem copy() => WItem(id, size, col, row);
+  Map<String, dynamic> toJson() => {'id': id, 'size': size.name, 'col': col, 'row': row};
   static WItem? fromJson(dynamic j) {
     if (j is! Map) return null;
     final id = '${j['id']}';
     if (!kWorkspaceModules.containsKey(id)) return null;
     final s = WSize.values.firstWhere((e) => e.name == j['size'], orElse: () => kWorkspaceModules[id]!.defaultSize);
-    return WItem(id, s);
+    final c = j['col'], r = j['row'];
+    return WItem(id, s, c is int ? c : -1, r is int ? r : -1);
   }
 }
 
-/// A module that can live on the workspace.
+/// A module. Every module the app has lives here: the Modules list and the
+/// workspace Add sheet both read this, so a new module shows up in both.
 class WModule {
   final String id;
   final String title;
+  final String sub;
   final String group; // software group
   final WSize defaultSize;
-  final Widget Function(String mId, WSize size) build;
-  final Widget Function() page;
-  const WModule(this.id, this.title, this.group, this.defaultSize, this.build, this.page);
+  final Widget Function(String mId, WSize size)? card;
+  final Widget Function()? page;
+  const WModule(this.id, this.title, this.sub, this.group, this.defaultSize, this.card, this.page);
+  bool get soon => page == null;
+  Widget build(String mId, WSize size) => card != null ? card!(mId, size) : _GenericW(this, size);
 }
 
 final kWorkspaceModules = <String, WModule>{
-  'kundli': WModule('kundli', 'CosmoKundli', 'BluePrint', WSize.l, (m, s) => _KundliW(m, s), () => const KundliPage()),
-  'degree': WModule('degree', 'Degree', 'BluePrint', WSize.t, (m, s) => _DegreeW(m, s), () => const CoordinatesPage()),
-  'power': WModule('power', 'Power', 'BluePrint', WSize.s, (m, s) => _BarsW(m, s, flavor: false), () => const StrengthPage(flavor: false)),
-  'flavor': WModule('flavor', 'Flavor', 'BluePrint', WSize.s, (m, s) => _BarsW(m, s, flavor: true), () => const StrengthPage(flavor: true)),
-  'transit': WModule('transit', 'Transit', 'Trajectory', WSize.w, (m, s) => _TransitW(m, s), () => const TransitPage()),
-  'sentiments': WModule('sentiments', 'Sentiments', 'Predictions', WSize.w, (m, s) => _SentimentsW(m, s), () => const SentimentsPage()),
+  'kundli': WModule('kundli', 'CosmoKundli', 'Birth chart · circle', 'BluePrint', WSize.l, (m, s) => _KundliW(m, s), () => const KundliPage()),
+  'degree': WModule('degree', 'Degree', 'Rashi, degree, nakshatra', 'BluePrint', WSize.t, (m, s) => _DegreeW(m, s), () => const CoordinatesPage()),
+  'power': WModule('power', 'Power', 'Strength of each GRAH', 'BluePrint', WSize.s, (m, s) => _BarsW(m, s, flavor: false), () => const StrengthPage(flavor: false)),
+  'flavor': WModule('flavor', 'Flavor', 'Nature of each GRAH', 'BluePrint', WSize.s, (m, s) => _BarsW(m, s, flavor: true), () => const StrengthPage(flavor: true)),
+  'transit': WModule('transit', 'Transit', 'Birth vs any moment', 'Trajectory', WSize.w, (m, s) => _TransitW(m, s), () => const TransitPage()),
+  'vibes': const WModule('vibes', 'GRAH Vibes', 'Coming soon', 'Trajectory', WSize.w, null, null),
+  'intensity': const WModule('intensity', 'GRAH Intensity', 'Coming soon', 'Trajectory', WSize.w, null, null),
+  'sentiments': WModule('sentiments', 'Sentiments', 'Daily, month by month', 'Predictions', WSize.w, (m, s) => _DailyW(m, s, signed: true), () => const SentimentsPage()),
+  'situations': WModule('situations', 'Situations', '7 zones, month by month', 'Predictions', WSize.w, (m, s) => _DailyW(m, s, signed: false), () => const SituationsPage()),
+  'sentiments5d': WModule('sentiments5d', 'Sentiments 5D', 'Career, Finance, Health, Social, Love', 'Predictions', WSize.s, null, () => const Sentiments5DPage()),
+  'panchang': WModule('panchang', 'Panchang', 'At the moment of birth', 'Traditional', WSize.w, (m, s) => _PanchangW(m, s), () => const PanchangPage()),
+  'melapak': WModule('melapak', 'Melapak', 'Match with a partner', 'Traditional', WSize.w, (m, s) => _MelapakW(m, s), () => const MelapakPage()),
 };
 
-/// Saved layouts. The first is the default a client opens on.
-const kLayouts = ['Live session', 'Preparation', 'Delivery'];
+const kTabCount = 3;
 
-List<WItem> _defaultLayout(String name) {
-  switch (name) {
-    case 'Preparation':
-      return [WItem('kundli', WSize.l), WItem('degree', WSize.t), WItem('power', WSize.s), WItem('flavor', WSize.s), WItem('sentiments', WSize.w)];
-    case 'Delivery':
-      return [WItem('sentiments', WSize.w), WItem('transit', WSize.w), WItem('kundli', WSize.l)];
+List<WItem> _defaultLayout(int tab) {
+  switch (tab) {
+    case 1:
+      return [WItem('transit', WSize.l, 0, 0)];
+    case 2:
+      return [WItem('sentiments', WSize.w, 0, 0), WItem('situations', WSize.w, 0, 1)];
     default:
       return [
-        WItem('kundli', WSize.l),
-        WItem('degree', WSize.t),
-        WItem('power', WSize.s),
-        WItem('flavor', WSize.s),
-        WItem('transit', WSize.w),
-        WItem('sentiments', WSize.w),
+        WItem('kundli', WSize.l, 0, 0),
+        WItem('degree', WSize.t, 0, 2),
+        WItem('power', WSize.s, 1, 2),
+        WItem('flavor', WSize.s, 1, 3),
+        WItem('transit', WSize.w, 0, 4),
       ];
   }
 }
 
+/// Layouts are saved per user (kept across logout).
 class WorkspaceStore {
-  static String _key(String layout) => 'ws_layout_$layout';
-  static String get active => Session.prefs.getString('ws_active') ?? kLayouts.first;
-  static set active(String v) => Session.prefs.setString('ws_active', v);
+  static String get _u => 'ws_u${Session.uid}';
+  static int get active => (Session.prefs.getInt('${_u}_active') ?? 0).clamp(0, kTabCount - 1);
+  static set active(int v) => Session.prefs.setInt('${_u}_active', v);
+  static String name(int i) {
+    final n = Session.prefs.getString('${_u}_name_$i');
+    return n == null || n.trim().isEmpty ? 'Tab ${i + 1}' : n;
+  }
 
-  static List<WItem> load(String layout) {
-    final raw = Session.prefs.getString(_key(layout));
-    if (raw == null) return _defaultLayout(layout);
+  static void setName(int i, String v) => Session.prefs.setString('${_u}_name_$i', v.trim());
+
+  static List<WItem> load(int tab) {
+    final raw = Session.prefs.getString('${_u}_layout_$tab');
+    if (raw == null) return _defaultLayout(tab);
     try {
       final l = (jsonDecode(raw) as List).map(WItem.fromJson).whereType<WItem>().toList();
-      return l;
+      if (l.any((e) => e.col < 0 || e.row < 0)) _packOld(l);
+      return Grid.settle(l);
     } catch (_) {
-      return _defaultLayout(layout);
+      return _defaultLayout(tab);
     }
   }
 
-  static void save(String layout, List<WItem> items) =>
-      Session.prefs.setString(_key(layout), jsonEncode(items.map((e) => e.toJson()).toList()));
-}
+  static void save(int tab, List<WItem> items) =>
+      Session.prefs.setString('${_u}_layout_$tab', jsonEncode(items.map((e) => e.toJson()).toList()));
 
-/// Opens the workspace in edit mode (from the client ⋮ menu).
-final ValueNotifier<bool> workspaceEditing = ValueNotifier(false);
-
-// ───────────────────────── page
-
-class WorkspacePage extends StatefulWidget {
-  const WorkspacePage({super.key});
-  @override
-  State<WorkspacePage> createState() => _WorkspacePageState();
-}
-
-class _WorkspacePageState extends State<WorkspacePage> {
-  late String _layout = WorkspaceStore.active;
-  late List<WItem> _items = WorkspaceStore.load(_layout);
-
-  // drag-to-move
-  int? _dragging;
-  Offset _dragPos = Offset.zero;
-  Offset _grab = Offset.zero;
-  // drag-to-resize
-  int? _resizing;
-  Rect? _resizeRect;
-
-  static const double _gap = 10;
-  static const double _unit = 228;
-
-  @override
-  void initState() {
-    super.initState();
-    workspaceEditing.addListener(_onEdit);
+  static bool isDefault(int tab, List<WItem> items) {
+    final d = _defaultLayout(tab);
+    String sig(List<WItem> l) => (l.map((e) => '${e.id}/${e.size.name}/${e.col}/${e.row}').toList()..sort()).join(',');
+    return sig(d) == sig(items);
   }
 
-  @override
-  void dispose() {
-    workspaceEditing.removeListener(_onEdit);
-    super.dispose();
-  }
-
-  void _onEdit() => setState(() {});
-  bool get _edit => workspaceEditing.value;
-
-  void _save() => WorkspaceStore.save(_layout, _items);
-
-  void _switchLayout(String l) {
-    if (l == _layout) return;
-    HapticFeedback.selectionClick();
-    setState(() {
-      _layout = l;
-      WorkspaceStore.active = l;
-      _items = WorkspaceStore.load(l);
-    });
-  }
-
-  /// First-fit packing on a 2-column grid.
-  List<Rect> _pack(List<WItem> items, double width) {
-    final cw = (width - _gap) / 2;
+  /// Old saved layouts had order only: give them cells by first-fit.
+  static void _packOld(List<WItem> items) {
     final occ = <List<bool>>[];
     bool free(int r, int c) {
       while (occ.length <= r) {
@@ -168,7 +142,6 @@ class _WorkspacePageState extends State<WorkspacePage> {
       return !occ[r][c];
     }
 
-    final out = <Rect>[];
     for (final it in items) {
       final cols = it.size.cols, rows = it.size.rows;
       var placed = false;
@@ -186,17 +159,159 @@ class _WorkspacePageState extends State<WorkspacePage> {
                 occ[r + dr][c + dc] = true;
               }
             }
-            out.add(Rect.fromLTWH(c * (cw + _gap), r * (_unit + _gap), cols * cw + (cols - 1) * _gap, rows * _unit + (rows - 1) * _gap));
+            it.col = c;
+            it.row = r;
             placed = true;
           }
         }
       }
     }
-    return out;
+  }
+}
+
+/// Explicit 2-column grid. [settle] puts [pin] exactly where asked, pushes
+/// anything in its way down (never sideways), then closes gaps upward.
+class Grid {
+  static bool _fits(Set<int> occ, int c, int r, WSize s) {
+    if (c < 0 || c + s.cols > 2 || r < 0) return false;
+    for (var dr = 0; dr < s.rows; dr++) {
+      for (var dc = 0; dc < s.cols; dc++) {
+        if (occ.contains((r + dr) * 2 + c + dc)) return false;
+      }
+    }
+    return true;
   }
 
+  static void _take(Set<int> occ, WItem it) {
+    for (var dr = 0; dr < it.size.rows; dr++) {
+      for (var dc = 0; dc < it.size.cols; dc++) {
+        occ.add((it.row + dr) * 2 + it.col + dc);
+      }
+    }
+  }
+
+  static void _drop(Set<int> occ, WItem it) {
+    var r = 0;
+    while (!_fits(occ, it.col, r, it.size)) {
+      r++;
+    }
+    it.row = r;
+    _take(occ, it);
+  }
+
+  static int _order(WItem a, WItem b) => a.row != b.row ? a.row.compareTo(b.row) : a.col.compareTo(b.col);
+
+  static List<WItem> settle(List<WItem> items, {WItem? pin}) {
+    for (final it in items) {
+      it.col = it.col.clamp(0, 2 - it.size.cols);
+      if (it.row < 0) it.row = 0;
+    }
+    final occ = <int>{};
+    if (pin != null) _take(occ, pin);
+    final rest = items.where((e) => !identical(e, pin)).toList()..sort(_order);
+    for (final it in rest) {
+      _drop(occ, it);
+    }
+    // Close gaps: everything (pin included) falls up in reading order.
+    final all = [...items]..sort(_order);
+    occ.clear();
+    for (final it in all) {
+      _drop(occ, it);
+    }
+    return items;
+  }
+
+  static List<WItem> clone(List<WItem> l) => [for (final e in l) e.copy()];
+}
+
+/// Opens the workspace in edit mode (from the client ⋮ menu).
+final ValueNotifier<bool> workspaceEditing = ValueNotifier(false);
+
+// ───────────────────────── page
+
+class WorkspacePage extends StatefulWidget {
+  const WorkspacePage({super.key});
+  @override
+  State<WorkspacePage> createState() => _WorkspacePageState();
+}
+
+class _WorkspacePageState extends State<WorkspacePage> {
+  late int _tab = WorkspaceStore.active;
+  late List<WItem> _items = WorkspaceStore.load(_tab);
+
+  // gesture state: _base is the layout when the gesture began.
+  List<WItem>? _base;
+  String? _moving;
+  Offset _grab = Offset.zero;
+  Offset _finger = Offset.zero;
+  String? _resizing;
+  // undo after remove
+  List<WItem>? _undo;
+  String _undoName = '';
+  Timer? _undoTimer;
+
+  static const double _gap = 14;
+  static const double _unit = 228;
   final _stackKey = GlobalKey();
-  double _stackWidth = 0;
+  final _scroll = ScrollController();
+  double _width = 0;
+  double get _cw => (_width - _gap) / 2;
+
+  @override
+  void initState() {
+    super.initState();
+    workspaceEditing.addListener(_onEdit);
+  }
+
+  @override
+  void dispose() {
+    workspaceEditing.removeListener(_onEdit);
+    _undoTimer?.cancel();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onEdit() {
+    if (!workspaceEditing.value) _save();
+    setState(() {});
+  }
+
+  bool get _edit => workspaceEditing.value;
+  void _save() => WorkspaceStore.save(_tab, _items);
+
+  void _switchTab(int t) {
+    if (t == _tab) return;
+    HapticFeedback.selectionClick();
+    _save();
+    setState(() {
+      _tab = t;
+      WorkspaceStore.active = t;
+      _items = WorkspaceStore.load(t);
+      _undo = null;
+    });
+  }
+
+  Future<void> _rename(int t) async {
+    HapticFeedback.mediumImpact();
+    final ctl = TextEditingController(text: WorkspaceStore.name(t));
+    final v = await showDialog<String>(
+      context: context,
+      useRootNavigator: true,
+      builder: (c) => AlertDialog(
+        backgroundColor: CkColors.navySheet,
+        title: const Text('Rename tab'),
+        content: TextField(controller: ctl, autofocus: true, maxLength: 16, decoration: const InputDecoration(hintText: 'Tab name')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(c, ctl.text), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (v != null) setState(() => WorkspaceStore.setName(t, v));
+  }
+
+  Rect _rect(WItem it) => Rect.fromLTWH(
+      it.col * (_cw + _gap), it.row * (_unit + _gap), it.size.cols * _cw + (it.size.cols - 1) * _gap, it.size.rows * _unit + (it.size.rows - 1) * _gap);
 
   Offset _toStack(Offset global) {
     final box = _stackKey.currentContext?.findRenderObject() as RenderBox?;
@@ -204,43 +319,142 @@ class _WorkspacePageState extends State<WorkspacePage> {
   }
 
   void _autoScroll(Offset global) {
-    final pos = Scrollable.maybeOf(_stackKey.currentContext ?? context)?.position;
-    if (pos == null) return;
+    if (!_scroll.hasClients) return;
+    final pos = _scroll.position;
     final h = MediaQuery.of(context).size.height;
-    const edge = 110.0;
+    const edge = 120.0;
     double dy = 0;
-    if (global.dy < edge) dy = -(edge - global.dy) / 6;
-    if (global.dy > h - edge) dy = (global.dy - (h - edge)) / 6;
+    if (global.dy < edge + 60) dy = -(edge + 60 - global.dy) / 6;
+    if (global.dy > h - edge - 80) dy = (global.dy - (h - edge - 80)) / 6;
     if (dy != 0) pos.jumpTo((pos.pixels + dy).clamp(pos.minScrollExtent, pos.maxScrollExtent));
   }
 
-  DateTime _lastSwap = DateTime(0);
+  // ── move
 
-  void _moveTo(Offset p, List<Rect> rects) {
-    if (_dragging == null) return;
-    if (DateTime.now().difference(_lastSwap) < const Duration(milliseconds: 280)) return;
-    for (var i = 0; i < rects.length; i++) {
-      // Only swap once the finger is past the middle of the target tile, so
-      // the order doesn't flip back and forth on the boundary.
-      final core = rects[i].deflate(rects[i].shortestSide * .22);
-      if (i != _dragging && core.contains(p)) {
-        _lastSwap = DateTime.now();
-        final it = _items.removeAt(_dragging!);
-        _items.insert(i, it);
-        _dragging = i;
-        HapticFeedback.selectionClick();
-        break;
+  void _moveStart(WItem it, Offset global) {
+    HapticFeedback.mediumImpact();
+    final local = _toStack(global);
+    setState(() {
+      _base = Grid.clone(_items);
+      _moving = it.id;
+      _grab = local - _rect(it).topLeft;
+      _finger = local;
+    });
+  }
+
+  void _moveUpdate(Offset global) {
+    final base = _base;
+    if (base == null || _moving == null) return;
+    _autoScroll(global);
+    final local = _toStack(global);
+    final next = Grid.clone(base);
+    final it = next.firstWhere((e) => e.id == _moving);
+    final tl = local - _grab;
+    it.col = (tl.dx / (_cw + _gap)).round().clamp(0, 2 - it.size.cols);
+    it.row = math.max(0, (tl.dy / (_unit + _gap)).round());
+    Grid.settle(next, pin: it);
+    final cur = _items.firstWhere((e) => e.id == _moving);
+    if (cur.col != it.col || cur.row != it.row) HapticFeedback.selectionClick();
+    setState(() {
+      _finger = local;
+      _items = next;
+    });
+  }
+
+  void _moveEnd() {
+    setState(() {
+      _moving = null;
+      _base = null;
+      _save();
+    });
+  }
+
+  // ── resize: the edge you don't drag stays put
+
+  void _resizeStart(WItem it) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _base = Grid.clone(_items);
+      _resizing = it.id;
+    });
+  }
+
+  void _resizeUpdate(int edge, Offset total) {
+    // edge: 0 left, 1 right, 2 bottom
+    final base = _base;
+    if (base == null || _resizing == null) return;
+    final next = Grid.clone(base);
+    final it = next.firstWhere((e) => e.id == _resizing);
+    var cols = it.size.cols, rows = it.size.rows, col = it.col;
+    final hx = _cw / 2, hy = _unit / 2;
+    if (edge == 0) {
+      if (cols == 2 && total.dx > hx) {
+        cols = 1;
+        col = 1;
+      } else if (cols == 1 && col == 1 && total.dx < -hx) {
+        cols = 2;
+        col = 0;
       }
+    } else if (edge == 1) {
+      if (cols == 2 && total.dx < -hx) {
+        cols = 1;
+        col = 0;
+      } else if (cols == 1 && col == 0 && total.dx > hx) {
+        cols = 2;
+      }
+    } else {
+      if (rows == 1 && total.dy > hy) rows = 2;
+      if (rows == 2 && total.dy < -hy) rows = 1;
     }
+    final ns = WSizeX.of(cols, rows);
+    final cur = _items.firstWhere((e) => e.id == _resizing);
+    if (ns != cur.size) HapticFeedback.selectionClick();
+    it.size = ns;
+    it.col = col;
+    Grid.settle(next, pin: it);
+    setState(() => _items = next);
+  }
+
+  void _resizeEnd() => setState(() {
+        _resizing = null;
+        _base = null;
+        _save();
+      });
+
+  // ── add / remove / reset
+
+  void _remove(WItem it) {
+    HapticFeedback.selectionClick();
+    _undoTimer?.cancel();
+    setState(() {
+      _undo = Grid.clone(_items);
+      _undoName = kWorkspaceModules[it.id]!.title;
+      _items.removeWhere((e) => e.id == it.id);
+      Grid.settle(_items);
+      _save();
+    });
+    _undoTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _undo = null);
+    });
+  }
+
+  void _restore() {
+    _undoTimer?.cancel();
+    setState(() {
+      _items = _undo ?? _items;
+      _undo = null;
+      _save();
+    });
   }
 
   Future<void> _reset() async {
-    final ok = await confirm(context, 'Reset $_layout?',
-        'Modules, order and sizes go back to the default for this layout. Other layouts stay as they are.',
+    final ok = await confirm(context, 'Reset ${WorkspaceStore.name(_tab)}?',
+        'Cards, places and sizes go back to the default for this tab. Other tabs stay as they are.',
         ok: 'Reset');
     if (!ok) return;
     setState(() {
-      _items = _defaultLayout(_layout);
+      _items = _defaultLayout(_tab);
+      _undo = null;
       _save();
     });
   }
@@ -258,251 +472,259 @@ class _WorkspacePageState extends State<WorkspacePage> {
       if (i >= 0) {
         _items.removeAt(i);
       } else {
-        _items.add(WItem(id, kWorkspaceModules[id]!.defaultSize));
+        final bottom = _items.fold<int>(0, (m, e) => math.max(m, e.row + e.size.rows));
+        _items.add(WItem(id, kWorkspaceModules[id]!.defaultSize, 0, bottom));
       }
+      Grid.settle(_items);
       _save();
     });
   }
+
+  // ── build
+
+  Widget _tabs() => SizedBox(
+        height: 38,
+        child: Row(children: [
+          for (var t = 0; t < kTabCount; t++) ...[
+            if (t > 0) const SizedBox(width: 6),
+            Expanded(
+              child: GestureDetector(
+                onLongPress: () => _rename(t),
+                child: _Chip(WorkspaceStore.name(t),
+                    selected: t == _tab,
+                    dot: !WorkspaceStore.isDefault(t, t == _tab ? _items : WorkspaceStore.load(t)),
+                    onTap: () => _switchTab(t)),
+              ),
+            ),
+          ],
+        ]),
+      );
+
+  Widget _grid(String mId) => LayoutBuilder(builder: (ctx, box) {
+        _width = box.maxWidth;
+        if (_items.isEmpty) {
+          return Glass(
+            padding: const EdgeInsets.all(20),
+            child: Column(children: [
+              Text('This tab is empty', style: CkText.h(15)),
+              const SizedBox(height: 6),
+              const Text('Add the modules you use most.', style: CkText.muted),
+              const SizedBox(height: 12),
+              _Chip('+ Add module', filled: true, onTap: () {
+                workspaceEditing.value = true;
+                _add();
+              }),
+            ]),
+          );
+        }
+        final rects = {for (final it in _items) it.id: _rect(it)};
+        final h = rects.values.map((r) => r.bottom).reduce(math.max);
+        final moving = _moving == null ? null : _items.firstWhere((e) => e.id == _moving);
+        return SizedBox(
+          key: _stackKey,
+          height: h + (_edit ? _unit * .5 : 0),
+          child: Stack(clipBehavior: Clip.none, children: [
+            // drop target
+            if (moving != null)
+              Positioned.fromRect(
+                rect: rects[moving.id]!,
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      color: const Color(0x1A5CE1FF),
+                      border: Border.all(color: CkColors.cyan, width: 2),
+                    ),
+                  ),
+                ),
+              ),
+            for (final it in _items)
+              AnimatedPositioned(
+                key: ValueKey(it.id),
+                duration: const Duration(milliseconds: 260),
+                curve: kEase,
+                left: rects[it.id]!.left,
+                top: rects[it.id]!.top,
+                width: rects[it.id]!.width,
+                height: rects[it.id]!.height,
+                child: Opacity(
+                  opacity: it.id == _moving ? 0 : 1,
+                  child: _tile(it, mId),
+                ),
+              ),
+            if (moving != null)
+              Positioned(
+                left: _finger.dx - _grab.dx,
+                top: _finger.dy - _grab.dy,
+                width: rects[moving.id]!.width,
+                height: rects[moving.id]!.height,
+                child: IgnorePointer(
+                  child: Transform.rotate(
+                    angle: -.02,
+                    child: Transform.scale(
+                      scale: 1.03,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), boxShadow: const [
+                          BoxShadow(color: Color(0x73000000), blurRadius: 40, offset: Offset(0, 18)),
+                        ]),
+                        child: Opacity(opacity: .94, child: _tile(moving, mId, floating: true)),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            if (_resizing != null)
+              Positioned.fromRect(
+                rect: rects[_resizing]!,
+                child: IgnorePointer(
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(color: CkColors.navySheet, borderRadius: BorderRadius.circular(10), border: Border.all(color: CkColors.cyan)),
+                      child: Text(_items.firstWhere((e) => e.id == _resizing).size.label.toUpperCase(), style: CkText.mono(12, color: CkColors.cyan)),
+                    ),
+                  ),
+                ),
+              ),
+          ]),
+        );
+      });
 
   @override
   Widget build(BuildContext context) {
     final c = Session.client.value;
     final mId = c?.mId ?? '';
+    if (_edit) return _editScreen(mId);
     return ClientPage(
       title: 'Workspace',
       isRoot: true,
       animate: false,
-      pinned: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        SizedBox(
-          height: 36,
-          child: Row(children: [
-            Expanded(
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  for (final l in kLayouts)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: _Chip(l, selected: l == _layout, onTap: () => _switchLayout(l)),
-                    ),
-                ],
-              ),
-            ),
-            if (_edit) ...[
-              const SizedBox(width: 6),
-              Semantics(
-                button: true,
-                label: 'Add module',
-                child: Pressable(
-                  onTap: _add,
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(color: CkColors.cyanTint, borderRadius: BorderRadius.circular(10), border: Border.all(color: CkColors.cyanStroke)),
-                    child: const Icon(Icons.add_rounded, size: 20, color: CkColors.cyan),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              _Chip('Done', filled: true, onTap: () {
-                _save();
-                workspaceEditing.value = false;
-              }),
-            ],
-          ]),
-        ),
-        if (_edit)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Row(children: [
-              Expanded(child: Text('HOLD TO MOVE · DRAG ANY EDGE OR CORNER TO RESIZE', style: CkText.label.copyWith(fontSize: 9.5))),
-              GestureDetector(
-                onTap: _reset,
-                child: const Row(children: [
-                  Icon(Icons.restart_alt_rounded, size: 15, color: CkColors.textSecondary),
-                  SizedBox(width: 3),
-                  Text('Reset', style: TextStyle(fontSize: 12.5, color: CkColors.textSecondary)),
-                ]),
-              ),
-            ]),
-          ),
-      ]),
+      pinned: _tabs(),
       onRefresh: () async {
-        ClientData.of(mId).chart(refresh: true);
-        ClientData.of(mId).shadbal(refresh: true);
+        final d = ClientData.of(mId);
+        d.chart(refresh: true);
+        d.shadbal(refresh: true);
+        d.drop('');
         setState(() {});
       },
       children: [
         const SizedBox(height: 4),
-        LayoutBuilder(builder: (ctx, box) {
-          _stackWidth = box.maxWidth;
-          final rects = _pack(_items, box.maxWidth);
-          final h = rects.isEmpty ? 120.0 : rects.map((r) => r.bottom).reduce(math.max);
-          if (_items.isEmpty) {
-            return Glass(
-              padding: const EdgeInsets.all(20),
-              child: Column(children: [
-                Text('Your workspace is empty', style: CkText.h(15)),
-                const SizedBox(height: 6),
-                const Text('Add the modules you use most.', style: CkText.muted),
-                const SizedBox(height: 12),
-                _Chip('+ Add module', filled: true, onTap: _add),
-              ]),
-            );
-          }
-          return SizedBox(
-            key: _stackKey,
-            height: h,
-            child: Stack(clipBehavior: Clip.none, children: [
-              for (var i = 0; i < _items.length; i++)
-                AnimatedPositioned(
-                    key: ValueKey(_items[i].id),
-                    duration: const Duration(milliseconds: 320),
-                    curve: kEase,
-                    left: rects[i].left,
-                    top: rects[i].top,
-                    width: rects[i].width,
-                    height: rects[i].height,
-                    // The tile being dragged stays in the tree as a faded
-                    // placeholder, so its gesture recognizer keeps tracking.
-                    child: AnimatedOpacity(
-                      duration: CkMotion.fast,
-                      opacity: i == _dragging ? .22 : 1,
-                      child: _tile(i, mId, rects),
-                    ),
-                  ),
-              if (_resizing != null && _resizeRect != null)
-                Positioned.fromRect(
-                  rect: _resizeRect!,
-                  child: IgnorePointer(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: CkColors.cyan, width: 1.5),
-                        color: CkColors.cyanTint,
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(_items[_resizing!].size.label.toUpperCase(), style: CkText.mono(12, color: CkColors.cyan)),
-                    ),
-                  ),
-                ),
-              if (_dragging != null)
-                Positioned(
-                  left: _dragPos.dx - _grab.dx,
-                  top: _dragPos.dy - _grab.dy,
-                  width: rects[_dragging!].width,
-                  height: rects[_dragging!].height,
-                  child: IgnorePointer(
-                    child: Transform.scale(
-                      scale: 1.03,
-                      child: Opacity(opacity: .92, child: _tile(_dragging!, mId, rects, floating: true)),
-                    ),
-                  ),
-                ),
-            ]),
-          );
-        }),
+        _grid(mId),
         const SizedBox(height: 16),
       ],
     );
   }
 
-  /// A resize handle at side (dx, dy): -1/0/1 for left/centre/right and
-  /// top/middle/bottom. Edges move only their own side of the tile.
-  Widget _handle(int i, List<Rect> rects, int dx, int dy) {
-    final corner = dx != 0 && dy != 0;
-    const hit = 34.0;
-    final bar = corner
-        ? Container(
-            width: 13,
-            height: 13,
-            decoration: BoxDecoration(
-              border: Border(
-                left: dx < 0 ? const BorderSide(color: CkColors.cyan, width: 2.5) : BorderSide.none,
-                right: dx > 0 ? const BorderSide(color: CkColors.cyan, width: 2.5) : BorderSide.none,
-                top: dy < 0 ? const BorderSide(color: CkColors.cyan, width: 2.5) : BorderSide.none,
-                bottom: dy > 0 ? const BorderSide(color: CkColors.cyan, width: 2.5) : BorderSide.none,
-              ),
-              borderRadius: BorderRadius.only(
-                topLeft: dx < 0 && dy < 0 ? const Radius.circular(7) : Radius.zero,
-                topRight: dx > 0 && dy < 0 ? const Radius.circular(7) : Radius.zero,
-                bottomLeft: dx < 0 && dy > 0 ? const Radius.circular(7) : Radius.zero,
-                bottomRight: dx > 0 && dy > 0 ? const Radius.circular(7) : Radius.zero,
+  Widget _editScreen(String mId) {
+    final pad = MediaQuery.of(context).padding;
+    return CkBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Stack(children: [
+          Column(children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(16, pad.top + 12, 16, 0),
+              child: Column(children: [
+                _tabs(),
+                const SizedBox(height: 8),
+                Text('DRAG ⋮⋮ TO MOVE · DRAG ANY GLOWING EDGE TO RESIZE · LONG-PRESS A TAB TO RENAME',
+                    textAlign: TextAlign.center, style: CkText.label.copyWith(fontSize: 9)),
+              ]),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                controller: _scroll,
+                physics: _moving != null || _resizing != null ? const NeverScrollableScrollPhysics() : const BouncingScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(16, 18, 16, 120 + pad.bottom),
+                child: _grid(mId),
               ),
             ),
-          )
-        : Container(
-            width: dx == 0 ? 28 : 5,
-            height: dy == 0 ? 28 : 5,
-            decoration: BoxDecoration(
-              color: CkColors.cyan,
-              borderRadius: BorderRadius.circular(3),
-              boxShadow: const [BoxShadow(color: Color(0x995CE1FF), blurRadius: 8)],
+          ]),
+          if (_undo != null)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 86 + pad.bottom,
+              child: Glass(
+                tint: const Color(0x33000000),
+                padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+                child: Row(children: [
+                  Expanded(child: Text('$_undoName removed', style: const TextStyle(fontSize: 13.5))),
+                  TextButton(onPressed: _restore, child: const Text('UNDO', style: TextStyle(color: CkColors.cyan, fontWeight: FontWeight.w700))),
+                ]),
+              ),
             ),
-          );
-    return Positioned(
-      left: dx < 0 ? -hit / 2 + 3 : (dx == 0 ? 0 : null),
-      right: dx > 0 ? -hit / 2 + 3 : (dx == 0 ? 0 : null),
-      top: dy < 0 ? -hit / 2 + 3 : (dy == 0 ? 0 : null),
-      bottom: dy > 0 ? -hit / 2 + 3 : (dy == 0 ? 0 : null),
-      child: Align(
-        child: RawGestureDetector(
-          behavior: HitTestBehavior.opaque,
-          gestures: {
-            _EagerPan: GestureRecognizerFactoryWithHandlers<_EagerPan>(
-              () => _EagerPan(),
-              (r) => r
-                ..onStart = (_) {
-                  HapticFeedback.selectionClick();
-                  setState(() {
-                    _resizing = i;
-                    _resizeRect = rects[i];
-                  });
-                }
-                ..onUpdate = (d) {
-                  final r = _resizeRect!;
-                  final nr = Rect.fromLTRB(
-                    r.left + (dx < 0 ? d.delta.dx : 0),
-                    r.top + (dy < 0 ? d.delta.dy : 0),
-                    r.right + (dx > 0 ? d.delta.dx : 0),
-                    r.bottom + (dy > 0 ? d.delta.dy : 0),
-                  );
-                  final cw = (_stackWidth - _gap) / 2;
-                  final cols = dx == 0 ? _items[i].size.cols : (nr.width > cw * 1.45 ? 2 : 1);
-                  final rows = dy == 0 ? _items[i].size.rows : (nr.height > _unit * 1.45 ? 2 : 1);
-                  final ns = WSizeX.of(cols, rows);
-                  setState(() {
-                    _resizeRect = nr;
-                    if (ns != _items[i].size) {
-                      HapticFeedback.selectionClick();
-                      _items[i].size = ns;
-                    }
-                  });
-                }
-                ..onEnd = (_) {
-                  setState(() {
-                    _resizing = null;
-                    _resizeRect = null;
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: EdgeInsets.fromLTRB(16, 18, 16, 14 + pad.bottom),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Color(0xF50A1E50), Color(0x000A1E50)], stops: [.7, 1]),
+              ),
+              child: Row(children: [
+                Expanded(flex: 5, child: _BarBtn(Icons.restart_alt_rounded, 'Reset', outlined: true, onTap: _reset)),
+                const SizedBox(width: 8),
+                Expanded(flex: 5, child: _BarBtn(Icons.add_rounded, 'Add', tinted: true, onTap: _add)),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 6,
+                  child: _BarBtn(null, 'Done', filled: true, onTap: () {
                     _save();
-                  });
-                },
+                    workspaceEditing.value = false;
+                  }),
+                ),
+              ]),
             ),
-          },
-          child: SizedBox(width: dx == 0 ? 56 : hit, height: dy == 0 ? 56 : hit, child: Center(child: bar)),
-        ),
+          ),
+        ]),
       ),
     );
   }
 
-  Widget _tile(int i, String mId, List<Rect> rects, {bool floating = false}) {
-    final it = _items[i];
+  /// One edge strip that resizes. The strip is mostly inside the card so
+  /// neighbours never fight over a touch in the gap between them.
+  Widget _edge(WItem it, int edge) {
+    Offset total = Offset.zero;
+    final strip = RawGestureDetector(
+      behavior: HitTestBehavior.opaque,
+      gestures: {
+        _EagerPan: GestureRecognizerFactoryWithHandlers<_EagerPan>(
+          () => _EagerPan(),
+          (r) => r
+            ..onStart = (_) {
+              total = Offset.zero;
+              _resizeStart(it);
+            }
+            ..onUpdate = (d) {
+              total += d.delta;
+              _resizeUpdate(edge, total);
+            }
+            ..onEnd = (_) => _resizeEnd()
+            ..onCancel = _resizeEnd,
+        ),
+      },
+      child: const SizedBox.expand(),
+    );
+    const out = 6.0, inner = 16.0;
+    switch (edge) {
+      case 0:
+        return Positioned(left: -out, top: 34, bottom: 20, width: out + inner, child: strip);
+      case 1:
+        return Positioned(right: -out, top: 34, bottom: 20, width: out + inner, child: strip);
+      default:
+        return Positioned(left: 20, right: 20, bottom: -out, height: out + inner, child: strip);
+    }
+  }
+
+  Widget _tile(WItem it, String mId, {bool floating = false}) {
     final m = kWorkspaceModules[it.id]!;
     final body = RepaintBoundary(
       child: Glass(
         padding: const EdgeInsets.all(12),
-        shadow: !floating,
-        stroke: _edit ? CkColors.cyanStroke : CkColors.panelStroke,
-        child: m.build(mId, it.size),
+        shadow: !floating && !_edit,
+        child: _edit ? Opacity(opacity: .72, child: IgnorePointer(child: m.build(mId, it.size))) : m.build(mId, it.size),
       ),
     );
     if (!_edit) {
@@ -511,111 +733,152 @@ class _WorkspacePageState extends State<WorkspacePage> {
           HapticFeedback.mediumImpact();
           workspaceEditing.value = true;
         },
-        child: Pressable(scale: .985, onTap: () => pushModule(context, m.page()), child: body),
+        child: Pressable(scale: .985, onTap: m.page == null ? null : () => pushModule(context, m.page!()), child: body),
       );
     }
+    final active = it.id == _resizing;
     return Stack(clipBehavior: Clip.none, children: [
       Positioned.fill(child: body),
-      // Move: press and hold briefly, then drag. A quick swipe still scrolls
-      // the page, so long boards stay reachable in edit mode.
+      // glowing edit border
       Positioned.fill(
-        child: RawGestureDetector(
-          behavior: HitTestBehavior.translucent,
-          gestures: {
-            LongPressGestureRecognizer: GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
-              () => LongPressGestureRecognizer(duration: const Duration(milliseconds: 220)),
-              (r) => r
-                ..onLongPressStart = (d) {
-                  HapticFeedback.mediumImpact();
-                  final local = _toStack(d.globalPosition);
-                  setState(() {
-                    _dragging = i;
-                    _grab = local - rects[i].topLeft;
-                    _dragPos = local;
-                  });
-                }
-                ..onLongPressMoveUpdate = (d) {
-                  _autoScroll(d.globalPosition);
-                  setState(() {
-                    _dragPos = _toStack(d.globalPosition);
-                    _moveTo(_dragPos, _pack(_items, _stackWidth));
-                  });
-                }
-                ..onLongPressEnd = (_) {
-                  setState(() {
-                    _dragging = null;
-                    _save();
-                  });
-                }
-                ..onLongPressCancel = () {
-                  setState(() => _dragging = null);
-                },
-            ),
-          },
-        ),
-      ),
-      Positioned(
-        top: 8,
-        right: 8,
-        child: Icon(Icons.drag_indicator_rounded, size: 18, color: CkColors.textSecondary.withValues(alpha: .8)),
-      ),
-      // remove
-      Positioned(
-        top: -8,
-        left: -8,
-        child: Pressable(
-          onTap: () => setState(() {
-            _items.removeAt(i);
-            _save();
-          }),
-          child: Container(
-            width: 24,
-            height: 24,
+        child: IgnorePointer(
+          child: AnimatedContainer(
+            duration: CkMotion.fast,
             decoration: BoxDecoration(
-              color: CkColors.deepSpace,
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0x99FFFFFF)),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: CkColors.cyan, width: active ? 2.5 : 1.5),
+              boxShadow: [BoxShadow(color: CkColors.cyan.withValues(alpha: active ? .55 : .35), blurRadius: active ? 16 : 10)],
             ),
-            child: const Icon(Icons.remove_rounded, size: 15, color: Colors.white),
           ),
         ),
       ),
-      // resize handles: four edges and four corners
-      // (top-left corner is the remove button)
-      for (final h in const [
-        (0, -1), (1, -1),
-        (-1, 0), (1, 0),
-        (-1, 1), (0, 1), (1, 1),
-      ])
-        _handle(i, rects, h.$1, h.$2),
+      if (!floating) ...[
+        // long-press anywhere also picks the card up
+        Positioned.fill(
+          child: RawGestureDetector(
+            behavior: HitTestBehavior.translucent,
+            gestures: {
+              LongPressGestureRecognizer: GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
+                () => LongPressGestureRecognizer(duration: const Duration(milliseconds: 260)),
+                (r) => r
+                  ..onLongPressStart = (d) => _moveStart(it, d.globalPosition)
+                  ..onLongPressMoveUpdate = (d) => _moveUpdate(d.globalPosition)
+                  ..onLongPressEnd = (_) => _moveEnd()
+                  ..onLongPressCancel = () {
+                    if (_moving != null) _moveEnd();
+                  },
+              ),
+            },
+          ),
+        ),
+        for (final e in const [0, 1, 2]) _edge(it, e),
+        // grip: drag right away
+        Positioned(
+          top: 2,
+          right: 2,
+          child: RawGestureDetector(
+            behavior: HitTestBehavior.opaque,
+            gestures: {
+              _EagerPan: GestureRecognizerFactoryWithHandlers<_EagerPan>(
+                () => _EagerPan(),
+                (r) => r
+                  ..onStart = (d) => _moveStart(it, d.globalPosition)
+                  ..onUpdate = (d) => _moveUpdate(d.globalPosition)
+                  ..onEnd = (_) => _moveEnd()
+                  ..onCancel = _moveEnd,
+              ),
+            },
+            child: const SizedBox(width: 44, height: 40, child: Icon(Icons.drag_indicator_rounded, size: 20, color: CkColors.cyan)),
+          ),
+        ),
+        // remove: small mark, big tap area
+        Positioned(
+          top: -16,
+          left: -16,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _remove(it),
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: Center(
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(color: CkColors.deepSpace, shape: BoxShape.circle, border: Border.all(color: const Color(0x99FFFFFF))),
+                  child: const Icon(Icons.remove_rounded, size: 15, color: Colors.white),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     ]);
   }
+}
+
+class _BarBtn extends StatelessWidget {
+  final IconData? icon;
+  final String text;
+  final bool outlined, tinted, filled;
+  final VoidCallback onTap;
+  const _BarBtn(this.icon, this.text, {this.outlined = false, this.tinted = false, this.filled = false, required this.onTap});
+  @override
+  Widget build(BuildContext context) => Pressable(
+        onTap: onTap,
+        child: Container(
+          height: 50,
+          decoration: BoxDecoration(
+            color: filled ? CkColors.cyan : tinted ? CkColors.cyanTint : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: filled ? CkColors.cyan : tinted ? CkColors.cyanStroke : const Color(0x8CFFFFFF), width: 1.5),
+            boxShadow: filled ? [BoxShadow(color: CkColors.cyan.withValues(alpha: .35), blurRadius: 18)] : null,
+          ),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            if (icon != null) ...[Icon(icon, size: 18, color: tinted ? CkColors.cyan : Colors.white), const SizedBox(width: 6)],
+            Text(text, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: filled ? const Color(0xFF06204F) : Colors.white)),
+          ]),
+        ),
+      );
 }
 
 class _Chip extends StatelessWidget {
   final String text;
   final bool selected;
   final bool filled;
+  final bool dot;
   final VoidCallback onTap;
-  const _Chip(this.text, {this.selected = false, this.filled = false, required this.onTap});
+  const _Chip(this.text, {this.selected = false, this.filled = false, this.dot = false, required this.onTap});
   @override
   Widget build(BuildContext context) => Pressable(
         scale: .95,
         onTap: onTap,
         child: AnimatedContainer(
           duration: CkMotion.fast,
+          curve: kEase,
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
           decoration: BoxDecoration(
             color: filled ? CkColors.cyan : selected ? CkColors.cyanTint : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: filled ? CkColors.cyan : selected ? CkColors.cyanStroke : CkColors.panelStroke),
+            boxShadow: selected || filled ? [BoxShadow(color: CkColors.cyan.withValues(alpha: .22), blurRadius: 14)] : null,
           ),
-          child: Text(text,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: filled || selected ? FontWeight.w600 : FontWeight.w500,
-                color: filled ? const Color(0xFF06204F) : selected ? Colors.white : CkColors.textSecondary,
-              )),
+          child: Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
+            Flexible(
+              child: Text(text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: filled || selected ? FontWeight.w600 : FontWeight.w500,
+                    color: filled ? const Color(0xFF06204F) : selected ? Colors.white : CkColors.textSecondary,
+                  )),
+            ),
+            if (dot) ...[
+              const SizedBox(width: 5),
+              Container(width: 5, height: 5, decoration: const BoxDecoration(color: CkColors.cyan, shape: BoxShape.circle)),
+            ],
+          ]),
         ),
       );
 }
@@ -630,7 +893,7 @@ class _AddSheet extends StatelessWidget {
       groups.putIfAbsent(m.group, () => []).add(m);
     }
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: const Color(0x4DFFFFFF), borderRadius: BorderRadius.circular(2)))),
@@ -645,14 +908,14 @@ class _AddSheet extends StatelessWidget {
             for (final m in g.value)
               InkWell(
                 borderRadius: BorderRadius.circular(10),
-                onTap: () => Navigator.pop(context, m.id),
+                onTap: m.soon ? null : () => Navigator.pop(context, m.id),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
                   child: Row(children: [
                     _ModIcon(m.title, 24),
                     const SizedBox(width: 12),
-                    Expanded(child: Text(m.title, style: const TextStyle(fontSize: 14.5))),
-                    Icon(on.contains(m.id) ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded,
+                    Expanded(child: Opacity(opacity: m.soon ? .5 : 1, child: Text(m.soon ? '${m.title} · soon' : m.title, style: const TextStyle(fontSize: 14.5)))),
+                    if (!m.soon) Icon(on.contains(m.id) ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded,
                         color: on.contains(m.id) ? CkColors.cyan : CkColors.textSecondary),
                   ]),
                 ),
@@ -763,52 +1026,50 @@ Widget _skelBars() => LayoutBuilder(builder: (c, b) {
       ]);
     });
 
-Widget _skelSentiments() => LayoutBuilder(builder: (c, b) {
-      final mid = (b.maxHeight - 14) / 2;
-      return Column(children: [
-        SizedBox(
-          height: mid * 2,
-          child: Row(children: [
-            for (var i = 0; i < 30; i++)
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: .8),
-                  child: Column(children: [
-                    SizedBox(
-                        height: mid,
-                        child: Align(
-                            alignment: Alignment.bottomCenter,
-                            child: i % 3 != 2 ? Skeleton(height: (mid - 4) * (.3 + (i * 37 % 60) / 100), radius: 2) : null)),
-                    SizedBox(
-                        height: mid,
-                        child: Align(
-                            alignment: Alignment.topCenter,
-                            child: i % 3 == 2 ? Skeleton(height: (mid - 4) * (.25 + (i * 23 % 50) / 100), radius: 2) : null)),
-                  ]),
+/// Loads one card's data. On failure only this card shows Retry, and
+/// Retry refetches only this card's API (failed calls aren't cached).
+class _Load<T> extends StatefulWidget {
+  final Future<T> Function() load;
+  final Widget Function(T) builder;
+  final Widget? skel;
+  const _Load(this.load, this.builder, {super.key, this.skel});
+  @override
+  State<_Load<T>> createState() => _LoadState<T>();
+}
+
+class _LoadState<T> extends State<_Load<T>> {
+  late Future<T> _f = widget.load();
+  @override
+  Widget build(BuildContext context) => FutureBuilder<T>(
+        future: _f,
+        builder: (c, s) {
+          if (s.hasError) {
+            return Center(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Text('Couldn\'t load', style: CkText.muted),
+                const SizedBox(height: 6),
+                Pressable(
+                  onTap: () => setState(() => _f = widget.load()),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(color: CkColors.cyanTint, borderRadius: BorderRadius.circular(10), border: Border.all(color: CkColors.cyanStroke)),
+                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.refresh_rounded, size: 15, color: CkColors.cyan),
+                      SizedBox(width: 5),
+                      Text('Retry', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
                 ),
-              ),
-          ]),
-        ),
-        const SizedBox(height: 4),
-        const Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Skeleton(width: 10, height: 7, radius: 3),
-          Skeleton(width: 10, height: 7, radius: 3),
-          Skeleton(width: 10, height: 7, radius: 3),
-          Skeleton(width: 10, height: 7, radius: 3),
-        ]),
-      ]);
-    });
+              ]),
+            );
+          }
+          if (!s.hasData) return widget.skel ?? const _Loading();
+          return AnimatedSwitcher(duration: CkMotion.base, child: KeyedSubtree(key: const ValueKey('data'), child: widget.builder(s.data as T)));
+        },
+      );
+}
 
-Widget _fail() => const Center(child: Text('Couldn\'t load', style: CkText.muted));
-
-Widget _future<T>(Future<T> f, Widget Function(T) b, {Widget? skel}) => FutureBuilder<T>(
-      future: f,
-      builder: (c, s) {
-        if (s.hasError) return _fail();
-        if (!s.hasData) return skel ?? const _Loading();
-        return b(s.data as T);
-      },
-    );
+Widget _future<T>(Future<T> Function() load, Widget Function(T) b, {Widget? skel}) => _Load<T>(load, b, skel: skel);
 
 Widget _grahLabel(GrahPos p, {bool retroOnLabel = true, double size = 12.5}) => Row(mainAxisSize: MainAxisSize.min, children: [
       Container(width: 6, height: 6, decoration: BoxDecoration(color: grahColor(p.id), shape: BoxShape.circle)),
@@ -848,7 +1109,7 @@ class _KundliW extends StatelessWidget {
         const _WHead('CosmoKundli'),
         const SizedBox(height: 6),
         Expanded(
-          child: _future<List<GrahPos>>(ClientData.of(mId).chart(), skel: _skelKundli(size), (planets) {
+          child: _future<List<GrahPos>>(() => ClientData.of(mId).chart(), skel: _skelKundli(size), (planets) {
             GrahPos? f(String id) => planets.where((e) => e.id == id).firstOrNull;
             final pills = [_pill('Sun', f('Su')), _pill('Moon', f('Mo')), _pill('Lagna', f('As'))];
             final chart = KundliChart(planets);
@@ -906,7 +1167,7 @@ class _DegreeW extends StatelessWidget {
         const _WHead('Degree'),
         const SizedBox(height: 6),
         Expanded(
-          child: _future<List<GrahPos>>(ClientData.of(mId).chart(), skel: _skelRows(10, twoCols: size == WSize.w, mid: size != WSize.s), (l) {
+          child: _future<List<GrahPos>>(() => ClientData.of(mId).chart(), skel: _skelRows(10, twoCols: size == WSize.w, mid: size != WSize.s), (l) {
             final ps = _ordered(l);
             if (size == WSize.w) {
               final a = ps.take(5).toList(), b = ps.skip(5).toList();
@@ -934,7 +1195,7 @@ class _BarsW extends StatelessWidget {
         _WHead(flavor ? 'Flavor' : 'Power'),
         const SizedBox(height: 8),
         Expanded(
-          child: _future<Map<String, double>>(ClientData.of(mId).shadbal(), skel: _skelBars(), (m) {
+          child: _future<Map<String, double>>(() => ClientData.of(mId).shadbal(), skel: _skelBars(), (m) {
             final v = [for (final id in flavor ? _flavor : _power) if (m[id] != null) MapEntry(id, m[id]!)];
             return LayoutBuilder(
               builder: (c, box) => GrahBarChart(values: v, height: math.max(40, box.maxHeight - 24), axis: size != WSize.s),
@@ -967,11 +1228,11 @@ class _TransitW extends StatelessWidget {
       _WHead('Transit', trailing: Text('● ${DateFormat('HH:mm').format(now)}', style: CkText.mono(10.5, color: CkColors.cyan))),
       const SizedBox(height: 6),
       Expanded(
-        child: _future<List<GrahPos>>(ClientData.of(mId).transit(now),
+        child: _future<List<GrahPos>>(() => ClientData.of(mId).transit(now),
             skel: size == WSize.l ? _skelCircle() : size == WSize.s ? _skelRows(5, mid: false) : _skelRows(10, twoCols: size == WSize.w), (t) {
           final ps = _ordered(t);
           if (size == WSize.l) {
-            return _future<List<GrahPos>>(ClientData.of(mId).chart(), skel: _skelCircle(), (b) => Center(child: KundliChart(b, transit: t)));
+            return _future<List<GrahPos>>(() => ClientData.of(mId).chart(), skel: _skelCircle(), (b) => Center(child: KundliChart(b, transit: t)));
           }
           if (size == WSize.s) {
             return Column(children: [for (final p in ps.where((e) => const ['Su', 'Mo', 'Ju', 'Ra', 'Ke'].contains(e.id))) _row(p, rashi: false)]);
@@ -990,85 +1251,407 @@ class _TransitW extends StatelessWidget {
   }
 }
 
-class _SentimentsW extends StatelessWidget {
+/// Sentiments (signed, software green/red) or Situations (0–100, 7 zones
+/// with arrows) for days around today, each bar with its value.
+/// Small: yesterday · today · tomorrow. Tall: 5 days. Wide: 10 days.
+/// Large: 14 days plus strongest / weakest / average.
+class _DailyW extends StatelessWidget {
   final String mId;
   final WSize size;
-  const _SentimentsW(this.mId, this.size);
+  final bool signed;
+  const _DailyW(this.mId, this.size, {required this.signed});
+
+  (int, int) get _span => switch (size) { WSize.s => (1, 1), WSize.t => (2, 2), WSize.w => (6, 3), WSize.l => (10, 3) };
+
+  static String _fmt(double v, bool signed) {
+    final r = v.round();
+    return signed && r > 0 ? '+$r' : '$r';
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final (back, ahead) = _span;
+    final from = today.subtract(Duration(days: back)), to = today.add(Duration(days: ahead));
+    final title = signed ? 'Sentiments' : 'Situations';
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      _WHead('Sentiments', trailing: Text(DateFormat('MMM yyyy').format(now).toUpperCase(), style: CkText.mono(10.5, color: CkColors.cyan))),
+      _WHead(title, trailing: Text(DateFormat('MMM yyyy').format(now).toUpperCase(), style: CkText.mono(10.5, color: CkColors.cyan))),
       const SizedBox(height: 8),
       Expanded(
-        child: _future<List<MapEntry<DateTime, double>>>(ClientData.of(mId).sentiments(DateTime(now.year, now.month)), skel: _skelSentiments(), (l) {
-          if (l.isEmpty) return const Center(child: Text('No data for this month', style: CkText.muted));
-          final maxAbs = l.map((e) => e.value.abs()).fold<double>(1, math.max);
-          return LayoutBuilder(builder: (c, box) {
-            const lab = 14.0;
-            final mid = (box.maxHeight - lab) / 2;
-            final n = l.length;
-            final colW = box.maxWidth / n;
-            final todayIdx = l.indexWhere((e) => e.key.year == now.year && e.key.month == now.month && e.key.day == now.day);
-            final marks = [for (var i = 0; i < n; i++) if (l[i].key.day == 1 || l[i].key.day % 5 == 0) i];
-            return Stack(children: [
-              Positioned(left: 0, right: 0, top: mid, child: Container(height: 1, color: const Color(0x338CBEFF))),
-              Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                height: mid * 2,
-                child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  for (final e in l)
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: .8),
-                        child: Column(children: [
-                          SizedBox(
-                            height: mid,
-                            child: Align(
-                              alignment: Alignment.bottomCenter,
-                              child: e.value > 0
-                                  ? Container(height: (mid - 4) * e.value / maxAbs, decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Color(0xFF73F4C4), Color(0xFF10B981)]), borderRadius: BorderRadius.circular(2)))
-                                  : null,
-                            ),
-                          ),
-                          SizedBox(
-                            height: mid,
-                            child: Align(
-                              alignment: Alignment.topCenter,
-                              child: e.value < 0
-                                  ? Container(height: (mid - 4) * -e.value / maxAbs, decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFF6B8B8), Color(0xFFEF4444)]), borderRadius: BorderRadius.circular(2)))
-                                  : null,
-                            ),
-                          ),
-                        ]),
-                      ),
-                    ),
-                ]),
-              ),
-              if (todayIdx >= 0)
-                Positioned(
-                  left: colW * todayIdx + colW / 2 - .75,
-                  top: 0,
-                  bottom: lab,
-                  child: Container(width: 1.5, color: CkColors.cyan),
+        child: _future<List<MapEntry<DateTime, double>>>(() => ClientData.of(mId).window(signed ? 'sent' : 'sit', from, to), skel: _skelDaily(back + ahead + 1, signed), (l) {
+          if (l.isEmpty) return const Center(child: Text('No data for these days', style: CkText.muted));
+          final chart = _bars(l, today);
+          if (size != WSize.l) return chart;
+          final best = l.reduce((a, b) => b.value > a.value ? b : a);
+          final worst = l.reduce((a, b) => b.value < a.value ? b : a);
+          final avg = l.map((e) => e.value).reduce((a, b) => a + b) / l.length;
+          Color col(double v) => signed ? (v >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444)) : zoneOf(v).color;
+          Widget stat(String k, double v) => Expanded(
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(9, 6, 9, 6),
+                  decoration: BoxDecoration(color: const Color(0x0FFFFFFF), borderRadius: BorderRadius.circular(9)),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(k.toUpperCase(), style: CkText.label.copyWith(fontSize: 8.5)),
+                    const SizedBox(height: 2),
+                    Text(_fmt(v, signed), style: CkText.mono(14, color: signed && k == 'Average' ? Colors.white : col(v))),
+                  ]),
                 ),
-              for (final i in marks)
-                Positioned(
-                  left: (colW * i + colW / 2 - 10).clamp(0.0, box.maxWidth - 20),
-                  bottom: 0,
-                  width: 20,
-                  child: Text('${l[i].key.day}',
-                      textAlign: TextAlign.center,
-                      style: CkText.mono(9, color: i == todayIdx ? CkColors.cyan : CkColors.labelMono)),
-                ),
-            ]);
-          });
+              );
+          return Column(children: [
+            Row(children: [
+              stat(signed ? 'Strongest' : 'Best', best.value),
+              const SizedBox(width: 6),
+              stat('Weakest', worst.value),
+              const SizedBox(width: 6),
+              stat('Average', avg),
+            ]),
+            const SizedBox(height: 10),
+            Expanded(child: chart),
+          ]);
         }),
       ),
     ]);
   }
+
+  Widget _bars(List<MapEntry<DateTime, double>> l, DateTime today) => LayoutBuilder(builder: (c, box) {
+        const lab = 16.0;
+        final few = l.length <= 3;
+        final fs = few ? 11.0 : 9.0;
+        final bw = few ? 18.0 : (l.length <= 5 ? 14.0 : 10.0);
+        final h = box.maxHeight - lab;
+        final maxAbs = signed ? l.map((e) => e.value.abs()).fold<double>(1, math.max) : 100.0;
+        final topPad = signed ? 14.0 : (few ? 30.0 : 26.0);
+        return Column(children: [
+          SizedBox(
+            height: h,
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              for (final e in l)
+                Expanded(child: _bar(e, today, h, maxAbs, topPad, bw, fs)),
+            ]),
+          ),
+          SizedBox(
+            height: lab,
+            child: Row(children: [
+              for (final e in l)
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      few && e.key == today ? 'Today' : '${e.key.day}',
+                      style: CkText.mono(9.5, color: e.key == today ? CkColors.cyan : CkColors.labelMono),
+                    ),
+                  ),
+                ),
+            ]),
+          ),
+        ]);
+      });
+
+  Widget _bar(MapEntry<DateTime, double> e, DateTime today, double h, double maxAbs, double topPad, double bw, double fs) {
+    final isToday = e.key == today;
+    final v = e.value;
+    final Widget inner;
+    if (signed) {
+      final half = h / 2;
+      final bh = (half - topPad) * (v.abs() / maxAbs);
+      final up = v >= 0;
+      final grad = up
+          ? const LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Color(0xFF73F4C4), Color(0xFF10B981)])
+          : const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFF6B8B8), Color(0xFFEF4444)]);
+      inner = Stack(children: [
+        Positioned(left: 0, right: 0, top: half - .5, child: Container(height: 1, color: const Color(0x338CBEFF))),
+        Positioned(
+          left: 0,
+          right: 0,
+          top: up ? half - bh : half,
+          height: bh,
+          child: Center(child: Container(width: bw, decoration: BoxDecoration(gradient: grad, borderRadius: BorderRadius.circular(3)))),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          top: up ? half - bh - fs - 5 : half + bh + 2,
+          child: Text(_fmt(v, true), textAlign: TextAlign.center, style: CkText.mono(fs, color: Colors.white)),
+        ),
+      ]);
+    } else {
+      final z = zoneOf(v);
+      final bh = (h - topPad) * (v.clamp(0, 100) / 100);
+      inner = Stack(children: [
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: bh,
+          child: Center(
+            child: Container(
+              width: bw,
+              decoration: BoxDecoration(color: z.color, borderRadius: const BorderRadius.vertical(top: Radius.circular(3), bottom: Radius.circular(1))),
+            ),
+          ),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: bh + 2,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            ZoneArrows(z, size: fs + 1),
+            Text(_fmt(v, false), style: CkText.mono(fs, color: Colors.white)),
+          ]),
+        ),
+      ]);
+    }
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 1),
+      decoration: isToday
+          ? BoxDecoration(
+              color: const Color(0x145CE1FF),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0x595CE1FF)),
+            )
+          : null,
+      child: inner,
+    );
+  }
+}
+
+Widget _skelDaily(int n, bool signed) => LayoutBuilder(builder: (c, b) {
+      final h = b.maxHeight - 16;
+      return Column(children: [
+        SizedBox(
+          height: h,
+          child: Row(children: [
+            for (var i = 0; i < n; i++)
+              Expanded(
+                child: signed
+                    ? Column(children: [
+                        SizedBox(height: h / 2, child: Align(alignment: Alignment.bottomCenter, child: i % 3 != 2 ? Skeleton(width: n <= 3 ? 18 : 10, height: (h / 2 - 16) * (.35 + (i * 37 % 55) / 100), radius: 3) : null)),
+                        SizedBox(height: h / 2, child: Align(alignment: Alignment.topCenter, child: i % 3 == 2 ? Skeleton(width: n <= 3 ? 18 : 10, height: (h / 2 - 16) * (.3 + (i * 23 % 45) / 100), radius: 3) : null)),
+                      ])
+                    : Align(alignment: Alignment.bottomCenter, child: Skeleton(width: n <= 3 ? 18 : 10, height: (h - 30) * (.4 + (i * 29 % 50) / 100), radius: 3)),
+              ),
+          ]),
+        ),
+        SizedBox(height: 16, child: Row(children: [for (var i = 0; i < n; i++) const Expanded(child: Center(child: Skeleton(width: 12, height: 7, radius: 3)))])),
+      ]);
+    });
+
+/// Birth-moment Panchang (client's birth place).
+class _PanchangW extends StatelessWidget {
+  final String mId;
+  final WSize size;
+  const _PanchangW(this.mId, this.size);
+
+  Widget _row(String k, String v, {double fs = 12.5}) => Expanded(
+        child: Container(
+          decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x1A8CBEFF)))),
+          child: Row(children: [
+            SizedBox(width: 74, child: Text(k.toUpperCase(), style: CkText.label.copyWith(fontSize: 9))),
+            Expanded(child: Text(v.isEmpty ? '—' : v, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: fs, fontWeight: FontWeight.w600))),
+          ]),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const _WHead('Panchang', trailing: Text('AT BIRTH', style: TextStyle(fontSize: 9.5, color: CkColors.cyan, letterSpacing: 1))),
+        const SizedBox(height: 6),
+        Expanded(
+          child: _future<ClientPanchang>(() => ClientPanchang.of(mId), skel: _skelRows(size == WSize.s ? 3 : 6, mid: false), (p) {
+            final d = p.data;
+            String g(String k) => d.get(k);
+            final keys = const ['Nakshatra', 'Tithi', 'Karan', 'Yog', 'Day', 'Rashi'];
+            switch (size) {
+              case WSize.s:
+                return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Text(g('Nakshatra'), maxLines: 1, overflow: TextOverflow.ellipsis, style: CkText.h(16)),
+                  const SizedBox(height: 3),
+                  Text(g('Tithi'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
+                  const SizedBox(height: 6),
+                  Text(g('Rashi'), style: CkText.mono(10.5, color: CkColors.labelMono)),
+                ]);
+              case WSize.w:
+                return Row(children: [
+                  SizedBox(
+                    width: 120,
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Text(g('Nakshatra'), maxLines: 1, overflow: TextOverflow.ellipsis, style: CkText.h(16)),
+                      const SizedBox(height: 3),
+                      Text(g('Tithi'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
+                    ]),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(children: [for (final k in const ['Karan', 'Yog', 'Day', 'Rashi']) _row(k, g(k), fs: 12)])),
+                ]);
+              case WSize.t:
+              case WSize.l:
+                final extra = size == WSize.l ? d.rows.where((r) => !keys.contains(r.$1)).take(4).toList() : const <(String, String)>[];
+                return Column(children: [
+                  if (size == WSize.l && p.at != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(children: [
+                        Text(DateFormat('dd MMM yyyy · HH:mm').format(p.at!), style: CkText.mono(11, color: CkColors.cyan)),
+                        const Spacer(),
+                        Flexible(child: Text(p.place, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: CkColors.textSecondary))),
+                      ]),
+                    ),
+                  for (final k in keys) _row(k, g(k), fs: size == WSize.t ? 11.5 : 12.5),
+                  for (final r in extra) _row(r.$1, r.$2),
+                ]);
+            }
+          }),
+        ),
+      ]);
+}
+
+/// Last Melapak result of this client (saved when a match is opened).
+class _MelapakW extends StatelessWidget {
+  final String mId;
+  final WSize size;
+  const _MelapakW(this.mId, this.size);
+
+  static const _rows = [
+    ('Varna', 'Varn_Points', 1),
+    ('Vashya', 'Vaishya_Points', 2),
+    ('Tara', 'Tara_Points', 3),
+    ('Yoni', 'Yoni_Points', 4),
+    ('Graha Maitri', 'Rashidhyapati_Points', 5),
+    ('Gana', 'Gan_Points', 6),
+    ('Bhakoot', 'Bhakoot_Points', 7),
+    ('Nadi', 'Naadi_Points', 8),
+  ];
+
+  static double _n(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v'.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
+
+  Widget _ring(double total, double d) {
+    final col = total >= 18 ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+    return SizedBox(
+      width: d,
+      height: d,
+      child: Stack(alignment: Alignment.center, children: [
+        SizedBox(
+          width: d,
+          height: d,
+          child: CircularProgressIndicator(value: (total / 36).clamp(0, 1), strokeWidth: 6, color: col, backgroundColor: const Color(0x2E8CBEFF), strokeCap: StrokeCap.round),
+        ),
+        Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(total % 1 == 0 ? '${total.toInt()}' : total.toStringAsFixed(1), style: CkText.mono(d / 4.2)),
+          Text('of 36', style: TextStyle(fontSize: d / 9, color: CkColors.textSecondary)),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _koota((String, String, int) k, Map<String, dynamic> r, {double label = 84}) {
+    final pts = _n(r[k.$2]);
+    final col = pts >= k.$3 ? const Color(0xFF10B981) : pts > 0 ? const Color(0xFFF5B66B) : const Color(0xFFEF4444);
+    return Expanded(
+      child: Row(children: [
+        SizedBox(width: label, child: Text(k.$1, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: CkColors.textSecondary))),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(value: (pts / k.$3).clamp(0, 1), minHeight: 5, color: col, backgroundColor: const Color(0x268CBEFF)),
+          ),
+        ),
+        SizedBox(width: 38, child: Text('${pts % 1 == 0 ? pts.toInt() : pts}/${k.$3}', textAlign: TextAlign.right, style: CkText.mono(10))),
+      ]),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = LastMatch.of(mId);
+    final me = Session.client.value;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      const _WHead('Melapak'),
+      const SizedBox(height: 6),
+      Expanded(
+        child: r == null
+            ? Center(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Text('No match yet', style: CkText.muted),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: CkColors.cyanStroke)),
+                    child: const Text('+ Pick partner', style: TextStyle(fontSize: 12.5, color: CkColors.cyan)),
+                  ),
+                ]),
+              )
+            : Builder(builder: (_) {
+                final total = _n(r['Total_Gun_Match']);
+                final female = me?.isFemale ?? false;
+                final partner = '${r[female ? 'Var_Name' : 'Vadhu_Name'] ?? ''}'.trim();
+                final good = total >= 18;
+                final doshas = [if (_n(r['Naadi_Points']) == 0) 'Nadi dosha', if (_n(r['Bhakoot_Points']) == 0) 'Bhakoot dosha'];
+                final verdict = Text(
+                  [total >= 28 ? 'Excellent match' : good ? 'Good match' : 'Below 18', ...doshas].join(' · '),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11.5, color: good ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
+                );
+                final names = Text('× $partner', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600));
+                switch (size) {
+                  case WSize.s:
+                    return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      _ring(total, 78),
+                      const SizedBox(height: 6),
+                      Text(partner, maxLines: 1, overflow: TextOverflow.ellipsis, style: CkText.mono(10, color: CkColors.textSecondary)),
+                    ]);
+                  case WSize.w:
+                    return Row(children: [
+                      _ring(total, 96),
+                      const SizedBox(width: 14),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [names, const SizedBox(height: 4), verdict])),
+                    ]);
+                  case WSize.t:
+                    return Column(children: [
+                      _ring(total, 90),
+                      const SizedBox(height: 6),
+                      names,
+                      verdict,
+                      const SizedBox(height: 6),
+                      Expanded(child: Column(children: [for (final k in _rows.skip(4)) _koota(k, r, label: 62)])),
+                    ]);
+                  case WSize.l:
+                    return Column(children: [
+                      Row(children: [
+                        _ring(total, 80),
+                        const SizedBox(width: 12),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [names, const SizedBox(height: 4), verdict])),
+                      ]),
+                      const SizedBox(height: 8),
+                      Expanded(child: Column(children: [for (final k in _rows) _koota(k, r)])),
+                    ]);
+                }
+              }),
+      ),
+    ]);
+  }
+}
+
+/// Any module without its own card: icon, name and what it shows; tap opens.
+class _GenericW extends StatelessWidget {
+  final WModule m;
+  final WSize size;
+  const _GenericW(this.m, this.size);
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _WHead(m.title),
+        Expanded(
+          child: Center(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              _ModIcon(m.title, size == WSize.s ? 40 : 56),
+              const SizedBox(height: 10),
+              Text(m.sub, textAlign: TextAlign.center, maxLines: 2, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
+              const SizedBox(height: 8),
+              Text('Open ›', style: CkText.mono(11, color: CkColors.cyan)),
+            ]),
+          ),
+        ),
+      ]);
 }
 
 /// Rendered chart reused inside widgets (keeps SvgPicture import used here).

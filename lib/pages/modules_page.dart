@@ -3,43 +3,18 @@ import 'package:flutter/material.dart';
 import '../ui/ck_theme.dart';
 import '../ui/glass.dart';
 import '../ui/widgets.dart';
-import 'blueprint_pages.dart';
 import 'client_shell.dart';
-import 'predictions_pages.dart';
-import 'traditional_pages.dart';
-import 'trajectory_pages.dart';
+import 'workspace.dart';
 
-class _Mod {
-  final String title;
-  final String sub;
-  final Widget Function()? page;
-  const _Mod(this.title, this.sub, [this.page]);
+/// Every module, under the software's group names, from the one registry
+/// the workspace also uses. Tapping one opens it full screen.
+Map<String, List<WModule>> get _groups {
+  final g = <String, List<WModule>>{};
+  for (final m in kWorkspaceModules.values) {
+    g.putIfAbsent(m.group, () => []).add(m);
+  }
+  return g;
 }
-
-/// Every module, under the software's group names. Tapping one opens it
-/// full screen.
-final _groups = <String, List<_Mod>>{
-  'BluePrint': [
-    _Mod('CosmoKundli', 'Birth chart · circle', () => const KundliPage()),
-    _Mod('GRAH Coordinates', 'Rashi, degree, nakshatra', () => const CoordinatesPage()),
-    _Mod('Power', 'Strength of each GRAH', () => const StrengthPage(flavor: false)),
-    _Mod('Flavor', 'Nature of each GRAH', () => const StrengthPage(flavor: true)),
-  ],
-  'Trajectory': [
-    _Mod('Transit', 'Birth vs any moment', () => const TransitPage()),
-    _Mod('GRAH Vibes', 'Coming soon'),
-    _Mod('GRAH Intensity', 'Coming soon'),
-  ],
-  'Predictions': [
-    _Mod('Sentiments', 'Daily, month by month', () => const SentimentsPage()),
-    _Mod('Situations', '7 zones, month by month', () => const SituationsPage()),
-    _Mod('Sentiments 5D', 'Career, Finance, Health, Social, Love', () => const Sentiments5DPage()),
-  ],
-  'Traditional': [
-    _Mod('Panchang', 'At the moment of birth', () => const PanchangPage()),
-    _Mod('Melapak', 'Match with a partner', () => const MelapakPage()),
-  ],
-};
 
 class ModulesPage extends StatelessWidget {
   const ModulesPage({super.key});
@@ -61,8 +36,8 @@ class ModulesPage extends StatelessWidget {
     return ClientPage(title: 'Modules', isRoot: true, children: children);
   }
 
-  Widget _row(BuildContext context, _Mod m, {bool first = false}) {
-    final soon = m.page == null;
+  Widget _row(BuildContext context, WModule m, {bool first = false}) {
+    final soon = m.soon;
     final icon = ckIconAsset(m.title);
     return Opacity(
       opacity: soon ? .5 : 1,

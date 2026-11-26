@@ -1028,9 +1028,17 @@ class AllReportsPage extends StatefulWidget {
 
 class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
   String _q = '';
-  ReportState? _state;
-  String? _type;
+  Set<ReportState> _state = {};
+  Set<String> _type = {};
   String _sort = 'new';
+  static const _types = [('CKP', 'Planner'), ('CKPP', 'Planner Plus'), ('CKPM', 'Planner Max'), ('GV', 'GRAH Vibes')];
+  static const _sorts = [
+    SortOption('new', 'Newest first', ascending: false),
+    SortOption('old', 'Oldest first', ascending: true),
+    SortOption('az', 'Client A–Z', ascending: true),
+    SortOption('za', 'Client Z–A', ascending: false),
+  ];
+  static String _stateLabel(ReportState s) => switch (s) { ReportState.generating => 'Generating', ReportState.ready => 'Ready', ReportState.expired => 'Expired', _ => s.name };
   late Future<Map<String, dynamic>> _credits = Api.post(Endpoints.credits, {'uID': Session.uid});
 
   @override
@@ -1053,8 +1061,8 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
                 }
                 int count(ReportState? st) => st == null ? all.length : all.where((e) => e.state == st).length;
                 final l = all
-                    .where((e) => _state == null || e.state == _state)
-                    .where((e) => _type == null || e.source == _type)
+                    .where((e) => _state.isEmpty || _state.contains(e.state))
+                    .where((e) => _type.isEmpty || _type.contains(e.source))
                     .where((e) => _q.isEmpty || '${e.name} ${e.title}'.toLowerCase().contains(_q))
                     .toList();
                 int byDate(ReportItem a, ReportItem b) {
@@ -1112,13 +1120,12 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
                     const SizedBox(height: 10),
                     Row(children: [
                       Expanded(
-                        child: FilterDropdown<ReportState?>(
+                        child: FilterDropdown<ReportState>(
                           label: 'Status',
-                          value: _state,
-                          defaultValue: null,
+                          values: _state,
+                          allCount: count(null),
                           onChanged: (v) => setState(() => _state = v),
                           options: [
-                            FilterOption(null, 'All', count: count(null)),
                             FilterOption(ReportState.generating, 'Generating', count: count(ReportState.generating)),
                             FilterOption(ReportState.ready, 'Ready', count: count(ReportState.ready)),
                             FilterOption(ReportState.expired, 'Expired', count: count(ReportState.expired)),
@@ -1127,14 +1134,13 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: FilterDropdown<String?>(
+                        child: FilterDropdown<String>(
                           label: 'Report',
-                          value: _type,
-                          defaultValue: null,
+                          values: _type,
+                          allCount: all.length,
                           onChanged: (v) => setState(() => _type = v),
                           options: [
-                            FilterOption(null, 'All', count: all.length),
-                            for (final e in const [('CKP', 'Planner'), ('CKPP', 'Planner Plus'), ('CKPM', 'Planner Max'), ('GV', 'GRAH Vibes')])
+                            for (final e in _types)
                               FilterOption(e.$1, e.$2, count: all.where((x) => x.source == e.$1).length),
                           ],
                         ),
@@ -1143,13 +1149,19 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
                       SortButton<String>(
                         value: _sort,
                         onChanged: (v) => setState(() => _sort = v),
-                        options: const [
-                          SortOption('new', 'Newest first', ascending: false),
-                          SortOption('old', 'Oldest first', ascending: true),
-                          SortOption('az', 'Client A–Z', ascending: true),
-                          SortOption('za', 'Client Z–A', ascending: false),
-                        ],
+                        options: _sorts,
                       ),
+                    ]),
+                    ActiveFilters([
+                      if (_state.isNotEmpty)
+                        (Icons.check_rounded, _state.length == 1 ? _stateLabel(_state.first) : '${_state.length} selected', () => setState(() => _state = {})),
+                      if (_type.isNotEmpty)
+                        (Icons.check_rounded, _type.length == 1 ? _types.firstWhere((t) => t.$1 == _type.first, orElse: () => (_type.first, _type.first)).$2 : '${_type.length} selected', () => setState(() => _type = {})),
+                      if (_sort != 'new')
+                        (() {
+                          final c = _sorts.firstWhere((o) => o.value == _sort);
+                          return (c.ascending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, c.label, () => setState(() => _sort = 'new'));
+                        })(),
                     ]),
                     if (s.hasError)
                       ErrorBox(message: 'Couldn\'t load reports.', onRetry: reloadHistory)

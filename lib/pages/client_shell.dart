@@ -103,7 +103,24 @@ class _ClientShellState extends State<ClientShell> {
               );
             }),
           ),
-          Positioned(left: 0, right: 0, bottom: 0, child: RepaintBoundary(child: _Dock(index: _index, onTap: _select))),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: ValueListenableBuilder<bool>(
+              valueListenable: workspaceEditing,
+              builder: (c, editing, child) => IgnorePointer(
+                ignoring: editing,
+                child: AnimatedSlide(
+                  offset: editing ? const Offset(0, 1.4) : Offset.zero,
+                  duration: CkMotion.base,
+                  curve: kEase,
+                  child: child,
+                ),
+              ),
+              child: RepaintBoundary(child: _Dock(index: _index, onTap: _select)),
+            ),
+          ),
         ]),
       ),
     );

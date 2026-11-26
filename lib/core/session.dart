@@ -104,8 +104,22 @@ class Session {
 
   static Future<void> signOut() async {
     final l = lang.value;
+    // Keep per-user workspace layouts and the location choice across logout.
+    final keep = <String, Object>{
+      for (final k in _p.getKeys())
+        if (k.startsWith('ws_u') || k.startsWith('here_'))
+          if (_p.get(k) != null) k: _p.get(k)!,
+    };
     await _p.clear();
     await _p.setString(SPKeys.language, l);
+    for (final e in keep.entries) {
+      final v = e.value;
+      if (v is String) await _p.setString(e.key, v);
+      if (v is bool) await _p.setBool(e.key, v);
+      if (v is double) await _p.setDouble(e.key, v);
+      if (v is int) await _p.setInt(e.key, v);
+      if (v is List) await _p.setStringList(e.key, v.map((x) => '$x').toList());
+    }
     client.value = null;
   }
 

@@ -14,6 +14,23 @@ class ClientData {
     return _current!;
   }
 
+  final _memo = <String, Future<dynamic>>{};
+
+  /// Caches a call under [key]; a failed call is dropped so Retry refetches.
+  Future<T> _m<T>(String key, Future<T> Function() f) {
+    final hit = _memo[key];
+    if (hit != null) return hit as Future<T>;
+    final fut = f();
+    _memo[key] = fut;
+    fut.then((_) {}, onError: (Object _) {
+      if (identical(_memo[key], fut)) _memo.remove(key);
+    });
+    return fut;
+  }
+
+  /// Drops cached calls whose key starts with [prefix] (per-module Retry).
+  void drop(String prefix) => _memo.removeWhere((k, _) => k.startsWith(prefix));
+
   Future<List<GrahPos>>? _chart;
   Future<List<GrahPos>>? _info;
   Future<Map<String, double>>? _shadbal;
@@ -26,7 +43,18 @@ class ClientData {
       _chart = null;
       _info = null;
     }
-    return _chart ??= () async {
+    if (_chart == null) {
+      final f = _chartLoad();
+      _chart = f;
+      f.then((_) {}, onError: (Object _) {
+        if (identical(_chart, f)) _chart = null;
+      });
+    }
+    return _chart!;
+  }
+
+  Future<List<GrahPos>> _chartLoad() async {
+    return () async {
       final r = await Api.post(Endpoints.birthChart, {'mID': mId});
       var list = GrahPos.listFrom(Api.list(r, ['planets', 'list']));
       List<GrahPos> info = [];
@@ -52,7 +80,18 @@ class ClientData {
   /// Shadbal (used for Power and Flavor until their own APIs exist).
   Future<Map<String, double>> shadbal({bool refresh = false}) {
     if (refresh) _shadbal = null;
-    return _shadbal ??= () async {
+    if (_shadbal == null) {
+      final f = _shadbalLoad();
+      _shadbal = f;
+      f.then((_) {}, onError: (Object _) {
+        if (identical(_shadbal, f)) _shadbal = null;
+      });
+    }
+    return _shadbal!;
+  }
+
+  Future<Map<String, double>> _shadbalLoad() async {
+    return () async {
       final r = await Api.post(Endpoints.shadbal, {'mID': mId});
       final out = <String, double>{};
       for (final e in Api.list(r, ['list', 'data'])) {
@@ -65,16 +104,32 @@ class ClientData {
     }();
   }
 
-  Future<Map<String, dynamic>> details() => _details ??= Api.post(Endpoints.memberDetails, {'mID': mId});
+  Future<Map<String, dynamic>> details({bool refresh = false}) {
+    if (refresh) _details = null;
+    final hit = _details;
+    if (hit != null) return hit;
+    final f = Api.post(Endpoints.memberDetails, {'mID': mId});
+    _details = f;
+    f.then((_) {}, onError: (Object _) {
+      if (identical(_details, f)) _details = null;
+    });
+    return f;
+  }
 
   /// Transit positions for a moment (GocharAnimated).
-  Future<List<GrahPos>> transit(DateTime at) async {
+  Future<List<GrahPos>> transit(DateTime at) =>
+      _m('transit:${DateFormat('yyyy-MM-dd HH:mm').format(at)}', () => _transit(at));
+
+  Future<List<GrahPos>> _transit(DateTime at) async {
     final r = await Api.post(Endpoints.gocharAnimated, {'mID': mId, 'Datetime': DateFormat('yyyy-MM-dd HH:mm:ss').format(at)});
     return GrahPos.listFrom(Api.list(r, ['planets', 'list']));
   }
 
   /// Sentiments for a month (Star_Power_Daily).
-  Future<List<MapEntry<DateTime, double>>> sentiments(DateTime month) async {
+  Future<List<MapEntry<DateTime, double>>> sentiments(DateTime month) =>
+      _m('sent:${DateFormat('yyyy-MM').format(month)}', () => _sentiments(month));
+
+  Future<List<MapEntry<DateTime, double>>> _sentiments(DateTime month) async {
     final r = await Api.post(Endpoints.starPowerDaily, {'mID': mId, 'Month': DateFormat('yyyy-MM').format(month)});
     final out = <MapEntry<DateTime, double>>[];
     var day = 1;
@@ -98,7 +153,26 @@ class ClientData {
   }
 
   /// Situations for a month (Cosmo_Power_Daily): {Date: "01 Aug", Value: 62.7}, 0..100.
-  Future<List<MapEntry<DateTime, double>>> situations(DateTime month) async {
+  Future<List<MapEntry<DateTime, double>>> situations(DateTime month) =>
+      _m('sit:${DateFormat('yyyy-MM').format(month)}', () => _situations(month));
+
+  /// Daily values from [from] to [to] (inclusive), fetching every month the
+  /// window touches. [kind] is 'sent' or 'sit'.
+  Future<List<MapEntry<DateTime, double>>> window(String kind, DateTime from, DateTime to) async {
+    final a = DateTime(from.year, from.month, from.day), b = DateTime(to.year, to.month, to.day);
+    final months = <DateTime>[];
+    for (var m = DateTime(a.year, a.month); !m.isAfter(DateTime(b.year, b.month)); m = DateTime(m.year, m.month + 1)) {
+      months.add(m);
+    }
+    final parts = await Future.wait(months.map((m) => kind == 'sent' ? sentiments(m) : situations(m)));
+    return [
+      for (final l in parts)
+        for (final e in l)
+          if (!e.key.isBefore(a) && !e.key.isAfter(b)) e
+    ];
+  }
+
+  Future<List<MapEntry<DateTime, double>>> _situations(DateTime month) async {
     final r = await Api.post(Endpoints.cosmoPowerDaily, {'mID': mId, 'Month': DateFormat('yyyy-MM').format(month)});
     final out = <MapEntry<DateTime, double>>[];
     var day = 1;

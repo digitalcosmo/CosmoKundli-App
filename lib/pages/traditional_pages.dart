@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 
@@ -45,6 +46,89 @@ class TraditionalSection extends StatelessWidget {
 
 // ───────────────────────── Panchang
 
+/// Birth-moment Panchang of a client at the birth place (shared by the
+/// Panchang page and the workspace card). Cached per client.
+class ClientPanchang {
+  final Map<String, dynamic> raw;
+  final DateTime? at;
+  final double lat, lng;
+  final String place;
+  ClientPanchang(this.raw, this.at, this.lat, this.lng, this.place);
+  PanchangData get data => PanchangData.parse(raw, at: at, lat: lat, lng: lng);
+
+  static final _cache = <String, Future<ClientPanchang>>{};
+  static Future<ClientPanchang> of(String mId, {bool refresh = false}) {
+    if (refresh) _cache.remove(mId);
+    final hit = _cache[mId];
+    if (hit != null) return hit;
+    final f = _load(mId);
+    _cache[mId] = f;
+    f.then((_) {}, onError: (Object _) {
+      if (identical(_cache[mId], f)) _cache.remove(mId);
+    });
+    return f;
+  }
+
+  static DateTime? _birthOf(Map<String, dynamic> d) {
+    final dob = (d['dob'] ?? '').toString().trim();
+    DateTime? day;
+    for (final f in ['yyyy-MM-dd', 'dd-MM-yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd HH:mm:ss', 'dd-MM-yyyy HH:mm:ss']) {
+      try {
+        day = DateFormat(f).parseStrict(dob);
+        break;
+      } catch (_) {}
+    }
+    if (day == null) return null;
+    int n(String k) => int.tryParse('${d[k] ?? ''}'.trim()) ?? 0;
+    return DateTime(day.year, day.month, day.day, n('btime_hrs'), n('btime_min'), n('btime_sec'));
+  }
+
+  static Future<ClientPanchang> _load(String mId) async {
+    final d = await ClientData.of(mId).details();
+    DateTime? fallback;
+    final c = Session.client.value;
+    if (c != null && c.mId == mId) {
+      try {
+        fallback = DateFormat('dd-MM-yyyy HH:mm:ss').parseStrict(c.dobRaw);
+      } catch (_) {}
+    }
+    final at = _birthOf(d) ?? fallback ?? DateTime.now();
+    final lat = double.tryParse('${d['latitude']}') ?? 0;
+    final lng = double.tryParse('${d['longitude']}') ?? 0;
+    final la = _dms(lat), lo = _dms(lng);
+    final r = await Api.post(Endpoints.panchang, {
+      'LongDeg': lo[0], 'LongMnt': lo[1], 'LongSec': lo[2], 'LongDirection': lng >= 0 ? 'E' : 'W',
+      'LatDeg': la[0], 'LatMnt': la[1], 'LatSec': la[2], 'LatDirection': lat >= 0 ? 'N' : 'S',
+      'timezone': '${d['timm_diff'] ?? '330'}',
+      'dob': DateFormat('yyyy-MM-dd').format(at),
+      'birthhour': '${at.hour}', 'birthmin': '${at.minute}', 'birthsec': '${at.second}',
+    });
+    return ClientPanchang(r, at, lat, lng, (d['birth_place'] ?? '').toString());
+  }
+}
+
+/// Last Melapak result per client, kept on the device for the workspace card.
+class LastMatch {
+  static String _k(String mId) => 'melapak_last_$mId';
+  static void save(String mId, Map<String, dynamic> r) {
+    if (mId.isEmpty) return;
+    try {
+      Session.prefs.setString(_k(mId), jsonEncode(r));
+    } catch (_) {}
+  }
+
+  static Map<String, dynamic>? of(String mId) {
+    final raw = Session.prefs.getString(_k(mId));
+    if (raw == null) return null;
+    try {
+      return Map<String, dynamic>.from(jsonDecode(raw) as Map);
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+
 List<String> _dms(double v) {
   final a = v.abs();
   final d = a.floor();
@@ -65,50 +149,14 @@ class _PanchangPageState extends State<PanchangPage> {
   String _place = '';
   double _lat = 0, _lng = 0;
 
-  static DateTime? _birthOf(Map<String, dynamic> d) {
-    final dob = (d['dob'] ?? '').toString().trim();
-    DateTime? day;
-    for (final f in ['yyyy-MM-dd', 'dd-MM-yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd HH:mm:ss', 'dd-MM-yyyy HH:mm:ss']) {
-      try {
-        day = DateFormat(f).parseStrict(dob);
-        break;
-      } catch (_) {}
-    }
-    if (day == null) return null;
-    int n(String k) => int.tryParse('${d[k] ?? ''}'.trim()) ?? 0;
-    return DateTime(day.year, day.month, day.day, n('btime_hrs'), n('btime_min'), n('btime_sec'));
-  }
-
-  Future<Map<String, dynamic>> _load() async {
-    final d = await _data.details();
-    // Panchang of the client's birth moment, at the birth place.
-    final at = _birthOf(d) ?? _clientBirth() ?? DateTime.now();
-    _at = at;
-    final lat = double.tryParse('${d['latitude']}') ?? 0;
-    final lng = double.tryParse('${d['longitude']}') ?? 0;
-    _lat = lat;
-    _lng = lng;
-    _place = (d['birth_place'] ?? '').toString();
-    final la = _dms(lat), lo = _dms(lng);
-    final r = await Api.post(Endpoints.panchang, {
-      'LongDeg': lo[0], 'LongMnt': lo[1], 'LongSec': lo[2], 'LongDirection': lng >= 0 ? 'E' : 'W',
-      'LatDeg': la[0], 'LatMnt': la[1], 'LatSec': la[2], 'LatDirection': lat >= 0 ? 'N' : 'S',
-      'timezone': '${d['timm_diff'] ?? '330'}',
-      'dob': DateFormat('yyyy-MM-dd').format(at),
-      'birthhour': '${at.hour}', 'birthmin': '${at.minute}', 'birthsec': '${at.second}',
-    });
+  Future<Map<String, dynamic>> _load({bool refresh = false}) async {
+    final p = await ClientPanchang.of(Session.client.value?.mId ?? '', refresh: refresh);
+    _at = p.at;
+    _lat = p.lat;
+    _lng = p.lng;
+    _place = p.place;
     if (mounted) setState(() {});
-    return r;
-  }
-
-  DateTime? _clientBirth() {
-    final c = Session.client.value;
-    if (c == null) return null;
-    try {
-      return DateFormat('dd-MM-yyyy HH:mm:ss').parseStrict(c.dobRaw);
-    } catch (_) {
-      return null;
-    }
+    return p.raw;
   }
 
   @override
@@ -155,7 +203,7 @@ class _PanchangPageState extends State<PanchangPage> {
         const SizedBox(height: 12),
         LoadView<Map<String, dynamic>>(
           future: _f,
-          onRetry: () => setState(() => _f = _load()),
+          onRetry: () => setState(() => _f = _load(refresh: true)),
           builder: (r) {
             final d = PanchangData.parse(r, at: _at, lat: _lat, lng: _lng);
             if (d.rows.isEmpty) return EmptyBox(icon: Icons.light_mode_outlined, title: 'No Panchang', body: Api.msg(r, 'Nothing returned for this moment.'));
@@ -391,6 +439,7 @@ class MelapakResultPage extends StatelessWidget {
                 return ErrorBox(message: Api.msg(r, 'Couldn\'t calculate this match.'));
               }
               final total = _n(r['Total_Gun_Match']);
+              LastMatch.save(Session.client.value?.mId ?? '', r);
               final verdict = total >= 28 ? 'Excellent match' : total >= 18 ? 'Good match' : 'Below the usual 18';
               final vc = total >= 18 ? const Color(0xFF10B981) : const Color(0xFFEF4444);
               final doshas = <(String, String)>[
