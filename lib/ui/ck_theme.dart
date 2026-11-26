@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -138,7 +139,7 @@ class CkTheme {
       ),
       iconTheme: const IconThemeData(color: CkColors.text),
       dividerTheme: const DividerThemeData(color: CkColors.glassStroke),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: CkColors.glassFill,
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -146,7 +147,7 @@ class CkTheme {
           side: const BorderSide(color: CkColors.glassStroke),
         ),
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: CkColors.navySheet.withOpacity(0.96),
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
@@ -201,7 +202,7 @@ class CkTheme {
         headingRowColor: const WidgetStatePropertyAll(CkColors.glassFillStrong),
         dividerThickness: 0.6,
       ),
-      tabBarTheme: const TabBarTheme(
+      tabBarTheme: const TabBarThemeData(
         labelColor: CkColors.text,
         unselectedLabelColor: CkColors.textMuted,
         dividerHeight: 0,
