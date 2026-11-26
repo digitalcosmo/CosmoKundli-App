@@ -272,8 +272,7 @@ class _SituationsPageState extends State<SituationsPage> {
     final z = zoneOf(v);
     return Expanded(
       child: Glass(
-        radius: 14,
-        shadow: false,
+        radius: 18,
         padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(label.toUpperCase(), style: CkText.label.copyWith(fontSize: 9.5)),
@@ -281,7 +280,7 @@ class _SituationsPageState extends State<SituationsPage> {
           Row(children: [
             ZoneArrows(z, size: 13),
             const SizedBox(width: 4),
-            Text('${v.round()}%', style: CkText.mono(16, color: z.color)),
+            CountUpText('${v.round()}%', style: CkText.mono(16, color: z.color)),
           ]),
           Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, color: CkColors.textSecondary)),
         ]),

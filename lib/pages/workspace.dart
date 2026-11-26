@@ -1331,7 +1331,7 @@ class _DailyW extends StatelessWidget {
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(k.toUpperCase(), style: CkText.label.copyWith(fontSize: 8.5)),
                     const SizedBox(height: 2),
-                    Text(_fmt(v, signed), style: CkText.mono(14, color: signed && k == 'Average' ? Colors.white : col(v))),
+                    CountUpText(_fmt(v, signed), style: CkText.mono(14, color: signed && k == 'Average' ? Colors.white : col(v))),
                   ]),
                 ),
               );
