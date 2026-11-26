@@ -12,31 +12,25 @@ const String kCkBackground = 'assets/images/ck_bg.jpg';
 /// Deep-space backdrop shared by every page (same art as the software).
 class CkBackground extends StatelessWidget {
   final Widget child;
-  const CkBackground({super.key, required this.child});
+  const CkBackground({super.key, required this.child}) : paint = true;
 
-  /// True inside a screen that already draws the background.
-  static bool inScope(BuildContext context) => context.getInheritedWidgetOfExactType<_BgScope>() != null;
+  /// [paint] false: a container screen whose pages each draw their own
+  /// background (the client shell) draws none itself.
+  final bool paint;
+  const CkBackground.none({super.key, required this.child}) : paint = false;
 
   @override
   Widget build(BuildContext context) {
-    // Pages inside a shell (client tabs, module pages) reuse the shell's
-    // background and blur group: one animated background per screen.
-    if (inScope(context)) return child;
+    if (!paint) return BackdropGroup(child: child);
     return ColoredBox(
       color: CkColors.deepSpace,
       child: Stack(fit: StackFit.expand, children: [
         const CosmicBackground(),
         // Every glass card on this screen shares one blur pass.
-        BackdropGroup(child: _BgScope(child: child)),
+        BackdropGroup(child: child),
       ]),
     );
   }
-}
-
-class _BgScope extends InheritedWidget {
-  const _BgScope({required super.child});
-  @override
-  bool updateShouldNotify(_BgScope old) => false;
 }
 
 /// Drop-in replacement for [Scaffold]: paints the cosmic backdrop under a
@@ -67,7 +61,11 @@ class CkScaffold extends StatelessWidget {
     this.extendBodyBehindAppBar = false,
     this.drawer,
     this.bottomSheet,
+    this.background = true,
   });
+
+  /// false for a shell whose pages draw their own background.
+  final bool background;
 
   @override
   Widget build(BuildContext context) {
@@ -76,7 +74,7 @@ class CkScaffold extends StatelessWidget {
         statusBarColor: Colors.transparent,
         systemNavigationBarColor: CkColors.deepSpace,
       ),
-      child: CkBackground(
+      child: (background ? CkBackground.new : CkBackground.none)(
         child: Scaffold(
           backgroundColor: Colors.transparent,
           appBar: appBar,
@@ -465,16 +463,10 @@ class CkRoute<T> extends PageRouteBuilder<T> {
           pageBuilder: (c, a, b) => builder(c),
           transitionsBuilder: (c, a, b, child) {
             final t = CurvedAnimation(parent: a, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
-            Widget page = FadeTransition(
+            return FadeTransition(
               opacity: t,
               child: ScaleTransition(scale: Tween(begin: .97, end: 1.0).animate(t), child: child),
             );
-            // Pages sharing one background are see-through, so the page being
-            // covered fades out as the new one fades in (same look as before).
-            if (CkBackground.inScope(c)) {
-              page = FadeTransition(opacity: ReverseAnimation(CurvedAnimation(parent: b, curve: Curves.easeOutCubic)), child: page);
-            }
-            return page;
           },
         );
 }

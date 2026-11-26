@@ -85,7 +85,9 @@ class _ClientShellState extends State<ClientShell> {
           Get.back();
         }
       },
+      // each tab page draws its own background; the shell draws none
       child: CkScaffold(
+        background: false,
         body: Stack(children: [
           TabFader(
             index: _index,
