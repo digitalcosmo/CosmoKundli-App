@@ -104,7 +104,7 @@ class _AppShellState extends State<AppShell> {
       child: Material(
         type: MaterialType.transparency,
         child: Stack(children: [
-        IndexedStack(index: _index, children: [for (var i = 0; i < 4; i++) RepaintBoundary(child: _page(i))]),
+        TabFader(index: _index, children: [for (var i = 0; i < 4; i++) RepaintBoundary(child: _page(i))]),
         Positioned(
           left: 12,
           right: 12,
@@ -114,7 +114,7 @@ class _AppShellState extends State<AppShell> {
               radius: 20,
               blur: 22,
               liquid: true,
-              tint: const Color(0x40081840),
+              tint: const Color(0xD9101E48),
               height: 66,
               padding: const EdgeInsets.all(5),
               child: LayoutBuilder(builder: (c, box) {
@@ -164,12 +164,16 @@ class _AppShellState extends State<AppShell> {
                             scale: .92,
                             onTap: () => _go(i),
                             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                              AnimatedScale(
+                              AnimatedSlide(
+                                offset: i == _index ? const Offset(0, -.08) : Offset.zero,
+                                duration: const Duration(milliseconds: 350),
+                                curve: kEase,
+                                child: AnimatedScale(
                                 scale: i == _index ? 1.08 : 1,
-                                duration: CkMotion.base,
+                                duration: const Duration(milliseconds: 350),
                                 curve: kEase,
                                 child: Icon(_items[i].$1, size: 22, color: i == _index ? CkColors.cyan : CkColors.textSecondary),
-                              ),
+                              )),
                               const SizedBox(height: 3),
                               FittedBox(
                                 fit: BoxFit.scaleDown,
@@ -275,7 +279,7 @@ class _HomePageState extends State<HomePage> {
           onRefresh: _refresh,
           child: ListView(
             physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 170),
+            padding: const EdgeInsets.fromLTRB(20, 16, 18, 170),
             children: [
               Text(DateFormat('EEE · d MMM yyyy · HH:mm').format(_now).toUpperCase(), style: CkText.label),
               const SizedBox(height: 6),
@@ -448,7 +452,7 @@ class _NewClientButton extends StatelessWidget {
         },
         child: Container(
           height: 50,
-          padding: const EdgeInsets.symmetric(horizontal: 18),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
             gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFF07E22)]),
             borderRadius: BorderRadius.circular(15),

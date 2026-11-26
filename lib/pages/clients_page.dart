@@ -206,7 +206,7 @@ class _ClientsPageState extends State<ClientsPage> {
           },
           child: Container(
             height: 50,
-            padding: const EdgeInsets.symmetric(horizontal: 18),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             decoration: BoxDecoration(
               gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFF07E22)]),
               borderRadius: BorderRadius.circular(15),
@@ -242,7 +242,7 @@ class _ClientsPageState extends State<ClientsPage> {
                   physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                   slivers: [
                     SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+                      padding: const EdgeInsets.fromLTRB(20, 16, 18, 0),
                       sliver: SliverToBoxAdapter(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Row(children: [
@@ -320,16 +320,16 @@ class _ClientsPageState extends State<ClientsPage> {
                       ),
                     ),
                     if (s.connectionState != ConnectionState.done)
-                      SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 18), child: Skels.clientCards(8)))
+                      SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Skels.clientCards(8)))
                     else if (s.hasError)
                       SliverToBoxAdapter(
                           child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 18),
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
                               child: ErrorBox(message: 'Couldn\'t load your clients.', onRetry: _reload)))
                     else if (list.isEmpty)
                       SliverToBoxAdapter(
                           child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: EmptyBox(
                             icon: Icons.people_outline_rounded,
                             title: _q.isEmpty ? 'No clients yet' : 'No match',
@@ -337,7 +337,7 @@ class _ClientsPageState extends State<ClientsPage> {
                       ))
                     else
                       SliverPadding(
-                        padding: EdgeInsets.fromLTRB(18, 0, 18, widget.embedded ? 190 : 120),
+                        padding: EdgeInsets.fromLTRB(20, 0, 20, widget.embedded ? 190 : 120),
                         sliver: SliverList.builder(
                           itemCount: list.length,
                           itemBuilder: (c, i) {

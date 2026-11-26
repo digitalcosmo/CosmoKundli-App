@@ -12,9 +12,12 @@ class CosmicBackground extends StatefulWidget {
   State<CosmicBackground> createState() => _CosmicBackgroundState();
 }
 
-class _CosmicBackgroundState extends State<CosmicBackground> with SingleTickerProviderStateMixin {
+class _CosmicBackgroundState extends State<CosmicBackground> with TickerProviderStateMixin {
   late final AnimationController _c =
       AnimationController(vsync: this, duration: const Duration(seconds: 120))..repeat();
+  // Slow breathing auras behind the glass (MyAcharyaji: 18 s, reversing).
+  late final AnimationController _aura =
+      AnimationController(vsync: this, duration: const Duration(seconds: 18))..repeat(reverse: true);
   static final List<_Star> _stars = _makeStars();
 
   static List<_Star> _makeStars() {
@@ -28,6 +31,7 @@ class _CosmicBackgroundState extends State<CosmicBackground> with SingleTickerPr
   @override
   void dispose() {
     _c.dispose();
+    _aura.dispose();
     super.dispose();
   }
 
@@ -35,13 +39,17 @@ class _CosmicBackgroundState extends State<CosmicBackground> with SingleTickerPr
   Widget build(BuildContext context) {
     final still = MediaQuery.of(context).disableAnimations;
     if (still && _c.isAnimating) _c.stop();
-    return RepaintBoundary(
-      child: CustomPaint(
-        painter: _SpacePainter(_c, _stars),
-        size: Size.infinite,
-        isComplex: true,
+    if (still && _aura.isAnimating) _aura.stop();
+    return Stack(fit: StackFit.expand, children: [
+      RepaintBoundary(
+        child: CustomPaint(
+          painter: _SpacePainter(_c, _stars),
+          size: Size.infinite,
+          isComplex: true,
+        ),
       ),
-    );
+      RepaintBoundary(child: CustomPaint(painter: _AuraPainter(_aura), size: Size.infinite)),
+    ]);
   }
 }
 
@@ -134,4 +142,32 @@ class _SpacePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_SpacePainter old) => false;
+}
+
+
+/// Three large soft colour glows that drift and breathe; they are what the
+/// see-through cards show behind them.
+class _AuraPainter extends CustomPainter {
+  final Animation<double> t;
+  _AuraPainter(this.t) : super(repaint: t);
+
+  void _blob(Canvas c, Offset o, double r, Color col, double a) {
+    c.drawCircle(
+        o,
+        r,
+        Paint()
+          ..shader = RadialGradient(colors: [col.withValues(alpha: a), col.withValues(alpha: 0)])
+              .createShader(Rect.fromCircle(center: o, radius: r)));
+  }
+
+  @override
+  void paint(Canvas canvas, Size s) {
+    final v = Curves.easeInOut.transform(t.value);
+    _blob(canvas, Offset(80 + 40 * v, 110 + 60 * v), 190, const Color(0xFF2E6BFF), .42);
+    _blob(canvas, Offset(s.width + 20 - 30 * v, s.height * .62 + 50 * v), 170, const Color(0xFF14A6B8), .34);
+    _blob(canvas, Offset(s.width * .45 + 30 * v, s.height * .38 - 30 * v), 120, const Color(0xFF5CE1FF), .14);
+  }
+
+  @override
+  bool shouldRepaint(covariant _AuraPainter old) => false;
 }

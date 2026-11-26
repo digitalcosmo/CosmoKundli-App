@@ -21,9 +21,9 @@ class CkColors {
   static const Color cyanTint = Color(0x295CE1FF);
   static const Color cyanStroke = Color(0x735CE1FF);
   static const Color retro = Color(0xFFF5D90A);
-  static const Color panelTop = Color(0x9E2856AA);
-  static const Color panelBottom = Color(0xB3123070);
-  static const Color panelStroke = Color(0x388CBEFF);
+  static const Color panelTop = Color(0x12FFFFFF); // see-through glass (MyAcharyaji ~6%)
+  static const Color panelBottom = Color(0x0BFFFFFF);
+  static const Color panelStroke = Color(0x1FFFFFFF);
   static const Color field = Color(0x8C0A1E50);
   static const Color labelMono = Color(0xFF93A8CF);
 
@@ -67,7 +67,7 @@ class CkColors {
 }
 
 class CkRadius {
-  static const double card = 18;
+  static const double card = 22;
   static const double control = 22;
   static const double pill = 32;
   static const double input = 14;

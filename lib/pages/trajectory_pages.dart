@@ -379,7 +379,7 @@ class _PickClientState extends State<_PickClient> {
           child: SizedBox(
             height: MediaQuery.of(context).size.height * .7,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+              padding: const EdgeInsets.fromLTRB(20, 16, 18, 0),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Compare with a client', style: CkText.h(18)),
                 const SizedBox(height: 12),
@@ -469,7 +469,7 @@ class CoordTable extends StatelessWidget {
     const divider = BoxDecoration(border: Border(top: BorderSide(color: Color(0x1F8CBEFF))));
     return Glass(
       margin: const EdgeInsets.only(top: 12),
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 4),
+      padding: const EdgeInsets.fromLTRB(20, 14, 18, 4),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('GRAH Coordinates', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
         const SizedBox(height: 12),

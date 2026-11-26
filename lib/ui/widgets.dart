@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -211,32 +212,56 @@ class Segmented<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Glass(
         height: height,
-        radius: 12,
-        shadow: false,
+        radius: 16,
         padding: const EdgeInsets.all(4),
-        child: Row(
-          children: values.map((v) {
-            final sel = v == selected;
-            return Expanded(
-              child: Pressable(
-                onTap: () => onChanged(v),
-                child: AnimatedContainer(
-                  duration: CkMotion.base,
-                  curve: CkMotion.ease,
-                  alignment: Alignment.center,
+        child: LayoutBuilder(builder: (c, box) {
+          final w = box.maxWidth / values.length;
+          final i = values.indexOf(selected);
+          return Stack(children: [
+            // the thumb slides to the selected item (MyAcharyaji: 450 ms)
+            AnimatedPositioned(
+              duration: CkMotion.slow,
+              curve: kEase,
+              left: w * (i < 0 ? 0 : i),
+              top: 0,
+              bottom: 0,
+              width: w,
+              child: AnimatedOpacity(
+                duration: CkMotion.fast,
+                opacity: i < 0 ? 0 : 1,
+                child: Container(
                   decoration: BoxDecoration(
-                    color: sel ? CkColors.cyanTint : null,
-                    border: sel ? Border.all(color: CkColors.cyanStroke) : null,
-                    borderRadius: BorderRadius.circular(10),
+                    color: CkColors.cyanTint,
+                    border: Border.all(color: CkColors.cyanStroke),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [BoxShadow(color: CkColors.cyan.withValues(alpha: .25), blurRadius: 16)],
                   ),
-                  child: Text(label(v),
-                      style: TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600, color: sel ? Colors.white : CkColors.textSecondary)),
                 ),
               ),
-            );
-          }).toList(),
-        ),
+            ),
+            Row(
+              children: [
+                for (final v in values)
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        if (v != selected) HapticFeedback.selectionClick();
+                        onChanged(v);
+                      },
+                      child: Center(
+                        child: AnimatedDefaultTextStyle(
+                          duration: CkMotion.base,
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: v == selected ? Colors.white : CkColors.textSecondary),
+                          child: Text(label(v)),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ]);
+        }),
       );
 }
 
@@ -288,14 +313,24 @@ class LoadView<T> extends StatelessWidget {
   Widget build(BuildContext context) => FutureBuilder<T>(
         future: future,
         builder: (c, s) {
+          final Widget child;
           if (s.connectionState != ConnectionState.done) {
-            return skeleton ?? (minHeight >= 300 ? SkeletonCard(height: minHeight) : const SkeletonList(rows: 5));
+            child = KeyedSubtree(key: const ValueKey('skel'), child: skeleton ?? (minHeight >= 300 ? SkeletonCard(height: minHeight) : const SkeletonList(rows: 5)));
+          } else if (s.hasError || !s.hasData) {
+            child = KeyedSubtree(
+              key: const ValueKey('err'),
+              child: ErrorBox(message: 'Couldn\'t load this. Check your connection and try again.', onRetry: onRetry),
+            );
+          } else {
+            child = KeyedSubtree(key: const ValueKey('ok'), child: builder(s.data as T));
           }
-          if (s.hasError || !s.hasData) {
-            return ErrorBox(
-                message: 'Couldn\'t load this. Check your connection and try again.', onRetry: onRetry);
-          }
-          return builder(s.data as T);
+          // loading -> data -> error swap with a soft cross-fade
+          return AnimatedSwitcher(
+            duration: const Duration(milliseconds: 350),
+            switchInCurve: Curves.easeOut,
+            layoutBuilder: (cur, prev) => Stack(alignment: Alignment.topCenter, children: [...prev, if (cur != null) cur]),
+            child: child,
+          );
         },
       );
 }
@@ -770,7 +805,245 @@ class ZoneArrows extends StatelessWidget {
   final double size;
   const ZoneArrows(this.zone, {super.key, this.size = 14});
   @override
-  Widget build(BuildContext context) => CustomPaint(size: Size.square(size), painter: _ArrowPainter(zone));
+  Widget build(BuildContext context) {
+    final p = CustomPaint(size: Size.square(size), painter: _ArrowPainter(zone));
+    // soft glow: a blurred copy behind the sharp arrows (MyAcharyaji ZoneIcon)
+    return SizedBox.square(
+      dimension: size,
+      child: Stack(clipBehavior: Clip.none, children: [
+        Opacity(
+          opacity: .75,
+          child: ImageFiltered(imageFilter: ImageFilter.blur(sigmaX: size * .14, sigmaY: size * .14), child: p),
+        ),
+        p,
+      ]),
+    );
+  }
+}
+
+/// A number that counts up (or down) to [value], fast then settling.
+class CountUp extends StatelessWidget {
+  final double value;
+  final TextStyle? style;
+  final String Function(double) format;
+  final Duration duration;
+  const CountUp(this.value, {super.key, this.style, required this.format, this.duration = const Duration(milliseconds: 1100)});
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: value),
+        duration: duration,
+        curve: kEase,
+        builder: (_, v, __) => Text(format(v), style: style),
+      );
+}
+
+/// Starts at 0 and grows to [value] after [delay] (bars rise as a wave).
+class GrowIn extends StatefulWidget {
+  final double value;
+  final Duration delay;
+  final Widget Function(double v) builder;
+  const GrowIn({super.key, required this.value, this.delay = Duration.zero, required this.builder});
+  @override
+  State<GrowIn> createState() => _GrowInState();
+}
+
+class _GrowInState extends State<GrowIn> {
+  bool _go = false;
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(widget.delay, () {
+      if (mounted) setState(() => _go = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: _go ? widget.value : 0),
+        duration: const Duration(milliseconds: 1000),
+        curve: kEase,
+        builder: (_, v, __) => widget.builder(v),
+      );
+}
+
+/// Scale + fade pop used by calendar cells.
+class PopIn extends StatefulWidget {
+  final Widget child;
+  final Duration delay;
+  const PopIn({super.key, required this.child, this.delay = Duration.zero});
+  @override
+  State<PopIn> createState() => _PopInState();
+}
+
+class _PopInState extends State<PopIn> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
+  late final Animation<double> _t = CurvedAnimation(parent: _c, curve: kEase);
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(widget.delay, () {
+      if (mounted) _c.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      FadeTransition(opacity: _t, child: ScaleTransition(scale: Tween(begin: .6, end: 1.0).animate(_t), child: widget.child));
+}
+
+/// Card that follows a sideways swipe with resistance and calls [onSwipe]
+/// (-1 previous, 1 next); directions not allowed rubber-band back.
+class SwipeArea extends StatefulWidget {
+  final Widget child;
+  final ValueChanged<int> onSwipe;
+  final bool Function(int dir) canSwipe;
+  const SwipeArea({super.key, required this.child, required this.onSwipe, required this.canSwipe});
+  @override
+  State<SwipeArea> createState() => _SwipeAreaState();
+}
+
+class _SwipeAreaState extends State<SwipeArea> with SingleTickerProviderStateMixin {
+  double _dx = 0, _from = 0;
+  late final AnimationController _back = AnimationController(vsync: this, duration: const Duration(milliseconds: 320))
+    ..addListener(() => setState(() => _dx = _from * (1 - kEase.transform(_back.value))));
+  @override
+  void dispose() {
+    _back.dispose();
+    super.dispose();
+  }
+
+  void _release(double v) {
+    final dir = (_dx < -70 || v < -500) ? 1 : (_dx > 70 || v > 500) ? -1 : 0;
+    if (dir != 0 && widget.canSwipe(dir)) {
+      HapticFeedback.selectionClick();
+      widget.onSwipe(dir);
+    }
+    _from = _dx;
+    _back.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragStart: (_) => _back.stop(),
+        onHorizontalDragUpdate: (d) {
+          final dir = d.delta.dx < 0 ? 1 : -1;
+          final k = widget.canSwipe(dir) ? .55 : .15;
+          setState(() => _dx = (_dx + d.delta.dx * k).clamp(-120.0, 120.0));
+        },
+        onHorizontalDragEnd: (d) => _release(d.primaryVelocity ?? 0),
+        onHorizontalDragCancel: () => _release(0),
+        child: Transform.translate(
+          offset: Offset(_dx, 0),
+          child: Opacity(opacity: (1 - _dx.abs() / 400).clamp(.6, 1.0), child: widget.child),
+        ),
+      );
+}
+
+/// Horizontal scroller with soft edge fades and a thin muted bar whose end
+/// arrows light up when there is more that way (tap an arrow to step).
+class HScroll extends StatefulWidget {
+  final Widget Function(ScrollController c) builder;
+  final ScrollController? controller;
+  final double step;
+  const HScroll({super.key, required this.builder, this.controller, this.step = 160});
+  @override
+  State<HScroll> createState() => _HScrollState();
+}
+
+class _HScrollState extends State<HScroll> {
+  late final ScrollController _c = widget.controller ?? ScrollController();
+  @override
+  void initState() {
+    super.initState();
+    _c.addListener(_tick);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tick());
+  }
+
+  void _tick() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _c.removeListener(_tick);
+    if (widget.controller == null) _c.dispose();
+    super.dispose();
+  }
+
+  void _step(int dir) {
+    if (!_c.hasClients) return;
+    final p = _c.position;
+    _c.animateTo((p.pixels + dir * widget.step).clamp(p.minScrollExtent, p.maxScrollExtent), duration: CkMotion.slow, curve: kEase);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final has = _c.hasClients && _c.position.hasContentDimensions;
+    final max = has ? _c.position.maxScrollExtent : 0.0;
+    final px = has ? _c.position.pixels.clamp(0.0, max) : 0.0;
+    final vp = has ? _c.position.viewportDimension : 1.0;
+    final canL = px > 1, canR = px < max - 1;
+    final frac = max <= 0 ? 1.0 : (vp / (vp + max)).clamp(.15, 1.0);
+    final pos = max <= 0 ? 0.0 : px / max;
+    Widget arrow(String ch, bool on, int dir) => GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: on ? () => _step(dir) : null,
+          child: SizedBox(
+            width: 22,
+            height: 18,
+            child: Center(
+              child: AnimatedDefaultTextStyle(
+                duration: CkMotion.base,
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: on ? CkColors.cyan : const Color(0x40FFFFFF)),
+                child: Text(ch),
+              ),
+            ),
+          ),
+        );
+    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      ShaderMask(
+        blendMode: BlendMode.dstIn,
+        shaderCallback: (r) => LinearGradient(
+          colors: [canL ? Colors.transparent : Colors.white, Colors.white, Colors.white, canR ? Colors.transparent : Colors.white],
+          stops: const [0, .06, .94, 1],
+        ).createShader(r),
+        child: widget.builder(_c),
+      ),
+      if (max > 0)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Row(children: [
+            arrow('‹', canL, -1),
+            Expanded(
+              child: LayoutBuilder(builder: (c, b) {
+                final tw = b.maxWidth * frac;
+                return SizedBox(
+                  height: 2,
+                  child: Stack(children: [
+                    Container(decoration: BoxDecoration(color: const Color(0x14FFFFFF), borderRadius: BorderRadius.circular(1))),
+                    Positioned(
+                      left: (b.maxWidth - tw) * pos,
+                      width: tw,
+                      top: 0,
+                      bottom: 0,
+                      child: Container(decoration: BoxDecoration(color: const Color(0x59FFFFFF), borderRadius: BorderRadius.circular(1))),
+                    ),
+                  ]),
+                );
+              }),
+            ),
+            arrow('›', canR, 1),
+          ]),
+        ),
+    ]);
+  }
 }
 
 class _ArrowPainter extends CustomPainter {
@@ -866,7 +1139,10 @@ class DailyBarChartState extends State<DailyBarChart> {
 
   List<double> get ticks => widget.signed ? [100, 50, 0, -50, -100] : [100, 85, 65, 55, 45, 35, 15, 0];
   double get height => widget.height;
-  double _y(double t) => widget.signed ? (100 - t) / 200 * height : 30 + (100 - t) / 100 * (height - 30);
+  // Room above and below the plot so the end labels never clip.
+  static const double _pt = 34, _pb = 22;
+  double get _ph => height - _pt - _pb;
+  double _y(double t) => widget.signed ? _pt + (100 - t) / 200 * _ph : _pt + (100 - t) / 100 * _ph;
   String _lab(double t) => widget.signed ? '${t > 0 ? '+' : ''}${t.round()}%' : '${t.round()}%';
 
   @override
@@ -916,15 +1192,19 @@ class DailyBarChartState extends State<DailyBarChart> {
                 right: 0,
                 child: Container(height: 1, color: Colors.white.withValues(alpha: widget.signed && t == 0 ? .32 : .1)),
               ),
-            SizedBox(
-              height: height + 40,
-              child: ListView.builder(
-                controller: _sc,
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: widget.days.length,
-                itemExtent: _colW,
-                itemBuilder: (c, i) => _bar(i, _colW),
+            HScroll(
+              controller: _sc,
+              step: _colW * 5,
+              builder: (sc) => SizedBox(
+                height: height + 40,
+                child: ListView.builder(
+                  controller: sc,
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: widget.days.length,
+                  itemExtent: _colW,
+                  itemBuilder: (c, i) => _bar(i, _colW),
+                ),
               ),
             ),
           ]),
@@ -940,8 +1220,9 @@ class DailyBarChartState extends State<DailyBarChart> {
     final sel = widget.selected == i;
     final today = widget.today == i;
     final up = v >= 0;
-    final h = signed ? v.abs() / 100 * height / 2 : v / 100 * (height - 30);
-    final color = signed ? null : zoneOf(v).color;
+    final mid = _pt + _ph / 2, base = _pt + _ph;
+    final full = signed ? v.abs() / 100 * _ph / 2 : v / 100 * _ph;
+    final zc = signed ? null : zoneOf(v).color;
     // Software: .sps-bar--pos linear-gradient(0deg,#73F4C4,#10B981); .sps-bar--neg linear-gradient(0deg,#EF4444,#F6B8B8)
     final grad = signed
         ? LinearGradient(
@@ -949,9 +1230,9 @@ class DailyBarChartState extends State<DailyBarChart> {
             end: Alignment.topCenter,
             colors: up ? const [Color(0xFF73F4C4), Color(0xFF10B981)] : const [Color(0xFFEF4444), Color(0xFFF6B8B8)],
           )
-        : null;
-    final glow = up ? const Color(0xFF10B981) : const Color(0xFFEF4444);
-    final label = signed ? '${v > 0 ? '+' : ''}${v.round()}%' : '${v.round()}%';
+        : LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [zc!, zc.withValues(alpha: .35)]);
+    final glow = signed ? (up ? const Color(0xFF10B981) : const Color(0xFFEF4444)) : zc!;
+    String label(double x) => signed ? '${x > 0.5 ? '+' : ''}${x.round()}%' : '${x.round()}%';
     final bw = math.max(10.0, w * .46);
     return GestureDetector(
       onTap: widget.onSelect == null ? null : () => widget.onSelect!(i),
@@ -964,37 +1245,42 @@ class DailyBarChartState extends State<DailyBarChart> {
             border: today ? Border.all(color: CkColors.cyanStroke) : null,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
-            Positioned(
-              bottom: signed ? (up ? height / 2 : null) : 0,
-              top: signed && !up ? height / 2 : null,
-              child: AnimatedContainer(
-                duration: CkMotion.slow,
-                curve: CkMotion.ease,
-                width: bw,
-                height: math.max(h, 3),
-                decoration: BoxDecoration(
-                  color: color,
-                  gradient: grad,
-                  boxShadow: today || sel ? [BoxShadow(color: glow.withValues(alpha: .6), blurRadius: 12)] : null,
-                  borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(signed && !up ? 2 : 6),
-                    bottom: Radius.circular(signed && !up ? 6 : 2),
+          // bars rise from the baseline as a wave, numbers count up beside them
+          child: GrowIn(
+            value: 1,
+            delay: Duration(milliseconds: 40 * (i % 12)),
+            builder: (k) {
+              final h = full * k;
+              return Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
+                Positioned(
+                  top: signed ? (up ? mid - h : mid) : base - h,
+                  height: math.max(h, 3),
+                  child: Container(
+                    width: bw,
+                    decoration: BoxDecoration(
+                      gradient: grad,
+                      border: sel ? Border.all(color: Colors.white, width: 1.5) : null,
+                      boxShadow: [BoxShadow(color: glow.withValues(alpha: today || sel ? .6 : .3), blurRadius: today || sel ? 14 : 8)],
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(signed && !up ? 2 : 6),
+                        bottom: Radius.circular(signed && !up ? 6 : 2),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            Positioned(
-              bottom: signed ? (up ? height / 2 + h + 3 : null) : h + 3,
-              top: signed && !up ? height / 2 + h + 3 : null,
-              child: signed
-                  ? Text(label, style: CkText.mono(10, color: Colors.white))
-                  : Column(mainAxisSize: MainAxisSize.min, children: [
-                      ZoneArrows(zoneOf(v), size: 13),
-                      Text(label, style: CkText.mono(10, color: Colors.white)),
-                    ]),
-            ),
-          ]),
+                Positioned(
+                  top: signed && !up ? mid + h + 3 : null,
+                  bottom: signed ? (up ? height - mid + h + 3 : null) : height - base + h + 3,
+                  child: signed
+                      ? Text(label(v * k), style: CkText.mono(10, color: Colors.white))
+                      : Column(mainAxisSize: MainAxisSize.min, children: [
+                          ZoneArrows(zoneOf(v), size: 13),
+                          Text(label(v * k), style: CkText.mono(10, color: Colors.white)),
+                        ]),
+                ),
+              ]);
+            },
+          ),
         ),
         const SizedBox(height: 6),
         Text('${d.date.day}', style: CkText.mono(11.5, color: today ? CkColors.cyan : CkColors.textTertiary)),
@@ -1014,7 +1300,7 @@ class GrahBarChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final axisW = axis ? 34.0 : 0.0;
-    final top = 18.0;
+    final top = 26.0;
     final h = height - top;
     return Column(children: [
       SizedBox(
@@ -1043,20 +1329,20 @@ class GrahBarChart extends StatelessWidget {
                 ),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
-                children: values.map((e) {
+                children: values.asMap().entries.map((en) {
+                  final e = en.value;
                   final c = grahColor(e.key);
                   final v = e.value.clamp(0.0, 100.0);
                   return Expanded(
-                    child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+                    child: GrowIn(
+                      value: v,
+                      delay: Duration(milliseconds: 60 * en.key),
+                      builder: (t) => Column(mainAxisAlignment: MainAxisAlignment.end, children: [
                       FittedBox(
                           fit: BoxFit.scaleDown,
-                          child: Text('${v.round()}%', style: TextStyle(fontSize: axis ? 11 : 9.5, fontWeight: FontWeight.w600))),
+                          child: Text('${t.round()}%', style: TextStyle(fontSize: axis ? 11 : 9.5, fontWeight: FontWeight.w600))),
                       const SizedBox(height: 3),
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0, end: v),
-                        duration: CkMotion.slow,
-                        curve: CkMotion.ease,
-                        builder: (ctx, t, _) => Container(
+                      Container(
                           height: math.max(3, t / 100 * h),
                           margin: EdgeInsets.symmetric(horizontal: axis ? 6 : 3),
                           decoration: BoxDecoration(
@@ -1065,11 +1351,11 @@ class GrahBarChart extends StatelessWidget {
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
                                 colors: [c, c.withOpacity(.25)]),
-                            boxShadow: [BoxShadow(color: c.withOpacity(.25), blurRadius: 12)],
+                            boxShadow: [BoxShadow(color: c.withOpacity(.35), blurRadius: 10)],
                           ),
                         ),
-                      ),
                     ]),
+                    ),
                   );
                 }).toList(),
               ),

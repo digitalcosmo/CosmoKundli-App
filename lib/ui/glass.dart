@@ -100,13 +100,13 @@ class Glass extends StatelessWidget {
     this.child,
     this.padding,
     this.margin,
-    this.radius = 14,
+    this.radius = 22,
     this.blur = 0,
     this.tint = const Color(0x00000000),
     this.stroke = CkColors.panelStroke,
     this.width,
     this.height,
-    this.shadow = true,
+    this.shadow = false,
     this.alignment,
     this.frost = true,
     this.liquid = false,
@@ -229,18 +229,19 @@ class FadeSlideIn extends StatefulWidget {
 
 class _FadeSlideInState extends State<FadeSlideIn>
     with SingleTickerProviderStateMixin {
+  // MyAcharyaji: 550 ms, rise 16px, grow 98 -> 100%, 70 ms apart.
   late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 340));
+      vsync: this, duration: const Duration(milliseconds: 550));
   late final Animation<double> _t = CurvedAnimation(parent: _c, curve: kEase);
 
   @override
   void initState() {
     super.initState();
-    final i = widget.index.clamp(0, 6);
+    final i = widget.index.clamp(0, 12);
     if (i == 0) {
       _c.forward();
     } else {
-      Future.delayed(Duration(milliseconds: 35 * i), () {
+      Future.delayed(Duration(milliseconds: 70 * i), () {
         if (mounted) _c.forward();
       });
     }
@@ -254,14 +255,19 @@ class _FadeSlideInState extends State<FadeSlideIn>
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _t,
-      child: AnimatedBuilder(
-        animation: _t,
-        child: widget.child,
-        builder: (_, c) =>
-            Transform.translate(offset: Offset(0, (1 - _t.value) * 14), child: c),
-      ),
+    return AnimatedBuilder(
+      animation: _t,
+      child: widget.child,
+      builder: (_, c) {
+        final v = _t.value;
+        return Opacity(
+          opacity: v.clamp(0.0, 1.0),
+          child: Transform.translate(
+            offset: Offset(0, (1 - v) * 16),
+            child: Transform.scale(scale: .98 + .02 * v, child: c),
+          ),
+        );
+      },
     );
   }
 }
@@ -449,4 +455,37 @@ class CkRoute<T> extends PageRouteBuilder<T> {
             );
           },
         );
+}
+
+
+/// Keeps every tab alive and cross-fades the incoming one while it rises a
+/// little (MyAcharyaji tab switch: 400-450 ms). Hidden tabs pause their
+/// animations and ignore touches.
+class TabFader extends StatelessWidget {
+  final int index;
+  final List<Widget> children;
+  const TabFader({super.key, required this.index, required this.children});
+  @override
+  Widget build(BuildContext context) => Stack(children: [
+        for (var i = 0; i < children.length; i++)
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: i != index,
+              child: TickerMode(
+                enabled: i == index,
+                child: AnimatedOpacity(
+                  opacity: i == index ? 1 : 0,
+                  duration: const Duration(milliseconds: 400),
+                  curve: kEase,
+                  child: AnimatedSlide(
+                    offset: i == index ? Offset.zero : const Offset(0, .025),
+                    duration: const Duration(milliseconds: 450),
+                    curve: kEase,
+                    child: children[i],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ]);
 }

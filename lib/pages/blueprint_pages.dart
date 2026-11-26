@@ -321,7 +321,7 @@ class _GrahSheetState extends State<_GrahSheet> {
     final n = widget.list.length;
     GrahPos at(int k) => widget.list[(k + n) % n];
     return Container(
-      padding: EdgeInsets.fromLTRB(18, 10, 18, 22 + MediaQuery.of(context).padding.bottom),
+      padding: EdgeInsets.fromLTRB(20, 10, 18, 22 + MediaQuery.of(context).padding.bottom),
       decoration: const BoxDecoration(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
         gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xF82856AA), Color(0xFC0E2860)]),

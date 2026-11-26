@@ -535,7 +535,7 @@ class _WorkspacePageState extends State<WorkspacePage> {
                 child: IgnorePointer(
                   child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(22),
                       color: const Color(0x1A5CE1FF),
                       border: Border.all(color: CkColors.cyan, width: 2),
                     ),
@@ -568,7 +568,7 @@ class _WorkspacePageState extends State<WorkspacePage> {
                     child: Transform.scale(
                       scale: 1.03,
                       child: DecoratedBox(
-                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), boxShadow: const [
+                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), boxShadow: const [
                           BoxShadow(color: Color(0x73000000), blurRadius: 40, offset: Offset(0, 18)),
                         ]),
                         child: Opacity(opacity: .94, child: _tile(moving, mId, floating: true)),
@@ -768,7 +768,7 @@ class _WorkspacePageState extends State<WorkspacePage> {
           child: AnimatedContainer(
             duration: CkMotion.fast,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: CkColors.cyan, width: active ? 2.5 : 1.5),
               boxShadow: [BoxShadow(color: CkColors.cyan.withValues(alpha: active ? .55 : .35), blurRadius: active ? 16 : 10)],
             ),
@@ -865,7 +865,7 @@ class _BarBtn extends StatelessWidget {
           height: 50,
           decoration: BoxDecoration(
             color: filled ? CkColors.cyan : tinted ? CkColors.cyanTint : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(22),
             border: Border.all(color: filled ? CkColors.cyan : tinted ? CkColors.cyanStroke : const Color(0x8CFFFFFF), width: 1.5),
             boxShadow: filled ? [BoxShadow(color: CkColors.cyan.withValues(alpha: .35), blurRadius: 18)] : null,
           ),
@@ -1356,13 +1356,19 @@ class _DailyW extends StatelessWidget {
         final bw = few ? 18.0 : (l.length <= 5 ? 14.0 : 10.0);
         final h = box.maxHeight - lab;
         final maxAbs = signed ? l.map((e) => e.value.abs()).fold<double>(1, math.max) : 100.0;
-        final topPad = signed ? 14.0 : (few ? 30.0 : 26.0);
+        final topPad = signed ? 20.0 : (few ? 32.0 : 28.0);
         return Column(children: [
           SizedBox(
             height: h,
             child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              for (final e in l)
-                Expanded(child: _bar(e, today, h, maxAbs, topPad, bw, fs)),
+              for (var i = 0; i < l.length; i++)
+                Expanded(
+                  child: GrowIn(
+                    value: 1,
+                    delay: Duration(milliseconds: 50 * i),
+                    builder: (k) => _bar(l[i], today, h, maxAbs, topPad, bw, fs, k),
+                  ),
+                ),
             ]),
           ),
           SizedBox(
@@ -1382,13 +1388,14 @@ class _DailyW extends StatelessWidget {
         ]);
       });
 
-  Widget _bar(MapEntry<DateTime, double> e, DateTime today, double h, double maxAbs, double topPad, double bw, double fs) {
+  Widget _bar(MapEntry<DateTime, double> e, DateTime today, double h, double maxAbs, double topPad, double bw, double fs, double k) {
     final isToday = e.key == today;
-    final v = e.value;
+    final v = e.value * k;
     final Widget inner;
     if (signed) {
       final half = h / 2;
       final bh = (half - topPad) * (v.abs() / maxAbs);
+      final glowC = v >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444);
       final up = v >= 0;
       final grad = up
           ? const LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Color(0xFF73F4C4), Color(0xFF10B981)])
@@ -1400,7 +1407,7 @@ class _DailyW extends StatelessWidget {
           right: 0,
           top: up ? half - bh : half,
           height: bh,
-          child: Center(child: Container(width: bw, decoration: BoxDecoration(gradient: grad, borderRadius: BorderRadius.circular(3)))),
+          child: Center(child: Container(width: bw, decoration: BoxDecoration(gradient: grad, borderRadius: BorderRadius.circular(3), boxShadow: [BoxShadow(color: glowC.withValues(alpha: .35), blurRadius: 8)]))),
         ),
         Positioned(
           left: 0,
@@ -1410,7 +1417,7 @@ class _DailyW extends StatelessWidget {
         ),
       ]);
     } else {
-      final z = zoneOf(v);
+      final z = zoneOf(e.value);
       final bh = (h - topPad) * (v.clamp(0, 100) / 100);
       inner = Stack(children: [
         Positioned(
@@ -1421,7 +1428,11 @@ class _DailyW extends StatelessWidget {
           child: Center(
             child: Container(
               width: bw,
-              decoration: BoxDecoration(color: z.color, borderRadius: const BorderRadius.vertical(top: Radius.circular(3), bottom: Radius.circular(1))),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [z.color, z.color.withValues(alpha: .35)]),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(3), bottom: Radius.circular(1)),
+                boxShadow: [BoxShadow(color: z.color.withValues(alpha: .35), blurRadius: 8)],
+              ),
             ),
           ),
         ),

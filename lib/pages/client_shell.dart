@@ -87,7 +87,7 @@ class _ClientShellState extends State<ClientShell> {
       },
       child: CkScaffold(
         body: Stack(children: [
-          IndexedStack(
+          TabFader(
             index: _index,
             children: List.generate(_tabs.length, (i) {
               return RepaintBoundary(
@@ -143,7 +143,7 @@ class _Dock extends StatelessWidget {
         radius: 20,
         blur: 22,
         liquid: true,
-        tint: const Color(0x40081840),
+        tint: const Color(0xD9101E48),
         height: 66,
         padding: const EdgeInsets.all(5),
         child: LayoutBuilder(builder: (c, box) {
@@ -193,7 +193,17 @@ class _Dock extends StatelessWidget {
                       scale: .92,
                       onTap: () => onTap(i),
                       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Icon(_tabs[i].icon, size: 22, color: sel ? CkColors.cyan : CkColors.textSecondary),
+                        AnimatedSlide(
+                          offset: sel ? const Offset(0, -.08) : Offset.zero,
+                          duration: const Duration(milliseconds: 350),
+                          curve: kEase,
+                          child: AnimatedScale(
+                            scale: sel ? 1.08 : 1,
+                            duration: const Duration(milliseconds: 350),
+                            curve: kEase,
+                            child: Icon(_tabs[i].icon, size: 22, color: sel ? CkColors.cyan : CkColors.textSecondary),
+                          ),
+                        ),
                         const SizedBox(height: 3),
                         FittedBox(
                           fit: BoxFit.scaleDown,
@@ -235,7 +245,7 @@ class ClientPage extends StatelessWidget {
       this.animate = true,
       this.floating,
       this.pinned,
-      this.padding = const EdgeInsets.fromLTRB(14, 0, 14, 120)});
+      this.padding = const EdgeInsets.fromLTRB(20, 0, 20, 120)});
 
   Future<void> _details(BuildContext context) async {
     final r = await showModalBottomSheet<String>(
@@ -261,7 +271,7 @@ class ClientPage extends StatelessWidget {
       context: context,
       builder: (s) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: const Color(0x4DFFFFFF), borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 10),
@@ -308,7 +318,7 @@ class ClientPage extends StatelessWidget {
       physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
       padding: padding,
       children: [
-        for (var i = 0; i < children.length; i++) animate && i < 7 ? FadeSlideIn(index: i, child: children[i]) : children[i],
+        for (var i = 0; i < children.length; i++) animate ? FadeSlideIn(index: i, child: children[i]) : children[i],
       ],
     );
     return CkBackground(
@@ -417,7 +427,7 @@ class _DetailsSheet extends StatelessWidget {
     final data = ClientData.of(c.mId);
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 16),
+        padding: const EdgeInsets.fromLTRB(20, 10, 18, 16),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: const Color(0x4DFFFFFF), borderRadius: BorderRadius.circular(2)))),
           const SizedBox(height: 14),

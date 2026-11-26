@@ -957,7 +957,7 @@ class _ConfirmSheetState extends State<_ConfirmSheet> {
     final next = DateTime(DateTime.now().year, DateTime.now().month + 1);
     final lead = _start == next ? 'Starts next month' : 'Starts';
     return Container(
-      padding: EdgeInsets.fromLTRB(18, 10, 18, 22 + MediaQuery.of(context).padding.bottom),
+      padding: EdgeInsets.fromLTRB(20, 10, 18, 22 + MediaQuery.of(context).padding.bottom),
       decoration: const BoxDecoration(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
         gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xF82856AA), Color(0xFC0E2860)]),
@@ -1098,7 +1098,7 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
                 return ListView(
                   physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                   keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 120),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 18, 120),
                   children: [
                     Text('ALL CLIENTS', style: CkText.label),
                     const SizedBox(height: 6),
