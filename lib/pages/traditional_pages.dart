@@ -96,13 +96,13 @@ class ClientPanchang {
     final lat = double.tryParse('${d['latitude']}') ?? 0;
     final lng = double.tryParse('${d['longitude']}') ?? 0;
     final la = _dms(lat), lo = _dms(lng);
-    final r = await Api.post(Endpoints.panchang, {
+    final r = await Api.postKept(Endpoints.panchang, {
       'LongDeg': lo[0], 'LongMnt': lo[1], 'LongSec': lo[2], 'LongDirection': lng >= 0 ? 'E' : 'W',
       'LatDeg': la[0], 'LatMnt': la[1], 'LatSec': la[2], 'LatDirection': lat >= 0 ? 'N' : 'S',
       'timezone': '${d['timm_diff'] ?? '330'}',
       'dob': DateFormat('yyyy-MM-dd').format(at),
       'birthhour': '${at.hour}', 'birthmin': '${at.minute}', 'birthsec': '${at.second}',
-    });
+    }, owner: 'm$mId');
     return ClientPanchang(r, at, lat, lng, (d['birth_place'] ?? '').toString());
   }
 }

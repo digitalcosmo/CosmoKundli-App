@@ -219,7 +219,9 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late Future<List<GrahPos>?> _sky = _loadSky();
-  late Future<Map<String, dynamic>> _credits = Api.post(Endpoints.credits, {'uID': Session.uid});
+  late Future<Map<String, dynamic>> _credits = _loadCredits();
+  static Future<Map<String, dynamic>> _loadCredits({bool force = false}) =>
+      Api.shared('credits:${Session.uid}', () => Api.post(Endpoints.credits, {'uID': Session.uid}), force: force);
   late Future<List<ReportItem>> _reports = fetchReports();
   Timer? _tick;
   DateTime _now = DateTime.now();
@@ -234,7 +236,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     // Keep the greeting name current from the profile.
-    Api.post(Endpoints.profileDetails, {'uID': Session.uid}).then((r) {
+    Api.shared('profile:${Session.uid}', () => Api.post(Endpoints.profileDetails, {'uID': Session.uid}), ttl: const Duration(hours: 6)).then((r) {
       final n = '${r['Name'] ?? ''}'.trim();
       if (n.isNotEmpty && n != 'null' && n != Session.prefs.getString('ck_user_name')) {
         Session.prefs.setString('ck_user_name', n);
@@ -257,8 +259,8 @@ class _HomePageState extends State<HomePage> {
   Future<void> _refresh() async {
     setState(() {
       _sky = _loadSky();
-      _credits = Api.post(Endpoints.credits, {'uID': Session.uid});
-      _reports = fetchReports();
+      _credits = _loadCredits(force: true);
+      _reports = fetchReports(force: true);
     });
   }
 

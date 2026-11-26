@@ -1,6 +1,9 @@
 import 'dart:convert';
 
+import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../network/network_api_services.dart';
 import '../values/urls.dart';
@@ -28,6 +31,35 @@ class Api {
     final r = await _net.postApi(data, endpoint);
     return _asMap(r);
   }
+
+  /// Same as [post], but answers that never change (a client's birth data
+  /// and everything computed from it, past months) are kept on the phone and
+  /// reused: no second network call, even after restarting the app.
+  /// [owner] groups the files so a client's cache can be dropped on edit.
+  static Future<Map<String, dynamic>> postKept(String endpoint, Map<String, dynamic> data, {required String owner}) async {
+    final key = '$endpoint|${jsonEncode(data)}';
+    final hit = await DiskCache.read(owner, key);
+    if (hit != null) return hit;
+    final r = await post(endpoint, data);
+    if (ok(r) || r.values.any((v) => v is List && v.isNotEmpty)) DiskCache.write(owner, key, r);
+    return r;
+  }
+
+  /// Shares one in-flight/recent answer between screens (client list,
+  /// report history, credits) for [ttl]; [force] refetches.
+  static final _shared = <String, (DateTime, Future<dynamic>)>{};
+  static Future<T> shared<T>(String key, Future<T> Function() load, {Duration ttl = const Duration(seconds: 60), bool force = false}) {
+    final hit = _shared[key];
+    if (!force && hit != null && DateTime.now().difference(hit.$1) < ttl) return hit.$2 as Future<T>;
+    final f = load();
+    _shared[key] = (DateTime.now(), f);
+    f.then((_) {}, onError: (Object _) {
+      if (identical(_shared[key]?.$2, f)) _shared.remove(key);
+    });
+    return f;
+  }
+
+  static void forget(String key) => _shared.remove(key);
 
   static Future<Map<String, dynamic>> upload(
       String endpoint, String uid, String filePath) async {
@@ -107,4 +139,51 @@ class Endpoints {
   static const cosmoPower3 = 'CosmoPower_3Month';
   static const cosmoPower6 = 'CosmoPower_6Month';
   static const cosmoPower12 = 'CosmoPower_12Month';
+}
+
+
+/// Small file cache under the app's private support folder.
+class DiskCache {
+  static Directory? _root;
+  static Future<Directory> _dir(String owner) async {
+    _root ??= Directory('${(await getApplicationSupportDirectory()).path}/ck_cache');
+    final d = Directory('${_root!.path}/${owner.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}');
+    if (!await d.exists()) await d.create(recursive: true);
+    return d;
+  }
+
+  static String _name(String key) {
+    // FNV-1a hash: short, stable file names
+    var h = 0x811c9dc5;
+    for (final c in utf8.encode(key)) {
+      h ^= c;
+      h = (h * 0x01000193) & 0xffffffff;
+    }
+    return '${h.toRadixString(16)}_${key.length}.json';
+  }
+
+  static Future<Map<String, dynamic>?> read(String owner, String key) async {
+    try {
+      final f = File('${(await _dir(owner)).path}/${_name(key)}');
+      if (!await f.exists()) return null;
+      final d = jsonDecode(await f.readAsString());
+      return d is Map ? Map<String, dynamic>.from(d) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> write(String owner, String key, Map<String, dynamic> v) async {
+    try {
+      await File('${(await _dir(owner)).path}/${_name(key)}').writeAsString(jsonEncode(v));
+    } catch (_) {}
+  }
+
+  /// Drops everything kept for [owner] (e.g. a client whose birth data changed).
+  static Future<void> drop(String owner) async {
+    try {
+      final d = await _dir(owner);
+      await d.delete(recursive: true);
+    } catch (_) {}
+  }
 }

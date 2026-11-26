@@ -2028,3 +2028,7 @@ class FiveDLegend extends StatelessWidget {
         const Text('High', style: TextStyle(fontSize: 11, color: CkColors.textSecondary)),
       ]);
 }
+
+
+/// Hidden testing switch: Flutter's frame-time graph over the app.
+final perfOverlay = ValueNotifier<bool>(false);

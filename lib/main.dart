@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'core/session.dart';
 import 'pages/auth_pages.dart';
@@ -18,6 +19,8 @@ Future<void> main() async {
     systemNavigationBarColor: Color(0xFF061A3F),
     systemNavigationBarIconBrightness: Brightness.light,
   ));
+  // Fonts ship inside the app: no download on first launch.
+  GoogleFonts.config.allowRuntimeFetching = false;
   await Session.init();
   await LiquidGlass.preload();
   runApp(const CosmoKundliApp());
@@ -28,7 +31,10 @@ class CosmoKundliApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GetMaterialApp(
+    return ValueListenableBuilder<bool>(
+      valueListenable: perfOverlay,
+      builder: (c, perf, _) => GetMaterialApp(
+      showPerformanceOverlay: perf,
       title: 'CosmoKundli',
       debugShowCheckedModeBanner: false,
       theme: CkTheme.dark(),
@@ -45,6 +51,7 @@ class CosmoKundliApp extends StatelessWidget {
         ),
         child: BackdropGroup(child: child!),
       ),
+    ),
     );
   }
 }

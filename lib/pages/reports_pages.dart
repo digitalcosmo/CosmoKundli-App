@@ -273,7 +273,12 @@ class ReportItem {
   }
 }
 
-Future<List<ReportItem>> fetchReports() async {
+/// Report history, shared by Dashboard, Reports and search (one call per
+/// 30 s at most); [force] after generating, polling or pull-to-refresh.
+Future<List<ReportItem>> fetchReports({bool force = false}) =>
+    Api.shared('reports:${Session.uid}', _fetchReports, ttl: const Duration(seconds: 30), force: force);
+
+Future<List<ReportItem>> _fetchReports() async {
   final r = await Api.post(Endpoints.reportHistoryAll, {'uID': int.tryParse(Session.uid) ?? Session.uid});
   // Server order is newest first; keep it.
   return Api.list(r, ['list', 'data']).map(ReportItem.new).toList();
@@ -555,14 +560,14 @@ mixin _HistoryPoll<T extends StatefulWidget> on State<T> {
   late Future<List<ReportItem>> history = fetchReports();
   Timer? _poll;
 
-  void reloadHistory() => setState(() => history = fetchReports());
+  void reloadHistory() => setState(() => history = fetchReports(force: true));
 
   void watch(List<ReportItem> l) {
     final busy = l.any((e) => e.pending);
     if (busy && _poll == null) {
       _poll = Timer.periodic(const Duration(seconds: 6), (_) async {
         try {
-          final n = await fetchReports();
+          final n = await fetchReports(force: true);
           if (!mounted) return;
           setState(() => history = Future.value(n));
           if (!n.any((e) => e.pending)) {
@@ -941,6 +946,8 @@ class _ConfirmSheetState extends State<_ConfirmSheet> {
       final ok = Api.ok(r);
       toast(context, Api.msg(r, ok ? 'Generating ${widget.type.title}. It will be ready in History.' : 'Couldn\'t generate the report'), error: !ok);
       if (ok) {
+        Api.forget('credits:${Session.uid}');
+        Api.forget('reports:${Session.uid}');
         Navigator.pop(context, true);
         return;
       }

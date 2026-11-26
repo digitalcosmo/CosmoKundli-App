@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
 import '../core/api.dart';
+import '../core/client_data.dart';
 import '../core/session.dart';
 import '../ui/ck_theme.dart';
 import '../ui/glass.dart';
@@ -18,7 +19,12 @@ class ClientsPage extends StatefulWidget {
   State<ClientsPage> createState() => _ClientsPageState();
 }
 
-Future<List<Client>> fetchClients() async {
+/// Client list, shared by every screen that needs it (one call per minute
+/// at most); [force] after adding, editing or deleting, or pull-to-refresh.
+Future<List<Client>> fetchClients({bool force = false}) =>
+    Api.shared('clients:${Session.uid}', _fetchClients, force: force);
+
+Future<List<Client>> _fetchClients() async {
   final r = await Api.post(Endpoints.memberList, {'uID': Session.uid});
   final list = Api.list(r, ['members', 'list']).map(Client.fromJson).where((c) => c.mId.isNotEmpty).toList();
   list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
@@ -72,6 +78,8 @@ Future<void> clientAction(BuildContext context, Client c, String action, {VoidCa
       if (!context.mounted) return;
       if (Api.ok(r)) {
         await Session.forget(c.mId);
+        Api.forget('clients:${Session.uid}');
+        ClientData.forgetClient(c.mId);
         toast(context, Api.msg(r, 'Client deleted'));
         if (fromShell) Get.back();
         onChanged?.call();
@@ -185,7 +193,7 @@ class _ClientsPageState extends State<ClientsPage> {
     _future = fetchClients();
   }
 
-  void _reload() => setState(() => _future = fetchClients());
+  void _reload() => setState(() => _future = fetchClients(force: true));
 
   void _jump(String letter) {
     final k = _keys[letter];
@@ -533,5 +541,10 @@ class _ClientCardState extends State<_ClientCard> {
 
 Future<void> editClient(BuildContext context, Client c) async {
   final saved = await Get.to(() => ClientFormPage(editId: c.mId));
-  if (saved != null) Session.client.value = Session.client.value;
+  if (saved != null) {
+    // birth data may have changed: drop everything kept for this client
+    await ClientData.forgetClient(c.mId);
+    Api.forget('clients:${Session.uid}');
+    Session.client.value = Session.client.value;
+  }
 }

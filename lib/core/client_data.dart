@@ -18,6 +18,21 @@ class ClientData {
 
   final _memo = <String, Future<dynamic>>{};
 
+  /// Past periods never change: keep them on the phone. [end] is the last
+  /// day (or the month) the answer covers.
+  Future<Map<String, dynamic>> _monthly(String ep, Map<String, dynamic> body, DateTime end) {
+    final now = DateTime.now();
+    final past = DateTime(end.year, end.month, end.day == 1 && body.containsKey('Month') ? DateTime(end.year, end.month + 1, 0).day : end.day)
+        .isBefore(DateTime(now.year, now.month, now.day));
+    return past ? Api.postKept(ep, body, owner: 'm$mId') : Api.post(ep, body);
+  }
+
+  /// Birth data changed (client edited): forget everything kept for them.
+  static Future<void> forgetClient(String mId) async {
+    if (_current?.mId == mId) _current = null;
+    await DiskCache.drop('m$mId');
+  }
+
   /// Caches a call under [key]; a failed call is dropped so Retry refetches.
   Future<T> _m<T>(String key, Future<T> Function() f) {
     final hit = _memo[key];
@@ -57,7 +72,7 @@ class ClientData {
 
   Future<List<GrahPos>> _chartLoad() async {
     return () async {
-      final r = await Api.post(Endpoints.birthChart, {'mID': mId});
+      final r = await Api.postKept(Endpoints.birthChart, {'mID': mId}, owner: 'm$mId');
       var list = GrahPos.listFrom(Api.list(r, ['planets', 'list']));
       List<GrahPos> info = [];
       try {
@@ -75,7 +90,7 @@ class ClientData {
   }
 
   Future<List<GrahPos>> planetInfo() => _info ??= () async {
-        final r = await Api.post(Endpoints.birthPlanetInfo, {'mID': mId});
+        final r = await Api.postKept(Endpoints.birthPlanetInfo, {'mID': mId}, owner: 'm$mId');
         return GrahPos.listFrom(Api.list(r, ['planets', 'list']));
       }();
 
@@ -94,7 +109,7 @@ class ClientData {
 
   Future<Map<String, double>> _shadbalLoad() async {
     return () async {
-      final r = await Api.post(Endpoints.shadbal, {'mID': mId});
+      final r = await Api.postKept(Endpoints.shadbal, {'mID': mId}, owner: 'm$mId');
       final out = <String, double>{};
       for (final e in Api.list(r, ['list', 'data'])) {
         final id = parseGrah(e['title'] ?? e['planet']);
@@ -110,7 +125,7 @@ class ClientData {
     if (refresh) _details = null;
     final hit = _details;
     if (hit != null) return hit;
-    final f = Api.post(Endpoints.memberDetails, {'mID': mId});
+    final f = Api.postKept(Endpoints.memberDetails, {'mID': mId}, owner: 'm$mId');
     _details = f;
     f.then((_) {}, onError: (Object _) {
       if (identical(_details, f)) _details = null;
@@ -132,7 +147,7 @@ class ClientData {
       _m('sent:${DateFormat('yyyy-MM').format(month)}', () => _sentiments(month));
 
   Future<List<MapEntry<DateTime, double>>> _sentiments(DateTime month) async {
-    final r = await Api.post(Endpoints.starPowerDaily, {'mID': mId, 'Month': DateFormat('yyyy-MM').format(month)});
+    final r = await _monthly(Endpoints.starPowerDaily, {'mID': mId, 'Month': DateFormat('yyyy-MM').format(month)}, month);
     final out = <MapEntry<DateTime, double>>[];
     var day = 1;
     for (final e in Api.list(r, ['list'])) {
@@ -175,7 +190,7 @@ class ClientData {
   }
 
   Future<List<MapEntry<DateTime, double>>> _situations(DateTime month) async {
-    final r = await Api.post(Endpoints.cosmoPowerDaily, {'mID': mId, 'Month': DateFormat('yyyy-MM').format(month)});
+    final r = await _monthly(Endpoints.cosmoPowerDaily, {'mID': mId, 'Month': DateFormat('yyyy-MM').format(month)}, month);
     final out = <MapEntry<DateTime, double>>[];
     var day = 1;
     for (final e in Api.list(r, ['list'])) {
@@ -245,11 +260,13 @@ class ClientData {
     }
     l.loading = true;
     l.notify();
-    await Future.wait(jobs.map((j) async {
+    // 6 at a time: the network stays responsive and weeks arrive in order
+    final queue = [...jobs];
+    Future<void> one((String, DateTime) j) async {
       final (dim, mon) = j;
       final w = isoWeek(mon);
       try {
-        final r = await Api.post(Endpoints.starPowerReport, {'mID': mId, 'Type': dim, 'Weeknumber': '${w.$1}', 'Year': '${w.$2}'});
+        final r = await _monthly(Endpoints.starPowerReport, {'mID': mId, 'Type': dim, 'Weeknumber': '${w.$1}', 'Year': '${w.$2}'}, mon.add(const Duration(days: 6)));
         final rows = Api.list(r, ['list']);
         if (rows.isNotEmpty) {
           final row = rows.first;
@@ -267,6 +284,12 @@ class ClientData {
       }
       l.finished++;
       l.notify();
+    }
+
+    await Future.wait(List.generate(6, (_) async {
+      while (queue.isNotEmpty) {
+        await one(queue.removeAt(0));
+      }
     }));
     l.loading = false;
     l.notify();
