@@ -39,9 +39,7 @@ class ModulesPage extends StatelessWidget {
   Widget _row(BuildContext context, WModule m, {bool first = false}) {
     final soon = m.soon;
     final icon = ckIconAsset(m.title);
-    return Opacity(
-      opacity: soon ? .5 : 1,
-      child: Pressable(
+    return greyed(on: soon, Pressable(
         scale: .985,
         onTap: soon ? null : () => pushModule(context, m.page!()),
         child: Container(
@@ -62,7 +60,6 @@ class ModulesPage extends StatelessWidget {
             if (!soon) const Icon(Icons.chevron_right_rounded, color: CkColors.labelMono),
           ]),
         ),
-      ),
-    );
+      ));
   }
 }

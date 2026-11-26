@@ -229,11 +229,6 @@ class _KundliPageState extends State<KundliPage> {
                   padding: const EdgeInsets.all(6),
                   child: Stack(children: [
                     ZoomChart(child: KundliChart(planets)),
-                    const Positioned(
-                      right: 10,
-                      top: 8,
-                      child: Text('Pinch to zoom · tap a GRAH below', style: TextStyle(fontSize: 11, color: CkColors.textSecondary)),
-                    ),
                   ]),
                 ),
                 const SizedBox(height: 10),
@@ -418,16 +413,17 @@ class _CoordinatesPageState extends State<CoordinatesPage> {
         title: 'GRAH Coordinates',
         children: [
           Glass(
-            radius: 16,
-            padding: const EdgeInsets.fromLTRB(16, 6, 10, 6),
+            radius: 14,
+            padding: const EdgeInsets.fromLTRB(14, 2, 6, 2),
             child: Row(children: [
-              const Expanded(child: Text('Show degree as 0–360°', style: TextStyle(fontSize: 14))),
-              Switch(
+              const Expanded(child: Text('Show degree as 0–360°', style: TextStyle(fontSize: 13))),
+              Transform.scale(scale: .82, child: Switch(
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 value: _abs,
                 activeColor: const Color(0xFF06204F),
                 activeTrackColor: CkColors.cyan,
                 onChanged: (v) => setState(() => _abs = v),
-              ),
+              )),
             ]),
           ),
           LoadView<List<GrahPos>>(

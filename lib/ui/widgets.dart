@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -301,6 +302,97 @@ class ChoiceChips<T> extends StatelessWidget {
 
 // ───────────────────────── loading / empty / error
 
+/// Results of futures that already finished, so a screen that is rebuilt
+/// (tab switched back, page reopened, card resized) draws its data in the
+/// first frame instead of flashing a skeleton for one frame.
+final Expando<_Done> _done = Expando<_Done>();
+
+class _Done {
+  final Object? data;
+  final Object? error;
+  final bool ok;
+  const _Done(this.data, this.error, this.ok);
+}
+
+/// Like FutureBuilder, but: data that is already there shows at once with no
+/// animation; the skeleton only appears if loading takes longer than 150 ms;
+/// the soft cross-fade runs only when a skeleton was actually on screen.
+class FastFuture<T> extends StatefulWidget {
+  final Future<T>? future;
+  final Widget Function(T data) builder;
+  final Widget loading;
+  final Widget Function() error;
+  final double? minHeight;
+  const FastFuture({super.key, required this.future, required this.builder, required this.loading, required this.error, this.minHeight});
+  @override
+  State<FastFuture<T>> createState() => _FastFutureState<T>();
+}
+
+class _FastFutureState<T> extends State<FastFuture<T>> {
+  _Done? _r;
+  bool _skel = false; // skeleton has been on screen for this future
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _watch();
+  }
+
+  @override
+  void didUpdateWidget(FastFuture<T> old) {
+    super.didUpdateWidget(old);
+    if (!identical(old.future, widget.future)) _watch();
+  }
+
+  void _watch() {
+    _t?.cancel();
+    final f = widget.future;
+    _skel = false;
+    _r = f == null ? null : _done[f];
+    if (f == null || _r != null) return;
+    _t = Timer(const Duration(milliseconds: 150), () {
+      if (mounted && _r == null) setState(() => _skel = true);
+    });
+    f.then((v) {
+      final d = _Done(v, null, true);
+      _done[f] = d;
+      if (mounted && identical(widget.future, f)) setState(() => _r = d);
+    }, onError: (Object e) {
+      final d = _Done(null, e, false);
+      if (mounted && identical(widget.future, f)) setState(() => _r = d);
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = _r;
+    final Widget child;
+    if (r == null) {
+      child = _skel
+          ? KeyedSubtree(key: const ValueKey('skel'), child: widget.loading)
+          : SizedBox(key: const ValueKey('wait'), height: widget.minHeight);
+    } else if (!r.ok || (r.data == null && null is! T)) {
+      child = KeyedSubtree(key: const ValueKey('err'), child: widget.error());
+    } else {
+      child = KeyedSubtree(key: const ValueKey('ok'), child: widget.builder(r.data as T));
+    }
+    if (!_skel) return child;
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      switchInCurve: Curves.easeOut,
+      layoutBuilder: (cur, prev) => Stack(alignment: Alignment.topCenter, children: [...prev, if (cur != null) cur]),
+      child: child,
+    );
+  }
+}
+
 class LoadView<T> extends StatelessWidget {
   final Future<T>? future;
   final Widget Function(T data) builder;
@@ -309,28 +401,12 @@ class LoadView<T> extends StatelessWidget {
   final Widget? skeleton;
   const LoadView({super.key, required this.future, required this.builder, this.onRetry, this.minHeight = 220, this.skeleton});
   @override
-  Widget build(BuildContext context) => FutureBuilder<T>(
+  Widget build(BuildContext context) => FastFuture<T>(
         future: future,
-        builder: (c, s) {
-          final Widget child;
-          if (s.connectionState != ConnectionState.done) {
-            child = KeyedSubtree(key: const ValueKey('skel'), child: skeleton ?? (minHeight >= 300 ? SkeletonCard(height: minHeight) : const SkeletonList(rows: 5)));
-          } else if (s.hasError || !s.hasData) {
-            child = KeyedSubtree(
-              key: const ValueKey('err'),
-              child: ErrorBox(message: 'Couldn\'t load this. Check your connection and try again.', onRetry: onRetry),
-            );
-          } else {
-            child = KeyedSubtree(key: const ValueKey('ok'), child: builder(s.data as T));
-          }
-          // loading -> data -> error swap with a soft cross-fade
-          return AnimatedSwitcher(
-            duration: const Duration(milliseconds: 350),
-            switchInCurve: Curves.easeOut,
-            layoutBuilder: (cur, prev) => Stack(alignment: Alignment.topCenter, children: [...prev, if (cur != null) cur]),
-            child: child,
-          );
-        },
+        builder: builder,
+        minHeight: minHeight,
+        loading: skeleton ?? (minHeight >= 300 ? SkeletonCard(height: minHeight) : const SkeletonList(rows: 5)),
+        error: () => ErrorBox(message: 'Couldn\'t load this. Check your connection and try again.', onRetry: onRetry),
       );
 }
 
@@ -450,13 +526,11 @@ class ModuleCard extends StatelessWidget {
   Widget build(BuildContext context) => KeyedSubtree(
         child: Pressable(
           onTap: comingSoon ? null : onTap,
-          child: Opacity(
-            opacity: comingSoon ? .72 : 1,
-            child: Glass(
+          child: Glass(
               margin: const EdgeInsets.only(top: 12),
               radius: 18,
               padding: const EdgeInsets.all(14),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              child: greyed(on: comingSoon, Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
                   Container(
                     width: 42,
@@ -492,9 +566,8 @@ class ModuleCard extends StatelessWidget {
                     const Icon(Icons.chevron_right_rounded, color: CkColors.textMuted),
                 ]),
                 if (preview != null && !comingSoon) ...[const SizedBox(height: 10), preview!],
-              ]),
+              ])),
             ),
-          ),
         ),
       );
 }
@@ -609,8 +682,9 @@ class MonthBar extends StatelessWidget {
       ]);
 }
 
-/// Month picker sheet: a swipeable strip of years (tap any year directly)
-/// above a 4×3 month grid, plus a one-tap jump to the current month.
+/// Month picker sheet: ‹ year ▾ › above a 4×3 month grid. Tapping a month
+/// picks it and closes; tapping the year opens a 12-year grid (‹ › there move
+/// 12 years at a time).
 Future<DateTime?> pickMonth(BuildContext context, DateTime initial) =>
     showModalBottomSheet<DateTime>(
       useRootNavigator: true,
@@ -626,48 +700,41 @@ class _MonthSheet extends StatefulWidget {
 }
 
 class _MonthSheetState extends State<_MonthSheet> {
-  static const _chipW = 76.0;
   late int _year = widget.initial.year;
-  late final int _first = math.min(widget.initial.year, DateTime.now().year) - 60;
-  late final int _last = math.max(widget.initial.year, DateTime.now().year) + 30;
-  ScrollController? _ctl;
-  ScrollController get _years => _ctl!;
+  bool _years = false;
+  late int _page = _year - (_year % 12); // first year of the 12-year grid
 
-  double _centred(int y) =>
-      math.max(0.0, (y - _first) * _chipW - (MediaQuery.of(context).size.width - 36) / 2 + _chipW / 2);
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _ctl ??= ScrollController(initialScrollOffset: _centred(_year));
-  }
-
-  @override
-  void dispose() {
-    _ctl?.dispose();
-    super.dispose();
-  }
-
-  void _setYear(int y) {
-    setState(() => _year = y);
-    _years.animateTo(_centred(y).clamp(0.0, _years.position.maxScrollExtent),
-        duration: const Duration(milliseconds: 380), curve: CkMotion.ease);
-  }
+  Widget _cell(String text, {required bool sel, required bool now, required VoidCallback onTap}) => Pressable(
+        scale: .94,
+        onTap: onTap,
+        child: Container(
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            gradient: sel ? CkColors.cta : null,
+            color: sel ? null : CkColors.glassFill,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: now && !sel ? CkColors.orangeStroke : CkColors.glassStroke),
+          ),
+          child: Text(text, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: sel ? Colors.white : CkColors.text)),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
+    final head = _years ? '$_page – ${_page + 11}' : '$_year';
+    void step(int d) => setState(() => _years ? _page += 12 * d : _year += d);
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(18, 10, 18, 16),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Center(
               child: Container(
                   width: 44, height: 5,
                   decoration: BoxDecoration(color: CkColors.glassStroke, borderRadius: BorderRadius.circular(3)))),
           const SizedBox(height: 14),
           Row(children: [
-            Expanded(child: Text('Choose month', style: CkText.h(18))),
+            Expanded(child: Text(_years ? 'Choose year' : 'Choose month', style: CkText.h(18))),
             Pressable(
               onTap: () => Navigator.pop(context, DateTime(now.year, now.month)),
               child: Container(
@@ -681,67 +748,54 @@ class _MonthSheetState extends State<_MonthSheet> {
               ),
             ),
           ]),
-          const SizedBox(height: 14),
-          HScroll(controller: _years, builder: (sc) => SizedBox(
-            height: 40,
-            child: ListView.builder(
-              controller: sc,
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              itemExtent: _chipW,
-              itemCount: _last - _first + 1,
-              itemBuilder: (_, i) {
-                final y = _first + i;
-                final sel = y == _year;
-                return GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => _setYear(y),
-                  child: AnimatedContainer(
-                    duration: CkMotion.fast,
-                    margin: const EdgeInsets.symmetric(horizontal: 3),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      gradient: sel ? CkColors.cta : null,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: sel ? Colors.transparent : const Color(0x1FFFFFFF)),
-                    ),
-                    child: Text('$y',
-                        style: TextStyle(
-                            fontSize: sel ? 15 : 14,
-                            fontWeight: sel ? FontWeight.w600 : FontWeight.w600,
-                            color: sel ? Colors.white : (y == now.year ? CkColors.orangeSoft : CkColors.textSecondary))),
-                  ),
-                );
-              },
-            ),
-          )),
-          const SizedBox(height: 16),
-          GridView.count(
-            shrinkWrap: true,
-            crossAxisCount: 4,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 1.55,
-            physics: const NeverScrollableScrollPhysics(),
-            children: List.generate(12, (i) {
-              final sel = _year == widget.initial.year && i + 1 == widget.initial.month;
-              final isNow = _year == now.year && i + 1 == now.month;
-              return Pressable(
-                scale: .94,
-                onTap: () => Navigator.pop(context, DateTime(_year, i + 1)),
-                child: Container(
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    gradient: sel ? CkColors.cta : null,
-                    color: sel ? null : CkColors.glassFill,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: isNow && !sel ? CkColors.orangeStroke : CkColors.glassStroke),
-                  ),
-                  child: Text(DateFormat('MMM').format(DateTime(2000, i + 1)),
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: sel ? Colors.white : CkColors.text)),
+          const SizedBox(height: 12),
+          Row(children: [
+            CircleBtn(Icons.chevron_left_rounded, size: 40, label: _years ? 'Previous 12 years' : 'Previous year', onTap: () => step(-1)),
+            Expanded(
+              child: Pressable(
+                scale: .96,
+                onTap: () => setState(() {
+                  _years = !_years;
+                  _page = _year - (_year % 12);
+                }),
+                child: SizedBox(
+                  height: 40,
+                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Text(head, style: CkText.h(17)),
+                    const SizedBox(width: 4),
+                    Icon(_years ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, size: 20, color: CkColors.cyan),
+                  ]),
                 ),
-              );
-            }),
+              ),
+            ),
+            CircleBtn(Icons.chevron_right_rounded, size: 40, label: _years ? 'Next 12 years' : 'Next year', onTap: () => step(1)),
+          ]),
+          const SizedBox(height: 12),
+          AnimatedSwitcher(
+            duration: CkMotion.fast,
+            child: GridView.count(
+              key: ValueKey(_years),
+              shrinkWrap: true,
+              crossAxisCount: 4,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 1.55,
+              physics: const NeverScrollableScrollPhysics(),
+              children: _years
+                  ? List.generate(12, (i) {
+                      final y = _page + i;
+                      return _cell('$y', sel: y == _year, now: y == now.year, onTap: () => setState(() {
+                            _year = y;
+                            _years = false;
+                          }));
+                    })
+                  : List.generate(12, (i) => _cell(
+                        DateFormat('MMM').format(DateTime(2000, i + 1)),
+                        sel: _year == widget.initial.year && i + 1 == widget.initial.month,
+                        now: _year == now.year && i + 1 == now.month,
+                        onTap: () => Navigator.pop(context, DateTime(_year, i + 1)),
+                      )),
+            ),
           ),
         ]),
       ),
@@ -1625,10 +1679,17 @@ class FilterDropdown<T> extends StatelessWidget {
             boxShadow: on ? [BoxShadow(color: CkColors.cyan.withValues(alpha: .22), blurRadius: 14)] : null,
           ),
           child: Row(children: [
-            if (on) ...[const Icon(Icons.check_rounded, size: 15, color: CkColors.cyan), const SizedBox(width: 4)],
-            Text(label, style: const TextStyle(fontSize: 12.5, color: CkColors.labelMono)),
-            const SizedBox(width: 6),
-            Expanded(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+            // off: just the name; on: "Gender: Female"
+            Expanded(
+              child: Text.rich(
+                TextSpan(children: [
+                  TextSpan(text: on ? '$label: ' : label, style: TextStyle(fontSize: 12.5, color: on ? CkColors.labelMono : CkColors.textSecondary)),
+                  if (on) TextSpan(text: text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                ]),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             if (on)
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
@@ -2031,6 +2092,25 @@ class FiveDLegend extends StatelessWidget {
 
 
 /// Hidden testing switch: Flutter's frame-time graph over the app.
+/// Greyed-out content for things not available (coming soon, expired):
+/// colour removed and dimmed. Applied to what's inside a glass card, not the
+/// card itself, so it reads clearly over the see-through glass.
+Widget greyed(Widget child, {bool on = true, double opacity = .42}) {
+  if (!on) return child;
+  return Opacity(
+    opacity: opacity,
+    child: ColorFiltered(
+      colorFilter: const ColorFilter.matrix([
+        .2126, .7152, .0722, 0, 0,
+        .2126, .7152, .0722, 0, 0,
+        .2126, .7152, .0722, 0, 0,
+        0, 0, 0, 1, 0,
+      ]),
+      child: child,
+    ),
+  );
+}
+
 final perfOverlay = ValueNotifier<bool>(false);
 
 /// Test-only switches for measuring what costs frame time (hidden sheet on

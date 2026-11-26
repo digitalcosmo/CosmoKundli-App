@@ -235,7 +235,6 @@ class _ClientsPageState extends State<ClientsPage> {
           builder: (c, s) {
             final all = s.data ?? [];
             final list = _apply(all);
-            final recent = Session.recent.where((r) => all.isEmpty || all.any((a) => a.mId == r.mId)).toList();
             _keys.clear();
             final letters = <String>[];
             for (final cl in list) {
@@ -291,36 +290,6 @@ class _ClientsPageState extends State<ClientsPage> {
                                       icon: const Icon(Icons.close_rounded)),
                             ),
                           ),
-                          if (recent.isNotEmpty && _q.isEmpty) ...[
-                            const SizedBox(height: 20),
-                            Text('RECENTLY OPENED', style: CkText.label),
-                            const SizedBox(height: 10),
-                            HScroll(builder: (sc) => SizedBox(
-                              height: 82,
-                              child: ListView(controller: sc, 
-                                scrollDirection: Axis.horizontal,
-                                children: recent
-                                    .map((r) => Padding(
-                                          padding: const EdgeInsets.only(right: 14),
-                                          child: Pressable(
-                                            onTap: () => openClient(all.firstWhere((a) => a.mId == r.mId, orElse: () => r)),
-                                            child: SizedBox(
-                                              width: 64,
-                                              child: Column(children: [
-                                                _Avatar(r, size: 56),
-                                                const SizedBox(height: 6),
-                                                Text(r.name.split(' ').first,
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(fontSize: 11, color: CkColors.textSecondary)),
-                                              ]),
-                                            ),
-                                          ),
-                                        ))
-                                    .toList(),
-                              ),
-                            )),
-                          ],
                           const SizedBox(height: 12),
                           _filters(all),
                           const SizedBox(height: 6),
@@ -497,10 +466,7 @@ class _ClientCardState extends State<_ClientCard> {
                   onTap: () => _dx < 0 ? _snap(false) : openClient(cl),
                   child: Glass(
                     radius: 18,
-                    // long fast lists: no live blur per card (smooth scrolling);
-                    // a touch more fill keeps the same glass look
-                    frost: false,
-                    tint: const Color(0x0AFFFFFF),
+                    // same glass as every other card
                     padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
                     child: Row(children: [
                       _Avatar(cl, size: 44),

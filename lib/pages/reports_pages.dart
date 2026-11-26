@@ -517,14 +517,14 @@ class ReportRow extends StatelessWidget {
       const SizedBox(width: 6),
       right,
     ]);
+    final faded = greyed(body, on: s == ReportState.expired);
     final card = compact
         ? Container(
             padding: const EdgeInsets.fromLTRB(10, 9, 8, 9),
             decoration: BoxDecoration(color: CkColors.field, borderRadius: BorderRadius.circular(12), border: Border.all(color: CkColors.panelStroke)),
-            child: body,
+            child: faded,
           )
-        : Glass(margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.fromLTRB(10, 10, 8, 10), child: body);
-    if (s == ReportState.expired) return Opacity(opacity: .5, child: card);
+        : Glass(margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.fromLTRB(10, 10, 8, 10), child: faded);
     return card;
   }
 }

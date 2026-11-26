@@ -40,7 +40,7 @@ class CosmoKundliApp extends StatelessWidget {
       theme: CkTheme.dark(),
       darkTheme: CkTheme.dark(),
       themeMode: ThemeMode.dark,
-      defaultTransition: Transition.fadeIn,
+      defaultTransition: Transition.noTransition,
       transitionDuration: const Duration(milliseconds: 240),
       home: const SplashPage(),
       navigatorObservers: [UnfocusObserver()],

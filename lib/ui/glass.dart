@@ -11,7 +11,11 @@ import 'widgets.dart' show perfOff;
 const String kCkBackground = 'assets/images/ck_bg.jpg';
 
 /// Deep-space backdrop shared by every page (same art as the software).
-class CkBackground extends StatelessWidget {
+///
+/// Motion: the background is solid from the first frame of a page or tab;
+/// only the content fades in (page opened) or fades and rises (tab switched
+/// to). Closing a page fades its content first, then the page.
+class CkBackground extends StatefulWidget {
   final Widget child;
   const CkBackground({super.key, required this.child}) : paint = true;
 
@@ -21,17 +25,70 @@ class CkBackground extends StatelessWidget {
   const CkBackground.none({super.key, required this.child}) : paint = false;
 
   @override
+  State<CkBackground> createState() => _CkBackgroundState();
+}
+
+class _CkBackgroundState extends State<CkBackground> with SingleTickerProviderStateMixin {
+  late final AnimationController _tab = AnimationController(vsync: this, duration: const Duration(milliseconds: 320), value: 1);
+  int? _gen;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final g = TabActivation.of(context);
+    if (_gen != null && g != _gen && widget.paint) _tab.forward(from: 0);
+    _gen = g;
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (!paint) return BackdropGroup(child: child);
-    return ColoredBox(
+    if (!widget.paint) return BackdropGroup(child: widget.child);
+    final a = ModalRoute.of(context)?.animation ?? kAlwaysCompleteAnimation;
+    final content = AnimatedBuilder(
+      animation: Listenable.merge([a, _tab]),
+      child: BackdropGroup(child: widget.child),
+      builder: (c, child) {
+        final rev = a.status == AnimationStatus.reverse;
+        final route = rev ? ((a.value - .4) / .6).clamp(0.0, 1.0) : Curves.easeOut.transform(a.value);
+        final tab = kEase.transform(_tab.value);
+        final o = route * tab;
+        if (o >= 1) return child!;
+        return Opacity(
+          opacity: o,
+          child: Transform.translate(offset: Offset(0, (1 - tab) * 12), child: child),
+        );
+      },
+    );
+    final page = ColoredBox(
       color: CkColors.deepSpace,
-      child: Stack(fit: StackFit.expand, children: [
-        const CosmicBackground(),
-        // Every glass card on this screen shares one blur pass.
-        BackdropGroup(child: child),
-      ]),
+      child: Stack(fit: StackFit.expand, children: [const CosmicBackground(), content]),
+    );
+    // closing: once the content is gone, the page itself fades out
+    return AnimatedBuilder(
+      animation: a,
+      child: page,
+      builder: (c, child) {
+        if (a.status != AnimationStatus.reverse || a.value >= .4) return child!;
+        return Opacity(opacity: (a.value / .4).clamp(0.0, 1.0), child: child);
+      },
     );
   }
+}
+
+/// Counts how often a tab has become the active one; pages inside it replay
+/// their entry when it changes.
+class TabActivation extends InheritedWidget {
+  final int gen;
+  const TabActivation({super.key, required this.gen, required super.child});
+  static int of(BuildContext c) => c.dependOnInheritedWidgetOfExactType<TabActivation>()?.gen ?? 0;
+  @override
+  bool updateShouldNotify(TabActivation old) => old.gen != gen;
 }
 
 /// Drop-in replacement for [Scaffold]: paints the cosmic backdrop under a
@@ -462,13 +519,9 @@ class CkRoute<T> extends PageRouteBuilder<T> {
           transitionDuration: const Duration(milliseconds: 240),
           reverseTransitionDuration: const Duration(milliseconds: 200),
           pageBuilder: (c, a, b) => builder(c),
-          transitionsBuilder: (c, a, b, child) {
-            final t = CurvedAnimation(parent: a, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
-            return FadeTransition(
-              opacity: t,
-              child: ScaleTransition(scale: Tween(begin: .97, end: 1.0).animate(t), child: child),
-            );
-          },
+          // the page's own CkBackground animates its content (background
+          // stays solid, nothing shows through)
+          transitionsBuilder: (c, a, b, child) => child,
         );
 }
 
@@ -486,47 +539,25 @@ class TabFader extends StatefulWidget {
 }
 
 class _TabFaderState extends State<TabFader> {
-  int? _leaving;
-  Timer? _t;
+  late final List<int> _gen = List.filled(widget.children.length, 0);
 
   @override
   void didUpdateWidget(TabFader old) {
     super.didUpdateWidget(old);
-    if (old.index != widget.index) {
-      _leaving = old.index;
-      _t?.cancel();
-      _t = Timer(const Duration(milliseconds: 470), () {
-        if (mounted) setState(() => _leaving = null);
-      });
-    }
+    if (old.index != widget.index && widget.index < _gen.length) _gen[widget.index]++;
   }
 
-  @override
-  void dispose() {
-    _t?.cancel();
-    super.dispose();
-  }
-
+  // The tab swaps at once (its background is solid from the first frame);
+  // the page inside fades and rises in through TabActivation.
   @override
   Widget build(BuildContext context) => Stack(children: [
         for (var i = 0; i < widget.children.length; i++)
           Positioned.fill(
             child: Offstage(
-              offstage: i != widget.index && i != _leaving,
-              child: IgnorePointer(
-                ignoring: i != widget.index,
-                child: AnimatedOpacity(
-                  opacity: i == widget.index ? 1 : 0,
-                  duration: const Duration(milliseconds: 400),
-                  curve: kEase,
-                  child: AnimatedSlide(
-                    offset: i == widget.index ? Offset.zero : const Offset(0, .025),
-                    duration: const Duration(milliseconds: 450),
-                    curve: kEase,
-                    // the tab's own content pauses as soon as you leave it
-                    child: TickerMode(enabled: i == widget.index, child: widget.children[i]),
-                  ),
-                ),
+              offstage: i != widget.index,
+              child: TabActivation(
+                gen: _gen[i],
+                child: TickerMode(enabled: i == widget.index, child: widget.children[i]),
               ),
             ),
           ),

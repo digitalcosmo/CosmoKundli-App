@@ -227,7 +227,6 @@ class TransitBodyState extends State<TransitBody> {
                 padding: const EdgeInsets.all(6),
                 child: Stack(children: [
                   ZoomChart(child: KundliChart(birth, transit: t)),
-                  const Positioned(left: 10, top: 8, child: Text('Pinch to zoom', style: TextStyle(fontSize: 11, color: CkColors.textSecondary))),
                 ]),
               ),
             ),

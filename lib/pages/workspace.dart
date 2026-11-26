@@ -15,6 +15,7 @@ import '../ui/ck_theme.dart';
 import '../ui/glass.dart';
 import '../ui/kundli_svg.dart';
 import '../ui/widgets.dart';
+import '../ui/zoom_chart.dart';
 import 'blueprint_pages.dart';
 import 'client_shell.dart';
 import 'predictions_pages.dart';
@@ -281,6 +282,25 @@ class _WorkspacePageState extends State<WorkspacePage> {
   }
 
   bool get _edit => workspaceEditing.value;
+
+  /// After edit mode opens, scroll so card [id] sits at screen y [y] again.
+  void _keepAt(String id, double y) {
+    void fix([int tries = 0]) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scroll.hasClients) {
+          if (tries < 3) fix(tries + 1);
+          return;
+        }
+        final i = _items.indexWhere((e) => e.id == id);
+        final box = _stackKey.currentContext?.findRenderObject() as RenderBox?;
+        if (i < 0 || box == null || !box.hasSize) return;
+        final now = box.localToGlobal(_rect(_items[i]).topLeft).dy;
+        final p = _scroll.position;
+        p.jumpTo((p.pixels + now - y).clamp(p.minScrollExtent, p.maxScrollExtent));
+      });
+    }
+    fix();
+  }
   void _save() => WorkspaceStore.save(_tab, _items);
 
   void _switchTab(int t) {
@@ -383,18 +403,17 @@ class _WorkspacePageState extends State<WorkspacePage> {
     });
   }
 
-  /// Free resize from a bottom corner, like an image crop handle: the
-  /// sideways part moves that corner's side edge, the up/down part moves the
-  /// bottom edge, a slant moves both. The opposite edges stay put.
-  void _resizeUpdate(int corner, Offset total) {
-    // corner: 0 bottom-left, 1 bottom-right
+  /// Free resize from any edge or corner, like an image crop handle.
+  /// [sx]: -1 left edge, 1 right edge, 0 neither; [sy]: -1 top, 1 bottom, 0
+  /// neither. The opposite edges stay put.
+  void _resizeUpdate(int sx, int sy, Offset total) {
     final base = _base;
     if (base == null || _resizing == null) return;
     final next = Grid.clone(base);
     final it = next.firstWhere((e) => e.id == _resizing);
-    var cols = it.size.cols, rows = it.size.rows, col = it.col;
+    var cols = it.size.cols, rows = it.size.rows, col = it.col, row = it.row;
     final hx = _cw / 2, hy = _unit / 2;
-    if (corner == 0) {
+    if (sx < 0) {
       if (cols == 2 && total.dx > hx) {
         cols = 1;
         col = 1;
@@ -402,7 +421,7 @@ class _WorkspacePageState extends State<WorkspacePage> {
         cols = 2;
         col = 0;
       }
-    } else {
+    } else if (sx > 0) {
       if (cols == 2 && total.dx < -hx) {
         cols = 1;
         col = 0;
@@ -410,13 +429,24 @@ class _WorkspacePageState extends State<WorkspacePage> {
         cols = 2;
       }
     }
-    if (rows == 1 && total.dy > hy) rows = 2;
-    if (rows == 2 && total.dy < -hy) rows = 1;
+    if (sy > 0) {
+      if (rows == 1 && total.dy > hy) rows = 2;
+      if (rows == 2 && total.dy < -hy) rows = 1;
+    } else if (sy < 0) {
+      if (rows == 1 && row > 0 && total.dy < -hy) {
+        rows = 2;
+        row -= 1;
+      } else if (rows == 2 && total.dy > hy) {
+        rows = 1;
+        row += 1;
+      }
+    }
     final ns = WSizeX.of(cols, rows);
     final cur = _items.firstWhere((e) => e.id == _resizing);
     if (ns != cur.size) HapticFeedback.selectionClick();
     it.size = ns;
     it.col = col;
+    it.row = row;
     Grid.settle(next, pin: it);
     setState(() => _items = next);
   }
@@ -500,6 +530,23 @@ class _WorkspacePageState extends State<WorkspacePage> {
                     selected: t == _tab,
                     dot: !WorkspaceStore.isDefault(t, t == _tab ? _items : WorkspaceStore.load(t)),
                     onTap: () => _switchTab(t)),
+              ),
+            ),
+          ],
+          if (!_edit) ...[
+            const SizedBox(width: 6),
+            // ✎ edit modules
+            Pressable(
+              scale: .92,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                workspaceEditing.value = true;
+              },
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: CkColors.panelStroke)),
+                child: const Icon(Icons.edit_rounded, size: 17, color: CkColors.cyan),
               ),
             ),
           ],
@@ -615,7 +662,12 @@ class _WorkspacePageState extends State<WorkspacePage> {
       },
       children: [
         const SizedBox(height: 4),
-        _grid(mId),
+        // swipe left / right: next / previous tab
+        SwipeArea(
+          canSwipe: (d) => _tab + d >= 0 && _tab + d < kTabCount,
+          onSwipe: (d) => _switchTab(_tab + d),
+          child: _grid(mId),
+        ),
         const SizedBox(height: 16),
       ],
     );
@@ -689,16 +741,38 @@ class _WorkspacePageState extends State<WorkspacePage> {
     );
   }
 
-  /// Thick L-shaped handle on a bottom corner; drag it any direction.
-  Widget _corner(WItem it, int corner) {
-    final left = corner == 0;
-    final active = it.id == _resizing && _cornerIdx == corner;
+  /// Invisible touch area on an edge or corner of a card in edit mode; the
+  /// two bottom corners also show the thick cyan L.
+  Widget _handle(WItem it, int sx, int sy) {
+    const c = 44.0, e = 20.0; // corner square, edge strip
+    final active = it.id == _resizing && _cornerIdx == sx * 3 + sy;
     const side = BorderSide(color: CkColors.cyan, width: 4.5);
+    final corner = sx != 0 && sy != 0;
+    final Widget mark = corner && sy > 0
+        ? Align(
+            alignment: sx < 0 ? Alignment.bottomLeft : Alignment.bottomRight,
+            child: AnimatedContainer(
+              duration: CkMotion.fast,
+              width: active ? 30 : 24,
+              height: active ? 30 : 24,
+              decoration: BoxDecoration(
+                border: Border(left: sx < 0 ? side : BorderSide.none, right: sx > 0 ? side : BorderSide.none, bottom: side),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: sx < 0 ? const Radius.circular(12) : Radius.zero,
+                  bottomRight: sx > 0 ? const Radius.circular(12) : Radius.zero,
+                ),
+              ),
+            ),
+          )
+        : const SizedBox.expand();
     return Positioned(
       // Inside the card: touches outside a widget's box never reach it.
-      left: left ? 0 : null,
-      right: left ? null : 0,
-      bottom: 0,
+      left: sx < 0 ? 0 : (sx == 0 ? c : null),
+      right: sx > 0 ? 0 : (sx == 0 ? c : null),
+      top: sy < 0 ? 0 : (sy == 0 ? c : null),
+      bottom: sy > 0 ? 0 : (sy == 0 ? c : null),
+      width: sx == 0 ? null : (corner ? c : e),
+      height: sy == 0 ? null : (corner ? c : e),
       child: RawGestureDetector(
         behavior: HitTestBehavior.opaque,
         gestures: {
@@ -707,12 +781,12 @@ class _WorkspacePageState extends State<WorkspacePage> {
             (r) => r
               ..onStart = (_) {
                 _drag = Offset.zero;
-                _cornerIdx = corner;
+                _cornerIdx = sx * 3 + sy;
                 _resizeStart(it);
               }
               ..onUpdate = (d) {
                 _drag += d.delta;
-                _resizeUpdate(corner, _drag);
+                _resizeUpdate(sx, sy, _drag);
               }
               ..onEnd = (_) {
                 _resizeEnd();
@@ -720,25 +794,7 @@ class _WorkspacePageState extends State<WorkspacePage> {
               ..onCancel = _resizeEnd,
           ),
         },
-        child: SizedBox(
-          width: 52,
-          height: 52,
-          child: Align(
-            alignment: left ? Alignment.bottomLeft : Alignment.bottomRight,
-            child: AnimatedContainer(
-              duration: CkMotion.fast,
-              width: active ? 30 : 24,
-              height: active ? 30 : 24,
-              decoration: BoxDecoration(
-                border: Border(left: left ? side : BorderSide.none, right: left ? BorderSide.none : side, bottom: side),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: left ? const Radius.circular(12) : Radius.zero,
-                  bottomRight: left ? Radius.zero : const Radius.circular(12),
-                ),
-              ),
-            ),
-          ),
-        ),
+        child: mark,
       ),
     );
   }
@@ -753,13 +809,16 @@ class _WorkspacePageState extends State<WorkspacePage> {
       ),
     );
     if (!_edit) {
-      return GestureDetector(
+      return Builder(builder: (tc) => GestureDetector(
         onLongPress: () {
           HapticFeedback.mediumImpact();
+          // keep this card where it is on screen when edit mode opens
+          final box = tc.findRenderObject() as RenderBox?;
+          if (box != null && box.hasSize) _keepAt(it.id, box.localToGlobal(Offset.zero).dy);
           workspaceEditing.value = true;
         },
         child: Pressable(scale: .985, onTap: m.page == null || m.ownTap ? null : () => pushModule(context, m.page!()), child: body),
-      );
+      ));
     }
     final active = it.id == _resizing;
     return Stack(clipBehavior: Clip.none, children: [
@@ -802,7 +861,9 @@ class _WorkspacePageState extends State<WorkspacePage> {
             },
           ),
         ),
-        for (final c in const [0, 1]) _corner(it, c),
+        // resize from all 4 edges and 4 corners; the grip and − below sit
+        // on top, so the top edge gives way to them
+        for (final (sx, sy) in const [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, -1), (-1, 1), (1, 1)]) _handle(it, sx, sy),
         // grip: drag right away
         Positioned(
           top: 2,
@@ -1077,11 +1138,11 @@ class _Load<T> extends StatefulWidget {
 class _LoadState<T> extends State<_Load<T>> {
   late Future<T> _f = widget.load();
   @override
-  Widget build(BuildContext context) => FutureBuilder<T>(
+  Widget build(BuildContext context) => FastFuture<T>(
         future: _f,
-        builder: (c, s) {
-          if (s.hasError) {
-            return Center(
+        builder: widget.builder,
+        loading: widget.skel ?? const _Loading(),
+        error: () => Center(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 const Text('Couldn\'t load', style: CkText.muted),
                 const SizedBox(height: 6),
@@ -1098,15 +1159,11 @@ class _LoadState<T> extends State<_Load<T>> {
                   ),
                 ),
               ]),
-            );
-          }
-          if (!s.hasData) return widget.skel ?? const _Loading();
-          return AnimatedSwitcher(duration: CkMotion.base, child: KeyedSubtree(key: const ValueKey('data'), child: widget.builder(s.data as T)));
-        },
+            ),
       );
 }
 
-Widget _future<T>(Future<T> Function() load, Widget Function(T) b, {Widget? skel}) => _Load<T>(load, b, skel: skel);
+Widget _future<T>(Future<T> Function() load, Widget Function(T) b, {Widget? skel, Key? key}) => _Load<T>(load, b, skel: skel, key: key);
 
 Widget _grahLabel(GrahPos p, {bool retroOnLabel = true, double size = 12.5}) => Row(mainAxisSize: MainAxisSize.min, children: [
       Container(width: 6, height: 6, decoration: BoxDecoration(color: grahColor(p.id), shape: BoxShape.circle)),
@@ -1166,7 +1223,7 @@ class _KundliW extends StatelessWidget {
                 ]);
               case WSize.l:
                 return Column(children: [
-                  Expanded(child: Center(child: chart)),
+                  Expanded(child: Center(child: ZoomChart(child: chart))),
                   const SizedBox(height: 8),
                   Row(children: [
                     for (var i = 0; i < 3; i++) ...[
@@ -1242,10 +1299,44 @@ class _BarsW extends StatelessWidget {
       ]);
 }
 
-class _TransitW extends StatelessWidget {
+class _TransitW extends StatefulWidget {
   final String mId;
   final WSize size;
   const _TransitW(this.mId, this.size);
+  @override
+  State<_TransitW> createState() => _TransitWState();
+}
+
+class _TransitWState extends State<_TransitW> {
+  DateTime? _at; // picked moment; null: now
+  int _step = 1; // index into _steps
+  static const _steps = <(String, Duration?, int)>[
+    ('1 Hour', Duration(hours: 1), 0),
+    ('1 Day', Duration(days: 1), 0),
+    ('1 Week', Duration(days: 7), 0),
+    ('1 Month', null, 1),
+    ('1 Year', null, 12),
+    ('10 Years', null, 120),
+  ];
+
+  String get mId => widget.mId;
+  WSize get size => widget.size;
+
+  DateTime _move(DateTime t, int dir) {
+    final (_, d, months) = _steps[_step];
+    if (d != null) return t.add(d * dir);
+    return DateTime(t.year, t.month + months * dir, t.day, t.hour, t.minute);
+  }
+
+  Future<void> _pick() async {
+    final cur = _at ?? DateTime.now();
+    final d = await showDatePicker(context: context, initialDate: cur, firstDate: DateTime(1900), lastDate: DateTime(2100));
+    if (d == null || !mounted) return;
+    final t = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(cur));
+    if (!mounted) return;
+    final tt = t ?? TimeOfDay.fromDateTime(cur);
+    setState(() => _at = DateTime(d.year, d.month, d.day, tt.hour, tt.minute));
+  }
 
   Widget _row(GrahPos p, {bool rashi = true}) => Expanded(
         child: Container(
@@ -1258,18 +1349,68 @@ class _TransitW extends StatelessWidget {
         ),
       );
 
+  Widget _arrow(IconData i, VoidCallback onTap) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: Padding(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), child: Icon(i, size: 22, color: CkColors.cyan)),
+      );
+
+  /// ‹ STEP 1 Day ▾ › — arrows move the moment by the step; the dropdown
+  /// shows about four steps at a time and scrolls.
+  Widget _stepper() => Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        _arrow(Icons.chevron_left_rounded, () => setState(() => _at = _move(_at ?? DateTime.now(), -1))),
+        PopupMenuButton<int>(
+          initialValue: _step,
+          color: CkColors.navySheet,
+          position: PopupMenuPosition.under,
+          constraints: const BoxConstraints(maxHeight: 4 * 44.0 + 12, minWidth: 120),
+          onSelected: (v) => setState(() => _step = v),
+          itemBuilder: (c) => [for (var i = 0; i < _steps.length; i++) PopupMenuItem(value: i, height: 44, child: Text(_steps[i].$1))],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text('STEP ', style: CkText.label),
+              Text('${_steps[_step].$1} ▾', style: CkText.mono(12, color: CkColors.cyan)),
+            ]),
+          ),
+        ),
+        _arrow(Icons.chevron_right_rounded, () => setState(() => _at = _move(_at ?? DateTime.now(), 1))),
+      ]);
+
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
+    final at = _at ?? DateTime.now();
+    final sameDay = DateUtils.isSameDay(at, DateTime.now());
+    final label = _at == null ? '● ${DateFormat('HH:mm').format(at)}' : DateFormat(sameDay ? 'HH:mm' : (size == WSize.s ? 'd MMM yy' : 'd MMM yy · HH:mm')).format(at);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      _WHead('Transit', trailing: Text('● ${DateFormat('HH:mm').format(now)}', style: CkText.mono(10.5, color: CkColors.cyan))),
+      _WHead('Transit',
+          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _pick,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                child: Text('$label ▾', style: CkText.mono(10.5, color: CkColors.cyan)),
+              ),
+            ),
+            if (_at != null)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => setState(() => _at = null),
+                child: const Padding(padding: EdgeInsets.fromLTRB(6, 2, 0, 2), child: Icon(Icons.restart_alt_rounded, size: 16, color: CkColors.cyan)),
+              ),
+          ])),
       const SizedBox(height: 6),
       Expanded(
-        child: _future<List<GrahPos>>(() => ClientData.of(mId).transit(now),
+        child: _future<List<GrahPos>>(key: ValueKey(DateFormat('yyyyMMddHHmm').format(at)), () => ClientData.of(mId).transit(at),
             skel: size == WSize.l ? _skelCircle() : size == WSize.s ? _skelRows(5, mid: false) : _skelRows(10, twoCols: size == WSize.w), (t) {
           final ps = _ordered(t);
           if (size == WSize.l) {
-            return _future<List<GrahPos>>(() => ClientData.of(mId).chart(), skel: _skelCircle(), (b) => Center(child: KundliChart(b, transit: t)));
+            return _future<List<GrahPos>>(() => ClientData.of(mId).chart(), skel: _skelCircle(),
+                (b) => Center(child: ZoomChart(child: KundliChart(b, transit: t))));
           }
           if (size == WSize.s) {
             return Column(children: [for (final p in ps.where((e) => const ['Su', 'Mo', 'Ju', 'Ra', 'Ke'].contains(e.id))) _row(p, rashi: false)]);
@@ -1284,6 +1425,7 @@ class _TransitW extends StatelessWidget {
           return Column(children: [for (final p in ps) _row(p)]);
         }),
       ),
+      if (size == WSize.l) _stepper(),
     ]);
   }
 }
@@ -1292,11 +1434,50 @@ class _TransitW extends StatelessWidget {
 /// with arrows) for days around today, each bar with its value.
 /// Small: yesterday · today · tomorrow. Tall: 5 days. Wide: 10 days.
 /// Large: 14 days plus strongest / weakest / average.
-class _DailyW extends StatelessWidget {
+/// Month shown in a card header: plain text + ▾ (no border), tap to pick a
+/// month; ⟲ appears once a month is picked and goes back to "around today".
+class _MonthChip extends StatelessWidget {
+  final DateTime shown;
+  final bool picked;
+  final bool short;
+  final ValueChanged<DateTime?> onChanged;
+  const _MonthChip({required this.shown, required this.picked, required this.short, required this.onChanged});
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () async {
+            final m = await pickMonth(context, shown);
+            if (m != null) onChanged(m);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+            child: Text('${DateFormat(short ? 'MMM yy' : 'MMM yyyy').format(shown).toUpperCase()} ▾', style: CkText.mono(10.5, color: CkColors.cyan)),
+          ),
+        ),
+        if (picked)
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => onChanged(null),
+            child: const Padding(padding: EdgeInsets.fromLTRB(6, 2, 0, 2), child: Icon(Icons.restart_alt_rounded, size: 16, color: CkColors.cyan)),
+          ),
+      ]);
+}
+
+class _DailyW extends StatefulWidget {
   final String mId;
   final WSize size;
   final bool signed;
   const _DailyW(this.mId, this.size, {required this.signed});
+  @override
+  State<_DailyW> createState() => _DailyWState();
+}
+
+class _DailyWState extends State<_DailyW> {
+  DateTime? _month; // picked month: the whole month; null: days around today
+  String get mId => widget.mId;
+  WSize get size => widget.size;
+  bool get signed => widget.signed;
 
   (int, int) get _span => switch (size) { WSize.s => (1, 1), WSize.t => (2, 2), WSize.w => (6, 3), WSize.l => (10, 3) };
 
@@ -1310,13 +1491,16 @@ class _DailyW extends StatelessWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final (back, ahead) = _span;
-    final from = today.subtract(Duration(days: back)), to = today.add(Duration(days: ahead));
+    final m = _month;
+    final from = m ?? today.subtract(Duration(days: back));
+    final to = m == null ? today.add(Duration(days: ahead)) : DateTime(m.year, m.month + 1, 0);
     final title = signed ? 'Sentiments' : 'Situations';
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      _WHead(title, trailing: Text(DateFormat('MMM yyyy').format(now).toUpperCase(), style: CkText.mono(10.5, color: CkColors.cyan))),
+      _WHead(title,
+          trailing: _MonthChip(shown: m ?? now, picked: m != null, short: size == WSize.s, onChanged: (v) => setState(() => _month = v))),
       const SizedBox(height: 8),
       Expanded(
-        child: _future<List<MapEntry<DateTime, double>>>(() => ClientData.of(mId).window(signed ? 'sent' : 'sit', from, to), skel: _skelDaily(back + ahead + 1, signed), (l) {
+        child: _future<List<MapEntry<DateTime, double>>>(key: ValueKey(from), () => ClientData.of(mId).window(signed ? 'sent' : 'sit', from, to), skel: _skelDaily(to.difference(from).inDays + 1, signed), (l) {
           if (l.isEmpty) return const Center(child: Text('No data for these days', style: CkText.muted));
           final chart = _bars(l, today);
           if (size != WSize.l) return chart;
@@ -1354,8 +1538,9 @@ class _DailyW extends StatelessWidget {
   Widget _bars(List<MapEntry<DateTime, double>> l, DateTime today) => LayoutBuilder(builder: (c, box) {
         const lab = 16.0;
         final few = l.length <= 3;
-        final fs = few ? 11.0 : 9.0;
-        final bw = few ? 18.0 : (l.length <= 5 ? 14.0 : 10.0);
+        final dense = box.maxWidth / l.length < 16; // whole month on a narrow card
+        final fs = few ? 11.0 : (dense ? 0.0 : 9.0);
+        final bw = few ? 18.0 : (l.length <= 5 ? 14.0 : (dense ? math.max(2.0, box.maxWidth / l.length - 3) : 10.0));
         final h = box.maxHeight - lab;
         final maxAbs = signed ? l.map((e) => e.value.abs()).fold<double>(1, math.max) : 100.0;
         final topPad = signed ? 20.0 : (few ? 32.0 : 28.0);
@@ -1380,7 +1565,7 @@ class _DailyW extends StatelessWidget {
                 Expanded(
                   child: Center(
                     child: Text(
-                      few && e.key == today ? 'Today' : '${e.key.day}',
+                      dense && e.key.day != 1 && e.key.day % 5 != 0 && e.key != today ? '' : few && e.key == today ? 'Today' : '${e.key.day}',
                       style: CkText.mono(9.5, color: e.key == today ? CkColors.cyan : CkColors.labelMono),
                     ),
                   ),
@@ -1415,7 +1600,7 @@ class _DailyW extends StatelessWidget {
           left: 0,
           right: 0,
           top: up ? half - bh - fs - 5 : half + bh + 2,
-          child: Text(_fmt(v, true), textAlign: TextAlign.center, style: CkText.mono(fs, color: Colors.white)),
+          child: fs == 0 ? const SizedBox() : Text(_fmt(v, true), textAlign: TextAlign.center, style: CkText.mono(fs, color: Colors.white)),
         ),
       ]);
     } else {
@@ -1442,10 +1627,12 @@ class _DailyW extends StatelessWidget {
           left: 0,
           right: 0,
           bottom: bh + 2,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            ZoneArrows(z, size: fs + 1),
-            Text(_fmt(v, false), style: CkText.mono(fs, color: Colors.white)),
-          ]),
+          child: fs == 0
+              ? const SizedBox()
+              : Column(mainAxisSize: MainAxisSize.min, children: [
+                  ZoneArrows(z, size: fs + 1),
+                  Text(_fmt(v, false), style: CkText.mono(fs, color: Colors.white)),
+                ]),
         ),
       ]);
     }
@@ -1504,10 +1691,17 @@ class _FiveDWState extends State<_FiveDW> {
   }();
 
   (int, int) get _span => switch (widget.size) { WSize.s => (1, 1), WSize.t => (2, 2), WSize.w => (6, 3), WSize.l => (13, 3) };
+  DateTime? _month; // picked month: the whole month; null: days around today
+
+  (DateTime, DateTime) get _range {
+    final m = _month;
+    if (m != null) return (m, DateTime(m.year, m.month + 1, 0));
+    final (b, a) = _span;
+    return (_today.subtract(Duration(days: b)), _today.add(Duration(days: a)));
+  }
 
   List<FiveDLoad> _loads() {
-    final (b, a) = _span;
-    final from = _today.subtract(Duration(days: b)), to = _today.add(Duration(days: a));
+    final (from, to) = _range;
     final d = ClientData.of(widget.mId);
     final out = <FiveDLoad>[];
     for (var m = DateTime(from.year, from.month); !m.isAfter(DateTime(to.year, to.month)); m = DateTime(m.year, m.month + 1)) {
@@ -1521,7 +1715,10 @@ class _FiveDWState extends State<_FiveDW> {
     final loads = _loads();
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _WHead('Sentiments 5D',
-          trailing: PopupMenuButton<String>(
+          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+            _MonthChip(shown: _month ?? _today, picked: _month != null, short: true, onChanged: (v) => setState(() => _month = v)),
+            const SizedBox(width: 6),
+            PopupMenuButton<String>(
             initialValue: _dim,
             color: CkColors.navySheet,
             position: PopupMenuPosition.under,
@@ -1535,14 +1732,15 @@ class _FiveDWState extends State<_FiveDW> {
               decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: CkColors.cyanStroke)),
               child: Text('${_dim.toUpperCase()} ▾', style: CkText.mono(10, color: CkColors.cyan)),
             ),
-          )),
+          ),
+          ])),
       const SizedBox(height: 8),
       Expanded(
         child: ListenableBuilder(
           listenable: Listenable.merge(loads),
           builder: (c, _) {
-            final (b, a) = _span;
-            final days = [for (var i = -b; i <= a; i++) _today.add(Duration(days: i))];
+            final (from, to) = _range;
+            final days = [for (var d = from; !d.isAfter(to); d = DateTime(d.year, d.month, d.day + 1)) d];
             final vals = <MapEntry<DateTime, double?>>[];
             var signed = false;
             for (final l in loads) {
@@ -1566,8 +1764,9 @@ class _FiveDWState extends State<_FiveDW> {
             final chart = LayoutBuilder(builder: (c, box) {
               const lab = 16.0, top = 18.0;
               final few = days.length <= 3;
+              final dense = box.maxWidth / days.length < 16;
               final h = box.maxHeight - lab;
-              final bw = few ? 18.0 : (days.length <= 5 ? 14.0 : 10.0);
+              final bw = few ? 18.0 : (days.length <= 5 ? 14.0 : (dense ? math.max(2.0, box.maxWidth / days.length - 3) : 10.0));
               return Column(children: [
                 SizedBox(
                   height: h,
@@ -1610,7 +1809,7 @@ class _FiveDWState extends State<_FiveDW> {
                                         left: 0,
                                         right: 0,
                                         bottom: bh + 2,
-                                        child: Text(pct(v * k), textAlign: TextAlign.center, style: CkText.mono(few ? 11 : 9, color: Colors.white)),
+                                        child: dense ? const SizedBox() : Text(pct(v * k), textAlign: TextAlign.center, style: CkText.mono(few ? 11 : 9, color: Colors.white)),
                                       ),
                                     ]);
                                   },
@@ -1625,7 +1824,7 @@ class _FiveDWState extends State<_FiveDW> {
                     for (final e in vals)
                       Expanded(
                         child: Center(
-                          child: Text(few && e.key == _today ? 'Today' : '${e.key.day}',
+                          child: Text(dense && e.key.day != 1 && e.key.day % 5 != 0 && e.key != _today ? '' : few && e.key == _today ? 'Today' : '${e.key.day}',
                               style: CkText.mono(9.5, color: e.key == _today ? CkColors.cyan : CkColors.labelMono)),
                         ),
                       ),
