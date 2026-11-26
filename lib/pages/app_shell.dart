@@ -241,8 +241,10 @@ class _HomePageState extends State<HomePage> {
         if (mounted) setState(() {});
       }
     }).catchError((_) {});
+    // only the greeting depends on the time: rebuild when the hour changes
     _tick = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) setState(() => _now = DateTime.now());
+      final n = DateTime.now();
+      if (mounted && n.hour != _now.hour) setState(() => _now = n);
     });
   }
 
@@ -281,7 +283,7 @@ class _HomePageState extends State<HomePage> {
             physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             padding: const EdgeInsets.fromLTRB(20, 16, 18, 170),
             children: [
-              Text(DateFormat('EEE · d MMM yyyy · HH:mm').format(_now).toUpperCase(), style: CkText.label),
+              _MinuteText((t) => DateFormat('EEE · d MMM yyyy · HH:mm').format(t).toUpperCase(), style: CkText.label),
               const SizedBox(height: 6),
               Text(name.isEmpty ? _greeting : '$_greeting, $name', style: CkText.h(26)),
               const SizedBox(height: 16),
@@ -360,7 +362,7 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(l == null ? (s.connectionState == ConnectionState.done ? 'Add a client to see the sky' : 'Reading the sky…') : 'Transit at ${DateFormat('HH:mm').format(_now)}',
+                      _MinuteText((t) => l == null ? (s.connectionState == ConnectionState.done ? 'Add a client to see the sky' : 'Reading the sky…') : 'Transit at ${DateFormat('HH:mm').format(t)}',
                           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
                       const SizedBox(height: 4),
                       if (l != null)
@@ -497,3 +499,37 @@ class SkyNowPage extends StatelessWidget {
 }
 
 String svgForSky(List<GrahPos> t) => KundliSvg.transit(const [], t);
+
+
+/// Text that updates itself each minute, so the whole page doesn't rebuild.
+class _MinuteText extends StatefulWidget {
+  final String Function(DateTime) text;
+  final TextStyle? style;
+  final int? maxLines;
+  final TextOverflow? overflow;
+  const _MinuteText(this.text, {this.style, this.maxLines, this.overflow});
+  @override
+  State<_MinuteText> createState() => _MinuteTextState();
+}
+
+class _MinuteTextState extends State<_MinuteText> {
+  DateTime _t = DateTime.now();
+  Timer? _timer;
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 20), (_) {
+      final n = DateTime.now();
+      if (mounted && n.minute != _t.minute) setState(() => _t = n);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Text(widget.text(_t), style: widget.style, maxLines: widget.maxLines, overflow: widget.overflow);
+}

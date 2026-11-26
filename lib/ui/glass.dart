@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -13,15 +14,29 @@ class CkBackground extends StatelessWidget {
   final Widget child;
   const CkBackground({super.key, required this.child});
 
+  /// True inside a screen that already draws the background.
+  static bool inScope(BuildContext context) => context.getInheritedWidgetOfExactType<_BgScope>() != null;
+
   @override
-  Widget build(BuildContext context) => ColoredBox(
-        color: CkColors.deepSpace,
-        child: Stack(fit: StackFit.expand, children: [
-          const CosmicBackground(),
-          // Every glass card on this screen shares one blur pass.
-          BackdropGroup(child: child),
-        ]),
-      );
+  Widget build(BuildContext context) {
+    // Pages inside a shell (client tabs, module pages) reuse the shell's
+    // background and blur group: one animated background per screen.
+    if (inScope(context)) return child;
+    return ColoredBox(
+      color: CkColors.deepSpace,
+      child: Stack(fit: StackFit.expand, children: [
+        const CosmicBackground(),
+        // Every glass card on this screen shares one blur pass.
+        BackdropGroup(child: _BgScope(child: child)),
+      ]),
+    );
+  }
+}
+
+class _BgScope extends InheritedWidget {
+  const _BgScope({required super.child});
+  @override
+  bool updateShouldNotify(_BgScope old) => false;
 }
 
 /// Drop-in replacement for [Scaffold]: paints the cosmic backdrop under a
@@ -255,19 +270,20 @@ class _FadeSlideInState extends State<FadeSlideIn>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _t,
-      child: widget.child,
-      builder: (_, c) {
-        final v = _t.value;
-        return Opacity(
-          opacity: v.clamp(0.0, 1.0),
-          child: Transform.translate(
+    return FadeTransition(
+      opacity: _t,
+      child: AnimatedBuilder(
+        animation: _t,
+        child: widget.child,
+        builder: (_, c) {
+          final v = _t.value;
+          if (v >= 1) return c!;
+          return Transform.translate(
             offset: Offset(0, (1 - v) * 16),
             child: Transform.scale(scale: .98 + .02 * v, child: c),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
@@ -449,39 +465,73 @@ class CkRoute<T> extends PageRouteBuilder<T> {
           pageBuilder: (c, a, b) => builder(c),
           transitionsBuilder: (c, a, b, child) {
             final t = CurvedAnimation(parent: a, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
-            return FadeTransition(
+            Widget page = FadeTransition(
               opacity: t,
               child: ScaleTransition(scale: Tween(begin: .97, end: 1.0).animate(t), child: child),
             );
+            // Pages sharing one background are see-through, so the page being
+            // covered fades out as the new one fades in (same look as before).
+            if (CkBackground.inScope(c)) {
+              page = FadeTransition(opacity: ReverseAnimation(CurvedAnimation(parent: b, curve: Curves.easeOutCubic)), child: page);
+            }
+            return page;
           },
         );
 }
 
 
 /// Keeps every tab alive and cross-fades the incoming one while it rises a
-/// little (MyAcharyaji tab switch: 400-450 ms). Hidden tabs pause their
-/// animations and ignore touches.
-class TabFader extends StatelessWidget {
+/// little (MyAcharyaji tab switch: 400-450 ms). Only the tab you're on and,
+/// during the fade, the one you left are drawn; the rest are offstage
+/// (state kept, nothing drawn, animations paused).
+class TabFader extends StatefulWidget {
   final int index;
   final List<Widget> children;
   const TabFader({super.key, required this.index, required this.children});
   @override
+  State<TabFader> createState() => _TabFaderState();
+}
+
+class _TabFaderState extends State<TabFader> {
+  int? _leaving;
+  Timer? _t;
+
+  @override
+  void didUpdateWidget(TabFader old) {
+    super.didUpdateWidget(old);
+    if (old.index != widget.index) {
+      _leaving = old.index;
+      _t?.cancel();
+      _t = Timer(const Duration(milliseconds: 470), () {
+        if (mounted) setState(() => _leaving = null);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) => Stack(children: [
-        for (var i = 0; i < children.length; i++)
+        for (var i = 0; i < widget.children.length; i++)
           Positioned.fill(
-            child: IgnorePointer(
-              ignoring: i != index,
-              child: TickerMode(
-                enabled: i == index,
+            child: Offstage(
+              offstage: i != widget.index && i != _leaving,
+              child: IgnorePointer(
+                ignoring: i != widget.index,
                 child: AnimatedOpacity(
-                  opacity: i == index ? 1 : 0,
+                  opacity: i == widget.index ? 1 : 0,
                   duration: const Duration(milliseconds: 400),
                   curve: kEase,
                   child: AnimatedSlide(
-                    offset: i == index ? Offset.zero : const Offset(0, .025),
+                    offset: i == widget.index ? Offset.zero : const Offset(0, .025),
                     duration: const Duration(milliseconds: 450),
                     curve: kEase,
-                    child: children[i],
+                    // the tab's own content pauses as soon as you leave it
+                    child: TickerMode(enabled: i == widget.index, child: widget.children[i]),
                   ),
                 ),
               ),

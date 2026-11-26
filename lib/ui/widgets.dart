@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -805,20 +804,9 @@ class ZoneArrows extends StatelessWidget {
   final double size;
   const ZoneArrows(this.zone, {super.key, this.size = 14});
   @override
-  Widget build(BuildContext context) {
-    final p = CustomPaint(size: Size.square(size), painter: _ArrowPainter(zone));
-    // soft glow: a blurred copy behind the sharp arrows (MyAcharyaji ZoneIcon)
-    return SizedBox.square(
-      dimension: size,
-      child: Stack(clipBehavior: Clip.none, children: [
-        Opacity(
-          opacity: .75,
-          child: ImageFiltered(imageFilter: ImageFilter.blur(sigmaX: size * .14, sigmaY: size * .14), child: p),
-        ),
-        p,
-      ]),
-    );
-  }
+  // Glow is painted by the same painter (blurred stroke under the sharp one),
+  // so there is no extra layer per arrow.
+  Widget build(BuildContext context) => CustomPaint(size: Size.square(size), painter: _ArrowPainter(zone));
 }
 
 /// A number that counts up (or down) to [value], fast then settling.
@@ -959,6 +947,10 @@ class HScroll extends StatefulWidget {
 
 class _HScrollState extends State<HScroll> {
   late final ScrollController _c = widget.controller ?? ScrollController();
+  // Edges change only when you reach or leave an end: rebuild the fade then,
+  // never the scrolled content itself.
+  final _edges = ValueNotifier<(bool, bool, bool)>((false, false, false)); // canL, canR, scrollable
+
   @override
   void initState() {
     super.initState();
@@ -967,13 +959,17 @@ class _HScrollState extends State<HScroll> {
   }
 
   void _tick() {
-    if (mounted) setState(() {});
+    if (!_c.hasClients || !_c.position.hasContentDimensions) return;
+    final p = _c.position;
+    final e = (p.pixels > 1, p.pixels < p.maxScrollExtent - 1, p.maxScrollExtent > 0);
+    if (e != _edges.value) _edges.value = e;
   }
 
   @override
   void dispose() {
     _c.removeListener(_tick);
     if (widget.controller == null) _c.dispose();
+    _edges.dispose();
     super.dispose();
   }
 
@@ -985,13 +981,7 @@ class _HScrollState extends State<HScroll> {
 
   @override
   Widget build(BuildContext context) {
-    final has = _c.hasClients && _c.position.hasContentDimensions;
-    final max = has ? _c.position.maxScrollExtent : 0.0;
-    final px = has ? _c.position.pixels.clamp(0.0, max) : 0.0;
-    final vp = has ? _c.position.viewportDimension : 1.0;
-    final canL = px > 1, canR = px < max - 1;
-    final frac = max <= 0 ? 1.0 : (vp / (vp + max)).clamp(.15, 1.0);
-    final pos = max <= 0 ? 0.0 : px / max;
+    final content = RepaintBoundary(child: widget.builder(_c));
     Widget arrow(String ch, bool on, int dir) => GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: on ? () => _step(dir) : null,
@@ -1007,43 +997,57 @@ class _HScrollState extends State<HScroll> {
             ),
           ),
         );
-    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      ShaderMask(
-        blendMode: BlendMode.dstIn,
-        shaderCallback: (r) => LinearGradient(
-          colors: [canL ? Colors.transparent : Colors.white, Colors.white, Colors.white, canR ? Colors.transparent : Colors.white],
-          stops: const [0, .06, .94, 1],
-        ).createShader(r),
-        child: widget.builder(_c),
-      ),
-      if (max > 0)
-        Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Row(children: [
-            arrow('‹', canL, -1),
-            Expanded(
-              child: LayoutBuilder(builder: (c, b) {
-                final tw = b.maxWidth * frac;
-                return SizedBox(
-                  height: 2,
-                  child: Stack(children: [
-                    Container(decoration: BoxDecoration(color: const Color(0x14FFFFFF), borderRadius: BorderRadius.circular(1))),
-                    Positioned(
-                      left: (b.maxWidth - tw) * pos,
-                      width: tw,
-                      top: 0,
-                      bottom: 0,
-                      child: Container(decoration: BoxDecoration(color: const Color(0x59FFFFFF), borderRadius: BorderRadius.circular(1))),
-                    ),
-                  ]),
-                );
-              }),
+    return ValueListenableBuilder<(bool, bool, bool)>(
+      valueListenable: _edges,
+      child: content,
+      builder: (c, e, content) {
+        final (canL, canR, scrollable) = e;
+        return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          ShaderMask(
+            blendMode: BlendMode.dstIn,
+            shaderCallback: (r) => LinearGradient(
+              colors: [canL ? Colors.transparent : Colors.white, Colors.white, Colors.white, canR ? Colors.transparent : Colors.white],
+              stops: const [0, .06, .94, 1],
+            ).createShader(r),
+            child: content,
+          ),
+          if (scrollable)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(children: [
+                arrow('‹', canL, -1),
+                Expanded(child: RepaintBoundary(child: CustomPaint(size: const Size(double.infinity, 2), painter: _ThumbPainter(_c)))),
+                arrow('›', canR, 1),
+              ]),
             ),
-            arrow('›', canR, 1),
-          ]),
-        ),
-    ]);
+        ]);
+      },
+    );
   }
+}
+
+/// The thin bar: repaints itself as you scroll, nothing else does.
+class _ThumbPainter extends CustomPainter {
+  final ScrollController c;
+  _ThumbPainter(this.c) : super(repaint: c);
+  static final _track = Paint()..color = const Color(0x14FFFFFF);
+  static final _thumb = Paint()..color = const Color(0x59FFFFFF);
+  @override
+  void paint(Canvas canvas, Size s) {
+    canvas.drawRRect(RRect.fromRectAndRadius(Offset.zero & s, const Radius.circular(1)), _track);
+    if (!c.hasClients || !c.position.hasContentDimensions) return;
+    final p = c.position;
+    final max = p.maxScrollExtent;
+    if (max <= 0) return;
+    final vp = p.viewportDimension;
+    final frac = (vp / (vp + max)).clamp(.15, 1.0);
+    final pos = (p.pixels / max).clamp(0.0, 1.0);
+    final tw = s.width * frac;
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH((s.width - tw) * pos, 0, tw, s.height), const Radius.circular(1)), _thumb);
+  }
+
+  @override
+  bool shouldRepaint(_ThumbPainter old) => old.c != c;
 }
 
 class _ArrowPainter extends CustomPainter {
@@ -1058,19 +1062,32 @@ class _ArrowPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     final w = s.width;
+    final path = Path();
     if (z.dir == 0) {
-      canvas.drawLine(Offset(w * .2, w * .5), Offset(w * .8, w * .5), p);
-      return;
-    }
-    final ys = z.arrows == 1 ? [.5] : z.arrows == 2 ? [.38, .66] : [.24, .5, .76];
-    for (final y in ys) {
+      path
+        ..moveTo(w * .2, w * .5)
+        ..lineTo(w * .8, w * .5);
+    } else {
+      final ys = z.arrows == 1 ? [.5] : z.arrows == 2 ? [.38, .66] : [.24, .5, .76];
       final dy = w * .16 * z.dir;
-      final path = Path()
-        ..moveTo(w * .2, w * y + dy)
-        ..lineTo(w * .5, w * y - dy)
-        ..lineTo(w * .8, w * y + dy);
-      canvas.drawPath(path, p);
+      for (final y in ys) {
+        path
+          ..moveTo(w * .2, w * y + dy)
+          ..lineTo(w * .5, w * y - dy)
+          ..lineTo(w * .8, w * y + dy);
+      }
     }
+    // soft glow under the sharp arrows (same look as a blurred copy at 75%)
+    canvas.drawPath(
+        path,
+        Paint()
+          ..color = z.color.withValues(alpha: .75)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = s.width * .12
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, w * .14));
+    canvas.drawPath(path, p);
   }
 
   @override
