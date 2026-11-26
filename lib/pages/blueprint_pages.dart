@@ -417,12 +417,18 @@ class _CoordinatesPageState extends State<CoordinatesPage> {
   Widget build(BuildContext context) => ClientPage(
         title: 'GRAH Coordinates',
         children: [
-          Segmented<bool>(
-            values: const [false, true],
-            selected: _abs,
-            label: (v) => v ? '0–360°' : 'Rashi + degree',
-            onChanged: (v) => setState(() => _abs = v),
-            height: 42,
+          Glass(
+            radius: 16,
+            padding: const EdgeInsets.fromLTRB(16, 6, 10, 6),
+            child: Row(children: [
+              const Expanded(child: Text('Show degree as 0–360°', style: TextStyle(fontSize: 14))),
+              Switch(
+                value: _abs,
+                activeColor: const Color(0xFF06204F),
+                activeTrackColor: CkColors.cyan,
+                onChanged: (v) => setState(() => _abs = v),
+              ),
+            ]),
           ),
           LoadView<List<GrahPos>>(
             future: _f,
@@ -452,7 +458,9 @@ class _CoordinatesPageState extends State<CoordinatesPage> {
                   ),
                   Container(width: 1, height: 30 + _rowH * planets.length, color: Colors.white.withOpacity(.12), margin: const EdgeInsets.only(right: 12)),
                   Expanded(
-                    child: SingleChildScrollView(
+                    child: HScroll(
+                      builder: (sc) => SingleChildScrollView(
+                      controller: sc,
                       scrollDirection: Axis.horizontal,
                       physics: const BouncingScrollPhysics(),
                       child: Padding(
@@ -480,6 +488,7 @@ class _CoordinatesPageState extends State<CoordinatesPage> {
                         ]),
                       ),
                     ),
+                    ),
                   ),
                 ]),
               ),
@@ -489,8 +498,6 @@ class _CoordinatesPageState extends State<CoordinatesPage> {
                   RetroBadge(),
                   SizedBox(width: 6),
                   Text('Retrograde (vakri)', style: TextStyle(fontSize: 11.5, color: CkColors.textSecondary)),
-                  Spacer(),
-                  Text('Swipe for Tatva, Swabhav, Swami', style: TextStyle(fontSize: 11.5, color: CkColors.textSecondary)),
                 ]),
               ),
             ]),

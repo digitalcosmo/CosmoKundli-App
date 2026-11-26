@@ -683,10 +683,10 @@ class _MonthSheetState extends State<_MonthSheet> {
             ),
           ]),
           const SizedBox(height: 14),
-          SizedBox(
+          HScroll(controller: _years, builder: (sc) => SizedBox(
             height: 40,
             child: ListView.builder(
-              controller: _years,
+              controller: sc,
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               itemExtent: _chipW,
@@ -715,7 +715,7 @@ class _MonthSheetState extends State<_MonthSheet> {
                 );
               },
             ),
-          ),
+          )),
           const SizedBox(height: 16),
           GridView.count(
             shrinkWrap: true,

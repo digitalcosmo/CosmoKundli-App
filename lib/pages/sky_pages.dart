@@ -340,17 +340,28 @@ class SkyArc extends StatelessWidget {
               ]),
             ),
             Positioned(left: 0, right: 0, top: height + 26, child: Container(height: 2, color: const Color(0x338CBEFF))),
+            // filled part of the line up to now
             Positioned(
-              left: (w * mins / 1440) - 9,
-              top: height + 18,
+              left: 0,
+              width: w * mins / 1440,
+              top: height + 26,
               child: Container(
-                width: 18,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: CkColors.cyan,
-                  shape: BoxShape.circle,
-                  boxShadow: const [BoxShadow(color: Color(0x995CE1FF), blurRadius: 10)],
-                ),
+                height: 2,
+                decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF4FC3FF), Color(0xFF2E6BFF)])),
+              ),
+            ),
+            // handle: two glowing arrows on the line, saying "drag sideways"
+            Positioned(
+              left: (w * mins / 1440) - 16,
+              top: height + 16,
+              child: const SizedBox(
+                width: 32,
+                height: 22,
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  _HandleArrow(left: true),
+                  SizedBox(width: 3),
+                  _HandleArrow(left: false),
+                ]),
               ),
             ),
           ]),
@@ -358,6 +369,20 @@ class SkyArc extends StatelessWidget {
       );
     });
   }
+}
+
+class _HandleArrow extends StatelessWidget {
+  final bool left;
+  const _HandleArrow({required this.left});
+  @override
+  Widget build(BuildContext context) => Text(left ? '‹' : '›',
+      style: const TextStyle(
+        fontSize: 22,
+        height: 1,
+        fontWeight: FontWeight.w800,
+        color: CkColors.cyan,
+        shadows: [Shadow(color: Color(0xCC5CE1FF), blurRadius: 8)],
+      ));
 }
 
 class _ArcPainter extends CustomPainter {
@@ -921,9 +946,9 @@ class _SearchPageState extends State<SearchPage> {
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel', style: TextStyle(color: CkColors.cyan))),
             ]),
           ),
-          SizedBox(
+          HScroll(builder: (sc) => SizedBox(
             height: 46,
-            child: ListView(
+            child: ListView(controller: sc, 
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
               children: [
@@ -946,7 +971,7 @@ class _SearchPageState extends State<SearchPage> {
                   ),
               ],
             ),
-          ),
+          )),
           Expanded(
             child: ListView(
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,

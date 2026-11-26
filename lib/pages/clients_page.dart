@@ -287,9 +287,9 @@ class _ClientsPageState extends State<ClientsPage> {
                             const SizedBox(height: 20),
                             Text('RECENTLY OPENED', style: CkText.label),
                             const SizedBox(height: 10),
-                            SizedBox(
+                            HScroll(builder: (sc) => SizedBox(
                               height: 82,
-                              child: ListView(
+                              child: ListView(controller: sc, 
                                 scrollDirection: Axis.horizontal,
                                 children: recent
                                     .map((r) => Padding(
@@ -311,7 +311,7 @@ class _ClientsPageState extends State<ClientsPage> {
                                         ))
                                     .toList(),
                               ),
-                            ),
+                            )),
                           ],
                           const SizedBox(height: 12),
                           _filters(all),
@@ -451,13 +451,18 @@ class _ClientCardState extends State<_ClientCard> {
       cl.timeText,
       cl.city,
     ].where((e) => e.trim().isNotEmpty).join(' · ');
-    return FadeSlideIn(
-      index: widget.index,
-      child: Padding(
+    // only the first screenful animates in; cards built while scrolling
+    // appear at once (no delayed fades = no flicker on fast scroll)
+    final Widget Function(Widget) enter = widget.index < 10 ? (c) => FadeSlideIn(index: widget.index, child: c) : (c) => c;
+    return RepaintBoundary(child: enter(
+      Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           child: Stack(children: [
+            // actions exist only while the card is swiped open, so they never
+            // show through the see-through card while scrolling
+            if (_dx < 0 || _dragging)
             Positioned.fill(
               child: Align(
                 alignment: Alignment.centerRight,
@@ -483,8 +488,11 @@ class _ClientCardState extends State<_ClientCard> {
                   scale: .98,
                   onTap: () => _dx < 0 ? _snap(false) : openClient(cl),
                   child: Glass(
-                    radius: 16,
-                    shadow: false,
+                    radius: 18,
+                    // long fast lists: no live blur per card (smooth scrolling);
+                    // a touch more fill keeps the same glass look
+                    frost: false,
+                    tint: const Color(0x0AFFFFFF),
                     padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
                     child: Row(children: [
                       _Avatar(cl, size: 44),
@@ -519,7 +527,7 @@ class _ClientCardState extends State<_ClientCard> {
           ]),
         ),
       ),
-    );
+    ));
   }
 }
 

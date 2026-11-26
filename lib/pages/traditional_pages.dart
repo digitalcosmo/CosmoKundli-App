@@ -107,6 +107,36 @@ class ClientPanchang {
   }
 }
 
+/// Picks a partner for [c] from their Melapak list (opposite gender first)
+/// and returns the match result, or null if cancelled.
+Future<Map<String, dynamic>?> pickMelapakMatch(BuildContext context, Client c) async {
+  final m = await showModalBottomSheet<Map<String, dynamic>>(
+    context: context,
+    useRootNavigator: true,
+    isScrollControlled: true,
+    builder: (_) => SafeArea(
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * .7,
+        child: _PickList<Map<String, dynamic>>(
+          title: 'Match ${c.name} with',
+          load: () async {
+            final l = Api.list(await Api.post(Endpoints.melapakOppList, {'mID': c.mId}), ['members', 'list']);
+            final want = c.isFemale ? 'm' : 'f';
+            final f = l.where((e) => (e['Gender'] ?? '').toString().toLowerCase().startsWith(want)).toList();
+            return f.isEmpty ? l : f;
+          },
+          name: (e) => '${e['Name'] ?? ''}',
+          sub: (e) => '${e['Gender'] ?? ''}',
+        ),
+      ),
+    ),
+  );
+  if (m == null) return null;
+  final r = await Api.post(Endpoints.melapakExisting, {'mID': c.mId, 'oID': '${m['oID']}'});
+  LastMatch.save(c.mId, r);
+  return r;
+}
+
 /// Last Melapak result per client, kept on the device for the workspace card.
 class LastMatch {
   static String _k(String mId) => 'melapak_last_$mId';
@@ -116,6 +146,8 @@ class LastMatch {
       Session.prefs.setString(_k(mId), jsonEncode(r));
     } catch (_) {}
   }
+
+  static void remove(String mId) => Session.prefs.remove(_k(mId));
 
   static Map<String, dynamic>? of(String mId) {
     final raw = Session.prefs.getString(_k(mId));

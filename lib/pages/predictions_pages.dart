@@ -198,9 +198,9 @@ class _SentimentsPageState extends State<SentimentsPage> {
                     ]),
                   ),
                 const SizedBox(height: 10),
-                SizedBox(
+                HScroll(builder: (sc) => SizedBox(
                   height: 92,
-                  child: ListView.separated(
+                  child: ListView.separated(controller: sc, 
                     scrollDirection: Axis.horizontal,
                     itemCount: weeks.length,
                     separatorBuilder: (_, __) => const SizedBox(width: 8),
@@ -228,7 +228,7 @@ class _SentimentsPageState extends State<SentimentsPage> {
                       );
                     },
                   ),
-                ),
+                )),
               ]);
             },
           ),

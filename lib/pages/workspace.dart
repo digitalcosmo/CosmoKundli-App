@@ -60,7 +60,9 @@ class WModule {
   final WSize defaultSize;
   final Widget Function(String mId, WSize size)? card;
   final Widget Function()? page;
-  const WModule(this.id, this.title, this.sub, this.group, this.defaultSize, this.card, this.page);
+  /// The card handles its own taps (no full page behind it).
+  final bool ownTap;
+  const WModule(this.id, this.title, this.sub, this.group, this.defaultSize, this.card, this.page, {this.ownTap = false});
   bool get soon => page == null;
   Widget build(String mId, WSize size) => card != null ? card!(mId, size) : _GenericW(this, size);
 }
@@ -77,7 +79,7 @@ final kWorkspaceModules = <String, WModule>{
   'situations': WModule('situations', 'Situations', '7 zones, month by month', 'Predictions', WSize.w, (m, s) => _DailyW(m, s, signed: false), () => const SituationsPage()),
   'sentiments5d': WModule('sentiments5d', 'Sentiments 5D', 'Career, Finance, Health, Social, Love', 'Predictions', WSize.w, (m, s) => _FiveDW(m, s), () => const Sentiments5DPage()),
   'panchang': WModule('panchang', 'Panchang', 'At the moment of birth', 'Traditional', WSize.w, (m, s) => _PanchangW(m, s), () => const PanchangPage()),
-  'melapak': WModule('melapak', 'Melapak', 'Match with a partner', 'Traditional', WSize.w, (m, s) => _MelapakW(m, s), () => const MelapakPage()),
+  'melapak': WModule('melapak', 'Melapak', 'Match with a partner', 'Traditional', WSize.w, (m, s) => _MelapakW(m, s), () => const MelapakPage(), ownTap: true),
 };
 
 const kTabCount = 3;
@@ -756,7 +758,7 @@ class _WorkspacePageState extends State<WorkspacePage> {
           HapticFeedback.mediumImpact();
           workspaceEditing.value = true;
         },
-        child: Pressable(scale: .985, onTap: m.page == null ? null : () => pushModule(context, m.page!()), child: body),
+        child: Pressable(scale: .985, onTap: m.page == null || m.ownTap ? null : () => pushModule(context, m.page!()), child: body),
       );
     }
     final active = it.id == _resizing;
@@ -1729,10 +1731,49 @@ class _PanchangW extends StatelessWidget {
 }
 
 /// Last Melapak result of this client (saved when a match is opened).
-class _MelapakW extends StatelessWidget {
+class _MelapakW extends StatefulWidget {
   final String mId;
   final WSize size;
   const _MelapakW(this.mId, this.size);
+  @override
+  State<_MelapakW> createState() => _MelapakWState();
+}
+
+class _MelapakWState extends State<_MelapakW> {
+  String get mId => widget.mId;
+  WSize get size => widget.size;
+  bool _busy = false;
+
+  Future<void> _pick() async {
+    final c = Session.client.value;
+    if (c == null) return;
+    setState(() => _busy = true);
+    try {
+      await pickMelapakMatch(context, c);
+    } catch (_) {
+      if (mounted) toast(context, 'Couldn\'t match. Try again.', error: true);
+    }
+    if (mounted) setState(() => _busy = false);
+  }
+
+  void _remove() => setState(() => LastMatch.remove(mId));
+
+  void _open(Map<String, dynamic> r) => pushModule(context, MelapakResultPage(future: Future.value(r)));
+
+  Widget _icon(IconData i, Color c, VoidCallback on, String tip) => Tooltip(
+        message: tip,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: on,
+          child: Container(
+            width: 30,
+            height: 30,
+            margin: const EdgeInsets.only(left: 6),
+            decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0x0EFFFFFF), border: Border.all(color: const Color(0x1FFFFFFF))),
+            child: Icon(i, size: 15, color: c),
+          ),
+        ),
+      );
 
   static const _rows = [
     ('Varna', 'Varn_Points', 1),
@@ -1787,11 +1828,22 @@ class _MelapakW extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = LastMatch.of(mId);
     final me = Session.client.value;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const _WHead('Melapak'),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _busy ? null : (r == null ? _pick : () => _open(r)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _WHead('Melapak',
+          trailing: r == null
+              ? null
+              : Row(mainAxisSize: MainAxisSize.min, children: [
+                  _icon(Icons.autorenew_rounded, CkColors.cyan, _pick, 'Switch partner'),
+                  _icon(Icons.close_rounded, const Color(0xFFF6B8B8), _remove, 'Remove match'),
+                ])),
       const SizedBox(height: 6),
       Expanded(
-        child: r == null
+        child: _busy
+            ? const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.2, color: CkColors.cyan)))
+            : r == null
             ? Center(
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
                   const Text('No match yet', style: CkText.muted),
@@ -1851,7 +1903,8 @@ class _MelapakW extends StatelessWidget {
                 }
               }),
       ),
-    ]);
+    ]),
+    );
   }
 }
 
