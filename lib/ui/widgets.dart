@@ -282,13 +282,14 @@ class LoadView<T> extends StatelessWidget {
   final Widget Function(T data) builder;
   final VoidCallback? onRetry;
   final double minHeight;
-  const LoadView({super.key, required this.future, required this.builder, this.onRetry, this.minHeight = 220});
+  final Widget? skeleton;
+  const LoadView({super.key, required this.future, required this.builder, this.onRetry, this.minHeight = 220, this.skeleton});
   @override
   Widget build(BuildContext context) => FutureBuilder<T>(
         future: future,
         builder: (c, s) {
           if (s.connectionState != ConnectionState.done) {
-            return minHeight >= 300 ? SkeletonCard(height: minHeight) : const SkeletonList(rows: 5);
+            return skeleton ?? (minHeight >= 300 ? SkeletonCard(height: minHeight) : const SkeletonList(rows: 5));
           }
           if (s.hasError || !s.hasData) {
             return ErrorBox(
@@ -1420,4 +1421,252 @@ class SortButton<T> extends StatelessWidget {
       ),
     );
   }
+}
+
+
+// ───────────────────────── shaped skeletons
+// Each mirrors the real layout it stands in for, so nothing jumps on load.
+
+class Skels {
+  static Widget _glass(Widget child, {EdgeInsets padding = const EdgeInsets.all(14), double top = 12, double radius = 18}) =>
+      Glass(margin: EdgeInsets.only(top: top), radius: radius, padding: padding, child: child);
+
+  /// Three stat tiles (Strongest · Weakest · Average).
+  static Widget stats() => Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Row(children: [
+          for (var i = 0; i < 3; i++) ...[
+            if (i > 0) const SizedBox(width: 7),
+            Expanded(
+              child: Glass(
+                radius: 14,
+                shadow: false,
+                padding: const EdgeInsets.fromLTRB(11, 10, 11, 10),
+                child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Skeleton(width: 54, height: 8, radius: 3),
+                  SizedBox(height: 7),
+                  Skeleton(width: 46, height: 15, radius: 4),
+                  SizedBox(height: 5),
+                  Skeleton(width: 40, height: 8, radius: 3),
+                ]),
+              ),
+            ),
+          ],
+        ]),
+      );
+
+  /// Daily bar chart card (signed: bars both sides of a middle line).
+  static Widget dailyChart({bool signed = true, double height = 210}) => _glass(
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Row(children: [Skeleton(width: 40, height: 9, radius: 3), Spacer(), Skeleton(width: 46, height: 18, radius: 6)]),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: height,
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              for (var i = 0; i < 9; i++)
+                Expanded(
+                  child: signed
+                      ? Column(children: [
+                          Expanded(child: Align(alignment: Alignment.bottomCenter, child: i % 3 != 2 ? Skeleton(width: 14, height: (height / 2 - 12) * (.35 + (i * 37 % 55) / 100), radius: 3) : null)),
+                          Expanded(child: Align(alignment: Alignment.topCenter, child: i % 3 == 2 ? Skeleton(width: 14, height: (height / 2 - 12) * (.3 + (i * 23 % 45) / 100), radius: 3) : null)),
+                        ])
+                      : Align(alignment: Alignment.bottomCenter, child: Skeleton(width: 14, height: (height - 24) * (.4 + (i * 29 % 50) / 100), radius: 3)),
+                ),
+            ]),
+          ),
+          const SizedBox(height: 8),
+          Row(children: [for (var i = 0; i < 9; i++) const Expanded(child: Center(child: Skeleton(width: 14, height: 8, radius: 3)))]),
+        ]),
+      );
+
+  /// Selected-day card under a chart.
+  static Widget dayCard() => _glass(
+        const Row(children: [
+          Skeleton(width: 44, height: 44, radius: 12),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Skeleton(width: 120, height: 13, radius: 4),
+              SizedBox(height: 7),
+              Skeleton(width: 170, height: 9, radius: 3),
+            ]),
+          ),
+        ]),
+      );
+
+  /// Sentiments / Situations page body.
+  static Widget daily({bool signed = true}) => Column(children: [stats(), dailyChart(signed: signed), dayCard()]);
+
+  /// Kundli circle card with a row of three pills.
+  static Widget kundli() => Column(children: [
+        _glass(
+          LayoutBuilder(builder: (c, b) {
+            final d = b.maxWidth * .86;
+            return Center(child: Skeleton(width: d, height: d, radius: d / 2));
+          }),
+          padding: const EdgeInsets.all(16),
+        ),
+        const SizedBox(height: 10),
+        Row(children: [
+          for (var i = 0; i < 3; i++) ...[if (i > 0) const SizedBox(width: 7), const Expanded(child: Skeleton(height: 56, radius: 12))],
+        ]),
+      ]);
+
+  /// Table card: label, middle and value columns.
+  static Widget table(int rows, {bool mid = true}) => _glass(
+        Column(children: [
+          for (var i = 0; i < rows; i++)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 9),
+              child: Row(children: [
+                const Skeleton(width: 34, height: 11, radius: 4),
+                const SizedBox(width: 14),
+                if (mid) Expanded(child: Align(alignment: Alignment.centerLeft, child: Skeleton(width: 60.0 + (i * 17 % 40), height: 10, radius: 4))) else const Spacer(),
+                const Skeleton(width: 48, height: 11, radius: 4),
+              ]),
+            ),
+        ]),
+      );
+
+  /// GRAH bar chart card (Power / Flavor).
+  static Widget bars({int n = 9, double height = 220}) => _glass(
+        Column(children: [
+          SizedBox(
+            height: height,
+            child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              for (var i = 0; i < n; i++)
+                Expanded(child: Center(child: Skeleton(width: 18, height: height * (.35 + (i * 31 % 60) / 100), radius: 4))),
+            ]),
+          ),
+          const SizedBox(height: 8),
+          Row(children: [for (var i = 0; i < n; i++) const Expanded(child: Center(child: Skeleton(width: 16, height: 9, radius: 3)))]),
+        ]),
+      );
+
+  /// Melapak result: two people, the score ring, then the 8 kootas.
+  static Widget match() => Column(children: [
+        Row(children: [
+          for (var i = 0; i < 2; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Expanded(
+              child: Glass(
+                padding: const EdgeInsets.all(12),
+                child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Skeleton(width: 36, height: 8, radius: 3),
+                  SizedBox(height: 8),
+                  Skeleton(width: 90, height: 13, radius: 4),
+                  SizedBox(height: 8),
+                  Skeleton(width: 70, height: 9, radius: 3),
+                ]),
+              ),
+            ),
+          ],
+        ]),
+        _glass(const Row(children: [
+          Skeleton(width: 100, height: 100, radius: 50),
+          SizedBox(width: 16),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Skeleton(width: 70, height: 8, radius: 3),
+              SizedBox(height: 8),
+              Skeleton(width: 130, height: 16, radius: 4),
+              SizedBox(height: 8),
+              Skeleton(width: 150, height: 9, radius: 3),
+            ]),
+          ),
+        ])),
+        table(8, mid: false),
+      ]);
+
+  /// Month calendar (5D).
+  static Widget calendar() => Column(children: [
+        stats(),
+        _glass(
+          Column(children: [
+            Row(children: [for (var i = 0; i < 7; i++) const Expanded(child: Center(child: Skeleton(width: 14, height: 8, radius: 3)))]),
+            const SizedBox(height: 10),
+            for (var r = 0; r < 5; r++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(children: [
+                  for (var i = 0; i < 7; i++) const Expanded(child: Padding(padding: EdgeInsets.symmetric(horizontal: 3), child: Skeleton(height: 40, radius: 9))),
+                ]),
+              ),
+          ]),
+        ),
+        dayCard(),
+      ]);
+
+  /// Client cards (avatar, name, one line, ⋮).
+  static Widget clientCards(int n) => Column(children: [
+        for (var i = 0; i < n; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Glass(
+              radius: 16,
+              shadow: false,
+              padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+              child: Row(children: [
+                const Skeleton(width: 44, height: 44, radius: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Skeleton(width: 110.0 + (i * 23 % 50), height: 13, radius: 4),
+                    const SizedBox(height: 8),
+                    Skeleton(width: 170.0 + (i * 13 % 40), height: 9, radius: 3),
+                  ]),
+                ),
+                const Skeleton(width: 5, height: 18, radius: 2),
+              ]),
+            ),
+          ),
+      ]);
+
+  /// Report rows: cover thumbnail, three lines, share + open buttons.
+  static Widget reportRows(int n) => Column(children: [
+        for (var i = 0; i < n; i++)
+          Glass(
+            margin: const EdgeInsets.only(top: 10),
+            radius: 16,
+            padding: const EdgeInsets.all(12),
+            child: Row(children: [
+              const Skeleton(width: 40, height: 54, radius: 6),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Skeleton(width: 100.0 + (i * 19 % 40), height: 13, radius: 4),
+                  const SizedBox(height: 7),
+                  const Skeleton(width: 120, height: 11, radius: 4),
+                  const SizedBox(height: 7),
+                  const Skeleton(width: 150, height: 9, radius: 3),
+                ]),
+              ),
+              const Skeleton(width: 24, height: 24, radius: 6),
+              const SizedBox(width: 12),
+              const Skeleton(width: 46, height: 46, radius: 13),
+            ]),
+          ),
+      ]);
+
+  /// Plain rows of a list card (transactions, people).
+  static Widget rows(int n) => _glass(
+        Column(children: [
+          for (var i = 0; i < n; i++)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(children: [
+                const Skeleton(width: 34, height: 34, radius: 17),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Skeleton(width: 120.0 + (i * 19 % 40), height: 12, radius: 4),
+                    const SizedBox(height: 6),
+                    const Skeleton(width: 80, height: 9, radius: 3),
+                  ]),
+                ),
+                const Skeleton(width: 50, height: 12, radius: 4),
+              ]),
+            ),
+        ]),
+      );
 }

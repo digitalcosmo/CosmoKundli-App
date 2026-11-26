@@ -111,6 +111,7 @@ class _SentimentsPageState extends State<SentimentsPage> {
           MonthBar(month: _month, onChanged: _setMonth),
           LoadView<List<MapEntry<DateTime, double>>>(
             future: _f,
+            skeleton: Skels.daily(),
             onRetry: () => _setMonth(_month),
             builder: (l) {
               if (l.isEmpty) {
@@ -295,6 +296,7 @@ class _SituationsPageState extends State<SituationsPage> {
           MonthBar(month: _month, onChanged: _setMonth),
           LoadView<List<MapEntry<DateTime, double>>>(
             future: _f,
+            skeleton: Skels.daily(signed: false),
             onRetry: () => _setMonth(_month),
             builder: (l) {
               if (l.isEmpty) {
@@ -476,12 +478,11 @@ class _Sentiments5DPageState extends State<Sentiments5DPage> {
             builder: (c, s) {
               if (s.hasError) return Padding(padding: const EdgeInsets.only(top: 12), child: ErrorBox(message: 'Couldn\'t load Sentiments 5D.', onRetry: () => _setMonth(_month)));
               if (!s.hasData) {
-                return const Padding(
-                  padding: EdgeInsets.only(top: 12),
+                return Padding(
+                  padding: const EdgeInsets.only(top: 12),
                   child: Column(children: [
-                    Text('Loading 5 dimensions for the month…', style: TextStyle(fontSize: 12, color: CkColors.textDim)),
-                    SizedBox(height: 10),
-                    SkeletonCard(height: 300),
+                    const Text('Loading 5 dimensions for the month…', style: TextStyle(fontSize: 12, color: CkColors.textDim)),
+                    Skels.calendar(),
                   ]),
                 );
               }

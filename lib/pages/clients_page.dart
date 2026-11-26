@@ -320,7 +320,7 @@ class _ClientsPageState extends State<ClientsPage> {
                       ),
                     ),
                     if (s.connectionState != ConnectionState.done)
-                      const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: 18), child: SkeletonList(rows: 8)))
+                      SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 18), child: Skels.clientCards(8)))
                     else if (s.hasError)
                       SliverToBoxAdapter(
                           child: Padding(

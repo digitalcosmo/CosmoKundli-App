@@ -904,6 +904,7 @@ class _CreditsPageState extends State<CreditsPage> {
         children: [
           LoadView<Map<String, dynamic>>(
             future: _f,
+            skeleton: Skels.rows(8),
             onRetry: () => setState(() => _f = Api.post(Endpoints.credits, {'uID': Session.uid})),
             builder: (r) {
               final all = Api.list(r, ['list']);
@@ -995,6 +996,7 @@ class _HistoryPageState extends State<HistoryPage> {
           ),
           LoadView<Map<String, dynamic>>(
             future: _f,
+            skeleton: Skels.reportRows(5),
             onRetry: () => setState(() => _f = Api.post(Endpoints.reportHistory, {'uID': Session.uid})),
             builder: (r) {
               final l = Api.list(r, ['list'])

@@ -392,7 +392,7 @@ class _PickClientState extends State<_PickClient> {
                     future: _f,
                     builder: (c, s) {
                       if (s.hasError) return const Center(child: Text('Couldn\'t load clients', style: CkText.muted));
-                      if (!s.hasData) return const SkeletonList(rows: 5);
+                      if (!s.hasData) return Skels.table(10);
                       final l = s.data!.where((e) => _q.isEmpty || '${e.name} ${e.city} ${e.dobRaw}'.toLowerCase().contains(_q)).toList();
                       return ListView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, children: [
                         Padding(padding: const EdgeInsets.only(top: 14, bottom: 4), child: Text('${l.length} CLIENTS', style: CkText.label)),

@@ -795,7 +795,7 @@ class _PanchangNowPageState extends State<PanchangNowPage> {
                 builder: (c, s) {
                   if (s.hasError && _last == null) return ErrorBox(message: 'Couldn\'t load Panchang.', onRetry: _load);
                   final d = s.data ?? _last;
-                  if (d == null) return const SkeletonList(rows: 8, leading: false);
+                  if (d == null) return Skels.table(8, mid: false);
                   return AnimatedOpacity(
                     duration: CkMotion.fast,
                     opacity: s.connectionState == ConnectionState.waiting ? .55 : 1,

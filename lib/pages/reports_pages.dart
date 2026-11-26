@@ -662,7 +662,7 @@ class _ClientReportsPageState extends State<ClientReportsPage> with _HistoryPoll
           future: history,
           builder: (ctx, s) {
             if (s.hasError) return ErrorBox(message: 'Couldn\'t load reports.', onRetry: reloadHistory);
-            if (!s.hasData) return const SkeletonList(rows: 3);
+            if (!s.hasData) return Skels.reportRows(3);
             final l = reportsFor(s.data!, c);
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) watch(l);
@@ -1166,7 +1166,7 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
                     if (s.hasError)
                       ErrorBox(message: 'Couldn\'t load reports.', onRetry: reloadHistory)
                     else if (!s.hasData)
-                      const SkeletonList(rows: 6)
+                      Skels.reportRows(6)
                     else if (l.isEmpty)
                       const Padding(
                           padding: EdgeInsets.only(top: 14),

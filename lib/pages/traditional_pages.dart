@@ -203,6 +203,7 @@ class _PanchangPageState extends State<PanchangPage> {
         const SizedBox(height: 12),
         LoadView<Map<String, dynamic>>(
           future: _f,
+          skeleton: Skels.table(8, mid: false),
           onRetry: () => setState(() => _f = _load(refresh: true)),
           builder: (r) {
             final d = PanchangData.parse(r, at: _at, lat: _lat, lng: _lng);
@@ -434,6 +435,7 @@ class MelapakResultPage extends StatelessWidget {
         children: [
           LoadView<Map<String, dynamic>>(
             future: future,
+            skeleton: Skels.match(),
             builder: (r) {
               if (!Api.ok(r) && !r.containsKey('Total_Gun_Match')) {
                 return ErrorBox(message: Api.msg(r, 'Couldn\'t calculate this match.'));

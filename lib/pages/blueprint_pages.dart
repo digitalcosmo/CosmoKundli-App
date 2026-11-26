@@ -122,6 +122,7 @@ class _BlueprintSectionState extends State<BlueprintSection> {
         children: [
           LoadView<List<GrahPos>>(
             future: _chart,
+            skeleton: Skels.kundli(),
             onRetry: _refresh,
             builder: (planets) => Column(children: [
               FadeSlideIn(
@@ -181,6 +182,7 @@ class _BlueprintSectionState extends State<BlueprintSection> {
           ),
           LoadView<Map<String, double>>(
             future: _bal,
+            skeleton: Column(children: [Skels.bars(height: 120), Skels.bars(height: 120)]),
             minHeight: 120,
             onRetry: _refresh,
             builder: (m) => Column(children: [
@@ -211,13 +213,15 @@ class KundliPage extends StatefulWidget {
 }
 
 class _KundliPageState extends State<KundliPage> {
-  final _f = _data.chart();
+  late Future<List<GrahPos>> _f = _data.chart();
   @override
   Widget build(BuildContext context) => ClientPage(
         title: 'CosmoKundli',
         children: [
           LoadView<List<GrahPos>>(
             future: _f,
+            skeleton: Column(children: [Skels.kundli(), Skels.table(10)]),
+            onRetry: () => setState(() => _f = _data.chart()),
             builder: (planets) {
               final ordered = [for (final id in kGrahOrder) ...planets.where((p) => p.id == id)];
               return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -403,7 +407,7 @@ class CoordinatesPage extends StatefulWidget {
 }
 
 class _CoordinatesPageState extends State<CoordinatesPage> {
-  final _f = _data.chart();
+  late Future<List<GrahPos>> _f = _data.chart();
   bool _abs = false;
 
   static const _cols = [('Rashi', 100.0), ('Degree', 108.0), ('Tatva', 80.0), ('Swabhav', 88.0), ('Swami', 88.0)];
@@ -422,6 +426,8 @@ class _CoordinatesPageState extends State<CoordinatesPage> {
           ),
           LoadView<List<GrahPos>>(
             future: _f,
+            skeleton: Skels.table(10),
+            onRetry: () => setState(() => _f = _data.chart()),
             builder: (planets) => Column(children: [
               Glass(
                 margin: const EdgeInsets.only(top: 12),
@@ -503,7 +509,7 @@ class StrengthPage extends StatefulWidget {
 }
 
 class _StrengthPageState extends State<StrengthPage> {
-  final _f = _data.shadbal();
+  late Future<Map<String, double>> _f = _data.shadbal();
   late bool _flavor = widget.flavor;
   @override
   Widget build(BuildContext context) => ClientPage(
@@ -519,6 +525,8 @@ class _StrengthPageState extends State<StrengthPage> {
           const SizedBox(height: 12),
           LoadView<Map<String, double>>(
             future: _f,
+            skeleton: Skels.bars(),
+            onRetry: () => setState(() => _f = _data.shadbal()),
             builder: (m) {
               final v = _ordered(m, _flavor ? _flavorOrder : _powerOrder);
               if (v.isEmpty) {
