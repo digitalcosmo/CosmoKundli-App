@@ -245,6 +245,8 @@ class _WorkspacePageState extends State<WorkspacePage> {
   Offset _grab = Offset.zero;
   Offset _finger = Offset.zero;
   String? _resizing;
+  Offset _drag = Offset.zero; // total drag since the resize began
+  int _cornerIdx = 1;
   // undo after remove
   List<WItem>? _undo;
   String _undoName = '';
@@ -379,15 +381,18 @@ class _WorkspacePageState extends State<WorkspacePage> {
     });
   }
 
-  void _resizeUpdate(int edge, Offset total) {
-    // edge: 0 left, 1 right, 2 bottom
+  /// Free resize from a bottom corner, like an image crop handle: the
+  /// sideways part moves that corner's side edge, the up/down part moves the
+  /// bottom edge, a slant moves both. The opposite edges stay put.
+  void _resizeUpdate(int corner, Offset total) {
+    // corner: 0 bottom-left, 1 bottom-right
     final base = _base;
     if (base == null || _resizing == null) return;
     final next = Grid.clone(base);
     final it = next.firstWhere((e) => e.id == _resizing);
     var cols = it.size.cols, rows = it.size.rows, col = it.col;
     final hx = _cw / 2, hy = _unit / 2;
-    if (edge == 0) {
+    if (corner == 0) {
       if (cols == 2 && total.dx > hx) {
         cols = 1;
         col = 1;
@@ -395,17 +400,16 @@ class _WorkspacePageState extends State<WorkspacePage> {
         cols = 2;
         col = 0;
       }
-    } else if (edge == 1) {
+    } else {
       if (cols == 2 && total.dx < -hx) {
         cols = 1;
         col = 0;
       } else if (cols == 1 && col == 0 && total.dx > hx) {
         cols = 2;
       }
-    } else {
-      if (rows == 1 && total.dy > hy) rows = 2;
-      if (rows == 2 && total.dy < -hy) rows = 1;
     }
+    if (rows == 1 && total.dy > hy) rows = 2;
+    if (rows == 2 && total.dy < -hy) rows = 1;
     final ns = WSizeX.of(cols, rows);
     final cur = _items.firstWhere((e) => e.id == _resizing);
     if (ns != cur.size) HapticFeedback.selectionClick();
@@ -627,7 +631,7 @@ class _WorkspacePageState extends State<WorkspacePage> {
               child: Column(children: [
                 _tabs(),
                 const SizedBox(height: 8),
-                Text('DRAG ⋮⋮ TO MOVE · DRAG ANY GLOWING EDGE TO RESIZE · LONG-PRESS A TAB TO RENAME',
+                Text('DRAG ⋮⋮ TO MOVE · DRAG A CORNER TO RESIZE · LONG-PRESS A TAB TO RENAME',
                     textAlign: TextAlign.center, style: CkText.label.copyWith(fontSize: 9)),
               ]),
             ),
@@ -683,41 +687,58 @@ class _WorkspacePageState extends State<WorkspacePage> {
     );
   }
 
-  /// One edge strip that resizes. The strip is mostly inside the card so
-  /// neighbours never fight over a touch in the gap between them.
-  Widget _edge(WItem it, int edge) {
-    Offset total = Offset.zero;
-    final strip = RawGestureDetector(
-      behavior: HitTestBehavior.opaque,
-      gestures: {
-        _EagerPan: GestureRecognizerFactoryWithHandlers<_EagerPan>(
-          () => _EagerPan(),
-          (r) => r
-            ..onStart = (_) {
-              total = Offset.zero;
-              _resizeStart(it);
-            }
-            ..onUpdate = (d) {
-              total += d.delta;
-              _resizeUpdate(edge, total);
-            }
-            ..onEnd = (_) {
-                    _resizeEnd();
-                  }
-            ..onCancel = _resizeEnd,
+  /// Thick L-shaped handle on a bottom corner; drag it any direction.
+  Widget _corner(WItem it, int corner) {
+    final left = corner == 0;
+    final active = it.id == _resizing && _cornerIdx == corner;
+    const side = BorderSide(color: CkColors.cyan, width: 4.5);
+    return Positioned(
+      // Inside the card: touches outside a widget's box never reach it.
+      left: left ? 0 : null,
+      right: left ? null : 0,
+      bottom: 0,
+      child: RawGestureDetector(
+        behavior: HitTestBehavior.opaque,
+        gestures: {
+          _EagerPan: GestureRecognizerFactoryWithHandlers<_EagerPan>(
+            () => _EagerPan(),
+            (r) => r
+              ..onStart = (_) {
+                _drag = Offset.zero;
+                _cornerIdx = corner;
+                _resizeStart(it);
+              }
+              ..onUpdate = (d) {
+                _drag += d.delta;
+                _resizeUpdate(corner, _drag);
+              }
+              ..onEnd = (_) {
+                _resizeEnd();
+              }
+              ..onCancel = _resizeEnd,
+          ),
+        },
+        child: SizedBox(
+          width: 52,
+          height: 52,
+          child: Align(
+            alignment: left ? Alignment.bottomLeft : Alignment.bottomRight,
+            child: AnimatedContainer(
+              duration: CkMotion.fast,
+              width: active ? 30 : 24,
+              height: active ? 30 : 24,
+              decoration: BoxDecoration(
+                border: Border(left: left ? side : BorderSide.none, right: left ? BorderSide.none : side, bottom: side),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: left ? const Radius.circular(12) : Radius.zero,
+                  bottomRight: left ? Radius.zero : const Radius.circular(12),
+                ),
+              ),
+            ),
+          ),
         ),
-      },
-      child: const SizedBox.expand(),
+      ),
     );
-    const out = 6.0, inner = 16.0;
-    switch (edge) {
-      case 0:
-        return Positioned(left: -out, top: 34, bottom: 20, width: out + inner, child: strip);
-      case 1:
-        return Positioned(right: -out, top: 34, bottom: 20, width: out + inner, child: strip);
-      default:
-        return Positioned(left: 20, right: 20, bottom: -out, height: out + inner, child: strip);
-    }
   }
 
   Widget _tile(WItem it, String mId, {bool floating = false}) {
@@ -779,7 +800,7 @@ class _WorkspacePageState extends State<WorkspacePage> {
             },
           ),
         ),
-        for (final e in const [0, 1, 2]) _edge(it, e),
+        for (final c in const [0, 1]) _corner(it, c),
         // grip: drag right away
         Positioned(
           top: 2,
@@ -807,8 +828,8 @@ class _WorkspacePageState extends State<WorkspacePage> {
         ),
         // remove: small mark, big tap area
         Positioned(
-          top: -16,
-          left: -16,
+          top: 0,
+          left: 0,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => _remove(it),
