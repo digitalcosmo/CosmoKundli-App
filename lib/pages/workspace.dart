@@ -701,7 +701,9 @@ class _WorkspacePageState extends State<WorkspacePage> {
               total += d.delta;
               _resizeUpdate(edge, total);
             }
-            ..onEnd = (_) => _resizeEnd()
+            ..onEnd = (_) {
+                    _resizeEnd();
+                  }
             ..onCancel = _resizeEnd,
         ),
       },
@@ -761,9 +763,15 @@ class _WorkspacePageState extends State<WorkspacePage> {
               LongPressGestureRecognizer: GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
                 () => LongPressGestureRecognizer(duration: const Duration(milliseconds: 260)),
                 (r) => r
-                  ..onLongPressStart = (d) => _moveStart(it, d.globalPosition)
-                  ..onLongPressMoveUpdate = (d) => _moveUpdate(d.globalPosition)
-                  ..onLongPressEnd = (_) => _moveEnd()
+                  ..onLongPressStart = (d) {
+                    _moveStart(it, d.globalPosition);
+                  }
+                  ..onLongPressMoveUpdate = (d) {
+                    _moveUpdate(d.globalPosition);
+                  }
+                  ..onLongPressEnd = (_) {
+                    _moveEnd();
+                  }
                   ..onLongPressCancel = () {
                     if (_moving != null) _moveEnd();
                   },
@@ -782,9 +790,15 @@ class _WorkspacePageState extends State<WorkspacePage> {
               _EagerPan: GestureRecognizerFactoryWithHandlers<_EagerPan>(
                 () => _EagerPan(),
                 (r) => r
-                  ..onStart = (d) => _moveStart(it, d.globalPosition)
-                  ..onUpdate = (d) => _moveUpdate(d.globalPosition)
-                  ..onEnd = (_) => _moveEnd()
+                  ..onStart = (d) {
+                    _moveStart(it, d.globalPosition);
+                  }
+                  ..onUpdate = (d) {
+                    _moveUpdate(d.globalPosition);
+                  }
+                  ..onEnd = (_) {
+                    _moveEnd();
+                  }
                   ..onCancel = _moveEnd,
               ),
             },

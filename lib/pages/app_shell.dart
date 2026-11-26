@@ -73,7 +73,7 @@ class _AppShellState extends State<AppShell> {
   }
 
   static const _items = [
-    (Icons.space_dashboard_outlined, 'Home'),
+    (Icons.space_dashboard_outlined, 'Dashboard'),
     (Icons.people_outline_rounded, 'Clients'),
     (Icons.description_outlined, 'Reports'),
     (Icons.person_outline_rounded, 'Account'),
@@ -189,7 +189,6 @@ class _HomePageState extends State<HomePage> {
   late Future<List<GrahPos>?> _sky = _loadSky();
   late Future<Map<String, dynamic>> _credits = Api.post(Endpoints.credits, {'uID': Session.uid});
   late Future<List<ReportItem>> _reports = fetchReports();
-  late Future<List<Client>> _clients = fetchClients();
   Timer? _tick;
   DateTime _now = DateTime.now();
 
@@ -226,7 +225,6 @@ class _HomePageState extends State<HomePage> {
       _sky = _loadSky();
       _credits = Api.post(Endpoints.credits, {'uID': Session.uid});
       _reports = fetchReports();
-      _clients = fetchClients();
     });
   }
 
@@ -275,9 +273,7 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 12),
               const FadeSlideIn(index: 2, child: PanchangNowCard()),
               const SizedBox(height: 18),
-              FadeSlideIn(index: 3, child: _recent()),
-              const SizedBox(height: 18),
-              FadeSlideIn(index: 4, child: _reportsCard()),
+              FadeSlideIn(index: 3, child: _reportsCard()),
             ],
           ),
         ),
@@ -358,65 +354,6 @@ class _HomePageState extends State<HomePage> {
             },
           ),
         ),
-      );
-
-  Widget _recent() => FutureBuilder<List<Client>>(
-        future: _clients,
-        builder: (c, s) {
-          final all = s.data ?? [];
-          var rec = Session.recent.where((r) => all.isEmpty || all.any((a) => a.mId == r.mId)).toList();
-          if (rec.isEmpty) rec = all.take(5).toList();
-          return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Text('RECENT CLIENTS', style: CkText.label),
-              const Spacer(),
-              GestureDetector(
-                onTap: () => appTabRequest.value = 1,
-                child: Text(all.isEmpty ? 'All clients' : 'All ${all.length}',
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: CkColors.cyan)),
-              ),
-            ]),
-            const SizedBox(height: 10),
-            if (rec.isEmpty)
-              Glass(
-                padding: const EdgeInsets.all(14),
-                child: Text(s.connectionState == ConnectionState.done ? 'No clients yet.' : 'Loading…', style: CkText.muted),
-              )
-            else
-              SizedBox(
-                height: 112,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: rec.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 10),
-                  itemBuilder: (_, i) {
-                    final cl = all.firstWhere((a) => a.mId == rec[i].mId, orElse: () => rec[i]);
-                    return Pressable(
-                      onTap: () => openClient(cl),
-                      child: Glass(
-                        width: 156,
-                        padding: const EdgeInsets.all(12),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Container(
-                            width: 34,
-                            height: 34,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0x598CBEFF))),
-                            child: Text(cl.initials, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                          ),
-                          const Spacer(),
-                          Text(cl.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                          const SizedBox(height: 3),
-                          Text(cl.birth == null ? cl.dateText : DateFormat('dd-MM-yyyy').format(cl.birth!),
-                              style: CkText.mono(11, color: CkColors.textSecondary)),
-                        ]),
-                      ),
-                    );
-                  },
-                ),
-              ),
-          ]);
-        },
       );
 
   Widget _reportsCard() => Glass(
