@@ -80,6 +80,8 @@ class Endpoints {
   static const birthPlanetInfo = AppUrls.bithPlanetInfo;
   static const shadbal = AppUrls.shadbal;
   static const starPowerDaily = AppUrls.Star_Power_Daily;
+  static const starPowerReport = 'Star_Power_Report';
+  static const cosmoPowerDaily = 'Cosmo_Power_Daily';
   static const gocharAnimated = AppUrls.GocharAnimated;
   static const melapakOppList = AppUrls.Melapak_Opp_User_List;
   static const melapakExisting = AppUrls.Melapak_Details_Existing_User;

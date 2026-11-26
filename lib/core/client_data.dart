@@ -96,4 +96,85 @@ class ClientData {
     out.sort((a, b) => a.key.compareTo(b.key));
     return out;
   }
+
+  /// Situations for a month (Cosmo_Power_Daily): {Date: "01 Aug", Value: 62.7}, 0..100.
+  Future<List<MapEntry<DateTime, double>>> situations(DateTime month) async {
+    final r = await Api.post(Endpoints.cosmoPowerDaily, {'mID': mId, 'Month': DateFormat('yyyy-MM').format(month)});
+    final out = <MapEntry<DateTime, double>>[];
+    var day = 1;
+    for (final e in Api.list(r, ['list'])) {
+      final raw = (e['Date'] ?? e['date'] ?? '').toString().trim();
+      final n = int.tryParse(RegExp(r'^\d{1,2}').firstMatch(raw)?.group(0) ?? '');
+      DateTime? d;
+      try {
+        d = DateFormat('yyyy-MM-dd').parseStrict(raw);
+      } catch (_) {}
+      d ??= DateTime(month.year, month.month, n ?? day);
+      final v = e['Value'] ?? e['value'];
+      out.add(MapEntry(d, v is num ? v.toDouble() : double.tryParse('$v') ?? 0));
+      day++;
+    }
+    out.sort((a, b) => a.key.compareTo(b.key));
+    return out;
+  }
+
+  static const kDims = ['Career', 'Finance', 'Health', 'Social', 'Love'];
+  final _fiveD = <String, Future<Map<DateTime, Map<String, double>>>>{};
+
+  /// Sentiments 5D for a whole month, built from Star_Power_Report, which
+  /// gives one dimension for one ISO week per call (5 dimensions x ~5 weeks).
+  Future<Map<DateTime, Map<String, double>>> sentiments5D(DateTime month) {
+    final k = '${month.year}-${month.month}';
+    return _fiveD[k] ??= _load5D(month).catchError((Object e) {
+      _fiveD.remove(k);
+      throw e;
+    });
+  }
+
+  Future<Map<DateTime, Map<String, double>>> _load5D(DateTime month) async {
+    final first = DateTime(month.year, month.month, 1);
+    final last = DateTime(month.year, month.month + 1, 0);
+    final mondays = <DateTime>[];
+    for (var m = first.subtract(Duration(days: first.weekday - 1)); !m.isAfter(last); m = m.add(const Duration(days: 7))) {
+      mondays.add(m);
+    }
+    (int, int) isoWeek(DateTime monday) {
+      final thu = monday.add(const Duration(days: 3));
+      final jan1 = DateTime(thu.year, 1, 1);
+      final week = ((thu.difference(jan1).inDays) ~/ 7) + 1;
+      return (week, thu.year);
+    }
+
+    const keys = ['Moday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const alt = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final out = <DateTime, Map<String, double>>{};
+    final calls = <Future<void>>[];
+    for (final dim in kDims) {
+      for (final mon in mondays) {
+        final w = isoWeek(mon);
+        calls.add(() async {
+          final Map<String, dynamic> r;
+          try {
+            r = await Api.post(Endpoints.starPowerReport, {'mID': mId, 'Type': dim, 'Weeknumber': '${w.$1}', 'Year': '${w.$2}'});
+          } catch (_) {
+            return;
+          }
+          final l = Api.list(r, ['list']);
+          if (l.isEmpty) return;
+          final row = l.first;
+          for (var k = 0; k < 7; k++) {
+            final d = mon.add(Duration(days: k));
+            if (d.month != month.month) continue;
+            final v = row[keys[k]] ?? row[alt[k]];
+            final n = v is num ? v.toDouble() : double.tryParse('$v');
+            if (n == null) continue;
+            out.putIfAbsent(DateTime(d.year, d.month, d.day), () => {})[dim] = n;
+          }
+        }());
+      }
+    }
+    await Future.wait(calls);
+    if (out.isEmpty) throw Exception('No 5D data');
+    return out;
+  }
 }

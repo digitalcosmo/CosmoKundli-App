@@ -865,7 +865,7 @@ class DailyBarChartState extends State<DailyBarChart> {
 
   List<double> get ticks => widget.signed ? [100, 50, 0, -50, -100] : [100, 85, 65, 55, 45, 35, 15, 0];
   double get height => widget.height;
-  double _y(double t) => widget.signed ? (100 - t) / 200 * height : (100 - t) / 100 * height;
+  double _y(double t) => widget.signed ? (100 - t) / 200 * height : 30 + (100 - t) / 100 * (height - 30);
   String _lab(double t) => widget.signed ? '${t > 0 ? '+' : ''}${t.round()}%' : '${t.round()}%';
 
   @override
@@ -939,7 +939,7 @@ class DailyBarChartState extends State<DailyBarChart> {
     final sel = widget.selected == i;
     final today = widget.today == i;
     final up = v >= 0;
-    final h = signed ? v.abs() / 100 * height / 2 : v / 100 * height;
+    final h = signed ? v.abs() / 100 * height / 2 : v / 100 * (height - 30);
     final color = signed ? null : zoneOf(v).color;
     // Software: .sps-bar--pos linear-gradient(0deg,#73F4C4,#10B981); .sps-bar--neg linear-gradient(0deg,#EF4444,#F6B8B8)
     final grad = signed
@@ -986,7 +986,12 @@ class DailyBarChartState extends State<DailyBarChart> {
             Positioned(
               bottom: signed ? (up ? height / 2 + h + 3 : null) : h + 3,
               top: signed && !up ? height / 2 + h + 3 : null,
-              child: Text(label, style: CkText.mono(10, color: Colors.white)),
+              child: signed
+                  ? Text(label, style: CkText.mono(10, color: Colors.white))
+                  : Column(mainAxisSize: MainAxisSize.min, children: [
+                      ZoneArrows(zoneOf(v), size: 13),
+                      Text(label, style: CkText.mono(10, color: Colors.white)),
+                    ]),
             ),
           ]),
         ),

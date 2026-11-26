@@ -32,8 +32,8 @@ final _groups = <String, List<_Mod>>{
   ],
   'Predictions': [
     _Mod('Sentiments', 'Daily, month by month', () => const SentimentsPage()),
-    _Mod('Situations', 'Coming soon'),
-    _Mod('Sentiments 5D', 'Coming soon'),
+    _Mod('Situations', '7 zones, month by month', () => const SituationsPage()),
+    _Mod('Sentiments 5D', 'Career, Finance, Health, Social, Love', () => const Sentiments5DPage()),
   ],
   'Traditional': [
     _Mod('Panchang', 'At the moment of birth', () => const PanchangPage()),
