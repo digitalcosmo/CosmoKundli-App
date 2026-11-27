@@ -85,9 +85,9 @@ class _ClientShellState extends State<ClientShell> {
           Get.back();
         }
       },
-      // each tab page draws its own background; the shell draws none
+      // the shell draws one background behind all tabs; each tab's root page
+      // draws only its content (pages pushed inside a tab draw their own)
       child: CkScaffold(
-        background: false,
         body: Stack(children: [
           TabFader(
             index: _index,
@@ -98,7 +98,7 @@ class _ClientShellState extends State<ClientShell> {
                     key: _keys[i],
                     observers: [UnfocusObserver()],
                     onGenerateRoute: (s) => PageRouteBuilder(
-                        pageBuilder: (_, __, ___) => _tabs[i].root(),
+                        pageBuilder: (_, __, ___) => SharedBackdrop(child: _tabs[i].root()),
                         transitionDuration: Duration.zero),
                   ),
                 ),

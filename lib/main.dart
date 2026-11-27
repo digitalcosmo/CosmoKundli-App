@@ -40,8 +40,9 @@ class CosmoKundliApp extends StatelessWidget {
       theme: CkTheme.dark(),
       darkTheme: CkTheme.dark(),
       themeMode: ThemeMode.dark,
-      defaultTransition: Transition.noTransition,
-      transitionDuration: const Duration(milliseconds: 240),
+      // motion spec: pages slide in fully drawn (as CkRoute)
+      defaultTransition: Transition.cupertino,
+      transitionDuration: const Duration(milliseconds: 300),
       home: const SplashPage(),
       navigatorObservers: [UnfocusObserver()],
       builder: (context, child) => MediaQuery(
@@ -56,6 +57,6 @@ class CosmoKundliApp extends StatelessWidget {
   }
 }
 
-void goHome() => Get.offAll(() => const AppShell());
-void goLogin() => Get.offAll(() => const LoginPage());
+void goHome() => Get.offAll(() => const AppShell(), transition: Transition.fadeIn);
+void goLogin() => Get.offAll(() => const LoginPage(), transition: Transition.fadeIn);
 

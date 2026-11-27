@@ -1,6 +1,6 @@
-import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/cupertino.dart' show CupertinoPageTransition;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -12,83 +12,45 @@ const String kCkBackground = 'assets/images/ck_bg.jpg';
 
 /// Deep-space backdrop shared by every page (same art as the software).
 ///
-/// Motion: the background is solid from the first frame of a page or tab;
-/// only the content fades in (page opened) or fades and rises (tab switched
-/// to). Closing a page fades its content first, then the page.
-class CkBackground extends StatefulWidget {
+/// Motion spec (Phase 1b): a page is fully drawn from its first frame, with
+/// its own background; it arrives by sliding in ([CkRoute]), never by fading
+/// from empty. Inside a shell that already paints the background for its
+/// tabs ([SharedBackdrop]), a page draws only its content.
+class CkBackground extends StatelessWidget {
   final Widget child;
   const CkBackground({super.key, required this.child}) : paint = true;
 
   /// [paint] false: a container screen whose pages each draw their own
-  /// background (the client shell) draws none itself.
+  /// background draws none itself.
   final bool paint;
   const CkBackground.none({super.key, required this.child}) : paint = false;
 
   @override
-  State<CkBackground> createState() => _CkBackgroundState();
-}
-
-class _CkBackgroundState extends State<CkBackground> with SingleTickerProviderStateMixin {
-  late final AnimationController _tab = AnimationController(vsync: this, duration: const Duration(milliseconds: 320), value: 1);
-  int? _gen;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final g = TabActivation.of(context);
-    if (_gen != null && g != _gen && widget.paint) _tab.forward(from: 0);
-    _gen = g;
-  }
-
-  @override
-  void dispose() {
-    _tab.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (!widget.paint) return BackdropGroup(child: widget.child);
-    final a = ModalRoute.of(context)?.animation ?? kAlwaysCompleteAnimation;
-    final content = AnimatedBuilder(
-      animation: Listenable.merge([a, _tab]),
-      child: BackdropGroup(child: widget.child),
-      builder: (c, child) {
-        final rev = a.status == AnimationStatus.reverse;
-        final route = rev ? ((a.value - .4) / .6).clamp(0.0, 1.0) : Curves.easeOut.transform(a.value);
-        final tab = kEase.transform(_tab.value);
-        final o = route * tab;
-        if (o >= 1) return child!;
-        return Opacity(
-          opacity: o,
-          child: Transform.translate(offset: Offset(0, (1 - tab) * 12), child: child),
-        );
-      },
-    );
-    final page = ColoredBox(
+    final content = BackdropGroup(child: child);
+    if (!paint || SharedBackdrop.covers(context)) return content;
+    return ColoredBox(
       color: CkColors.deepSpace,
       child: Stack(fit: StackFit.expand, children: [const CosmicBackground(), content]),
     );
-    // closing: once the content is gone, the page itself fades out
-    return AnimatedBuilder(
-      animation: a,
-      child: page,
-      builder: (c, child) {
-        if (a.status != AnimationStatus.reverse || a.value >= .4) return child!;
-        return Opacity(opacity: (a.value / .4).clamp(0.0, 1.0), child: child);
-      },
-    );
   }
 }
 
-/// Counts how often a tab has become the active one; pages inside it replay
-/// their entry when it changes.
-class TabActivation extends InheritedWidget {
-  final int gen;
-  const TabActivation({super.key, required this.gen, required super.child});
-  static int of(BuildContext c) => c.dependOnInheritedWidgetOfExactType<TabActivation>()?.gen ?? 0;
+/// The background alone, for a shell to paint once behind all its tabs.
+class CkBackdrop extends StatelessWidget {
+  const CkBackdrop({super.key});
   @override
-  bool updateShouldNotify(TabActivation old) => old.gen != gen;
+  Widget build(BuildContext context) =>
+      const ColoredBox(color: CkColors.deepSpace, child: SizedBox.expand(child: CosmicBackground()));
+}
+
+/// Marks a tab page whose shell already paints the background behind all
+/// its tabs, so cross-fading tabs never fade the background itself.
+class SharedBackdrop extends InheritedWidget {
+  const SharedBackdrop({super.key, required super.child});
+  static bool covers(BuildContext c) => c.getInheritedWidgetOfExactType<SharedBackdrop>() != null;
+  @override
+  bool updateShouldNotify(SharedBackdrop old) => false;
 }
 
 /// Drop-in replacement for [Scaffold]: paints the cosmic backdrop under a
@@ -511,53 +473,52 @@ class LiquidGlass extends StatelessWidget {
   }
 }
 
-/// Light page transition: a short fade with a slight scale, cheaper and
-/// smoother than a full-page slide over glass content.
+/// Page transition (motion spec): the new page slides in from the right,
+/// fully drawn, while the old one shifts a little left; back reverses it.
+/// Same feel as MyAcharyaji's pushed pages (iOS-style slide, 300 ms).
 class CkRoute<T> extends PageRouteBuilder<T> {
   CkRoute({required WidgetBuilder builder, super.settings})
       : super(
-          transitionDuration: const Duration(milliseconds: 240),
-          reverseTransitionDuration: const Duration(milliseconds: 200),
+          transitionDuration: const Duration(milliseconds: 300),
+          reverseTransitionDuration: const Duration(milliseconds: 300),
           pageBuilder: (c, a, b) => builder(c),
-          // the page's own CkBackground animates its content (background
-          // stays solid, nothing shows through)
-          transitionsBuilder: (c, a, b, child) => child,
+          transitionsBuilder: (c, a, b, child) => CupertinoPageTransition(
+            primaryRouteAnimation: a,
+            secondaryRouteAnimation: b,
+            linearTransition: false,
+            child: child,
+          ),
         );
 }
 
-
-/// Keeps every tab alive and cross-fades the incoming one while it rises a
-/// little (MyAcharyaji tab switch: 400-450 ms). Only the tab you're on and,
-/// during the fade, the one you left are drawn; the rest are offstage
-/// (state kept, nothing drawn, animations paused).
-class TabFader extends StatefulWidget {
+/// Keeps every tab alive and switches like MyAcharyaji: the old tab fades
+/// out fast (the curve drops most of it within ~100 ms) while the new one
+/// fades in over 400 ms and rises 2.5% over 450 ms. Hidden tabs are not
+/// painted (opacity 0), don't take touches and have their animations paused.
+class TabFader extends StatelessWidget {
   final int index;
   final List<Widget> children;
   const TabFader({super.key, required this.index, required this.children});
-  @override
-  State<TabFader> createState() => _TabFaderState();
-}
 
-class _TabFaderState extends State<TabFader> {
-  late final List<int> _gen = List.filled(widget.children.length, 0);
-
-  @override
-  void didUpdateWidget(TabFader old) {
-    super.didUpdateWidget(old);
-    if (old.index != widget.index && widget.index < _gen.length) _gen[widget.index]++;
-  }
-
-  // The tab swaps at once (its background is solid from the first frame);
-  // the page inside fades and rises in through TabActivation.
   @override
   Widget build(BuildContext context) => Stack(children: [
-        for (var i = 0; i < widget.children.length; i++)
+        for (var i = 0; i < children.length; i++)
           Positioned.fill(
-            child: Offstage(
-              offstage: i != widget.index,
-              child: TabActivation(
-                gen: _gen[i],
-                child: TickerMode(enabled: i == widget.index, child: widget.children[i]),
+            child: IgnorePointer(
+              ignoring: i != index,
+              child: TickerMode(
+                enabled: i == index,
+                child: AnimatedOpacity(
+                  opacity: i == index ? 1 : 0,
+                  duration: const Duration(milliseconds: 400),
+                  curve: kEase,
+                  child: AnimatedSlide(
+                    offset: i == index ? Offset.zero : const Offset(0, 0.025),
+                    duration: const Duration(milliseconds: 450),
+                    curve: kEase,
+                    child: children[i],
+                  ),
+                ),
               ),
             ),
           ),

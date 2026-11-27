@@ -104,7 +104,9 @@ class _AppShellState extends State<AppShell> {
       child: Material(
         type: MaterialType.transparency,
         child: Stack(children: [
-        TabFader(index: _index, children: [for (var i = 0; i < 4; i++) RepaintBoundary(child: _page(i))]),
+        // one background behind all tabs; only the tab content cross-fades
+        const Positioned.fill(child: CkBackdrop()),
+        TabFader(index: _index, children: [for (var i = 0; i < 4; i++) RepaintBoundary(child: SharedBackdrop(child: _page(i)))]),
         Positioned(
           left: 12,
           right: 12,
