@@ -249,8 +249,14 @@ class _PressableState extends State<Pressable> {
   }
 }
 
-/// Fade + rise entrance, staggered by [index] (MyAcharyaji motion: one
-/// controller, cubic(.22,1,.36,1), plays once and never on scroll-back).
+/// Fade + rise entrance, staggered by [index] (motion spec, MyAcharyaji:
+/// 550 ms, rise 16 px, scale 98 -> 100%, 70 ms apart, curve kEase).
+///
+/// One entrance per card: inside another FadeSlideIn it does nothing, so a
+/// card never plays its entrance twice. Only the first [kEntranceCount]
+/// items animate (later ones are usually off screen and must not animate
+/// while scrolling). Plays once when it is built; with the phone's
+/// "remove animations" setting it shows at once.
 class FadeSlideIn extends StatefulWidget {
   final Widget child;
   final int index;
@@ -260,18 +266,32 @@ class FadeSlideIn extends StatefulWidget {
   State<FadeSlideIn> createState() => _FadeSlideInState();
 }
 
+const int kEntranceCount = 6;
+
+class _InEntrance extends InheritedWidget {
+  const _InEntrance({required super.child});
+  @override
+  bool updateShouldNotify(_InEntrance old) => false;
+}
+
 class _FadeSlideInState extends State<FadeSlideIn>
     with SingleTickerProviderStateMixin {
-  // MyAcharyaji: 550 ms, rise 16px, grow 98 -> 100%, 70 ms apart.
   late final AnimationController _c = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 550));
   late final Animation<double> _t = CurvedAnimation(parent: _c, curve: kEase);
+  bool _decided = false;
 
   @override
-  void initState() {
-    super.initState();
-    final i = widget.index.clamp(0, 12);
-    if (i == 0) {
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_decided) return;
+    _decided = true;
+    final i = widget.index;
+    final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final nested = context.getInheritedWidgetOfExactType<_InEntrance>() != null;
+    if (still || nested || i < 0 || i >= kEntranceCount) {
+      _c.value = 1;
+    } else if (i == 0) {
       _c.forward();
     } else {
       Future.delayed(Duration(milliseconds: 70 * i), () {
@@ -288,19 +308,21 @@ class _FadeSlideInState extends State<FadeSlideIn>
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _t,
-      child: AnimatedBuilder(
-        animation: _t,
-        child: widget.child,
-        builder: (_, c) {
-          final v = _t.value;
-          if (v >= 1) return c!;
-          return Transform.translate(
-            offset: Offset(0, (1 - v) * 16),
-            child: Transform.scale(scale: .98 + .02 * v, child: c),
-          );
-        },
+    return _InEntrance(
+      child: FadeTransition(
+        opacity: _t,
+        child: AnimatedBuilder(
+          animation: _t,
+          child: widget.child,
+          builder: (_, c) {
+            final v = _t.value;
+            if (v >= 1) return c!;
+            return Transform.translate(
+              offset: Offset(0, (1 - v) * 16),
+              child: Transform.scale(scale: .98 + .02 * v, child: c),
+            );
+          },
+        ),
       ),
     );
   }
@@ -482,7 +504,9 @@ class CkRoute<T> extends PageRouteBuilder<T> {
           transitionDuration: const Duration(milliseconds: 300),
           reverseTransitionDuration: const Duration(milliseconds: 300),
           pageBuilder: (c, a, b) => builder(c),
-          transitionsBuilder: (c, a, b, child) => CupertinoPageTransition(
+          transitionsBuilder: (c, a, b, child) => (MediaQuery.maybeDisableAnimationsOf(c) ?? false)
+              ? child
+              : CupertinoPageTransition(
             primaryRouteAnimation: a,
             secondaryRouteAnimation: b,
             linearTransition: false,
@@ -501,7 +525,9 @@ class TabFader extends StatelessWidget {
   const TabFader({super.key, required this.index, required this.children});
 
   @override
-  Widget build(BuildContext context) => Stack(children: [
+  Widget build(BuildContext context) {
+    final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    return Stack(children: [
         for (var i = 0; i < children.length; i++)
           Positioned.fill(
             child: IgnorePointer(
@@ -510,11 +536,11 @@ class TabFader extends StatelessWidget {
                 enabled: i == index,
                 child: AnimatedOpacity(
                   opacity: i == index ? 1 : 0,
-                  duration: const Duration(milliseconds: 400),
+                  duration: still ? Duration.zero : const Duration(milliseconds: 400),
                   curve: kEase,
                   child: AnimatedSlide(
                     offset: i == index ? Offset.zero : const Offset(0, 0.025),
-                    duration: const Duration(milliseconds: 450),
+                    duration: still ? Duration.zero : const Duration(milliseconds: 450),
                     curve: kEase,
                     child: children[i],
                   ),
@@ -523,4 +549,5 @@ class TabFader extends StatelessWidget {
             ),
           ),
       ]);
+  }
 }

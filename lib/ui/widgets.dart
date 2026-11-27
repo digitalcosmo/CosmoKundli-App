@@ -376,13 +376,16 @@ class _FastFutureState<T> extends State<FastFuture<T>> {
     }
     if (!_skel) return child;
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 300),
+      duration: _still(context) ? Duration.zero : const Duration(milliseconds: 300),
       switchInCurve: Curves.easeOut,
       layoutBuilder: (cur, prev) => Stack(alignment: Alignment.topCenter, children: [...prev, if (cur != null) cur]),
       child: child,
     );
   }
 }
+
+/// The phone's "remove animations" setting (motion spec: honour it).
+bool _still(BuildContext c) => MediaQuery.maybeDisableAnimationsOf(c) ?? false;
 
 class LoadView<T> extends StatelessWidget {
   final Future<T>? future;
@@ -864,7 +867,7 @@ class CountUp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => TweenAnimationBuilder<double>(
         tween: Tween(begin: 0, end: value),
-        duration: duration,
+        duration: _still(context) ? Duration.zero : duration,
         curve: kEase,
         builder: (_, v, __) => Text(format(v), style: style),
       );
@@ -890,10 +893,11 @@ class _GrowInState extends State<GrowIn> {
     });
   }
 
+  // Grows from zero once; later value changes glide from the old value.
   @override
   Widget build(BuildContext context) => TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: _go ? widget.value : 0),
-        duration: const Duration(milliseconds: 1000),
+        tween: Tween(begin: 0, end: _go || _still(context) ? widget.value : 0),
+        duration: _still(context) ? Duration.zero : const Duration(milliseconds: 1000),
         curve: kEase,
         builder: (_, v, __) => widget.builder(v),
       );
@@ -911,9 +915,16 @@ class PopIn extends StatefulWidget {
 class _PopInState extends State<PopIn> with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
   late final Animation<double> _t = CurvedAnimation(parent: _c, curve: kEase);
+  bool _decided = false;
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_decided) return;
+    _decided = true;
+    if (_still(context)) {
+      _c.value = 1;
+      return;
+    }
     Future.delayed(widget.delay, () {
       if (mounted) _c.forward();
     });
@@ -2044,7 +2055,7 @@ class CountUpText extends StatelessWidget {
     final plus = m.group(2)!.startsWith('+');
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: n),
-      duration: const Duration(milliseconds: 1100),
+      duration: _still(context) ? Duration.zero : const Duration(milliseconds: 1100),
       curve: kEase,
       builder: (_, v, __) => Text('${m.group(1)}${plus && v > 0 ? '+' : ''}${v.toStringAsFixed(dec)}${m.group(3)}', style: style),
     );
