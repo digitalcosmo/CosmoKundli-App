@@ -532,18 +532,17 @@ class TabFader extends StatelessWidget {
           Positioned.fill(
             child: IgnorePointer(
               ignoring: i != index,
-              child: TickerMode(
-                enabled: i == index,
-                child: AnimatedOpacity(
-                  opacity: i == index ? 1 : 0,
-                  duration: still ? Duration.zero : const Duration(milliseconds: 400),
+              // The fade itself must keep ticking after the tab is left, so
+              // only the tab's content is paused (TickerMode inside).
+              child: AnimatedOpacity(
+                opacity: i == index ? 1 : 0,
+                duration: still ? Duration.zero : const Duration(milliseconds: 400),
+                curve: kEase,
+                child: AnimatedSlide(
+                  offset: i == index ? Offset.zero : const Offset(0, 0.025),
+                  duration: still ? Duration.zero : const Duration(milliseconds: 450),
                   curve: kEase,
-                  child: AnimatedSlide(
-                    offset: i == index ? Offset.zero : const Offset(0, 0.025),
-                    duration: still ? Duration.zero : const Duration(milliseconds: 450),
-                    curve: kEase,
-                    child: children[i],
-                  ),
+                  child: TickerMode(enabled: i == index, child: children[i]),
                 ),
               ),
             ),
