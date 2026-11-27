@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -314,9 +313,12 @@ class _Done {
   const _Done(this.data, this.error, this.ok);
 }
 
-/// Like FutureBuilder, but: data that is already there shows at once with no
-/// animation; the skeleton only appears if loading takes longer than 150 ms;
-/// the soft cross-fade runs only when a skeleton was actually on screen.
+/// Like FutureBuilder, but (motion spec, Phase 1a):
+/// - data that is already there shows in the first frame, with no animation;
+/// - otherwise the skeleton shows at once (no blank wait), and data or an
+///   error then fades in over it (300 ms) inside the card;
+/// - a new future for data that is still loading keeps the same skeleton on
+///   screen, so it never vanishes and reappears.
 class FastFuture<T> extends StatefulWidget {
   final Future<T>? future;
   final Widget Function(T data) builder;
@@ -330,8 +332,7 @@ class FastFuture<T> extends StatefulWidget {
 
 class _FastFutureState<T> extends State<FastFuture<T>> {
   _Done? _r;
-  bool _skel = false; // skeleton has been on screen for this future
-  Timer? _t;
+  bool _skel = false; // a skeleton was on screen for this future
 
   @override
   void initState() {
@@ -346,15 +347,11 @@ class _FastFutureState<T> extends State<FastFuture<T>> {
   }
 
   void _watch() {
-    _t?.cancel();
     final f = widget.future;
-    _skel = false;
     _r = f == null ? null : _done[f];
-    if (f == null || _r != null) return;
-    _t = Timer(const Duration(milliseconds: 150), () {
-      if (mounted && _r == null) setState(() => _skel = true);
-    });
-    f.then((v) {
+    _skel = f != null && _r == null;
+    if (!_skel) return;
+    f!.then((v) {
       final d = _Done(v, null, true);
       _done[f] = d;
       if (mounted && identical(widget.future, f)) setState(() => _r = d);
@@ -365,19 +362,13 @@ class _FastFutureState<T> extends State<FastFuture<T>> {
   }
 
   @override
-  void dispose() {
-    _t?.cancel();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final r = _r;
     final Widget child;
     if (r == null) {
-      child = _skel
-          ? KeyedSubtree(key: const ValueKey('skel'), child: widget.loading)
-          : SizedBox(key: const ValueKey('wait'), height: widget.minHeight);
+      child = widget.future == null
+          ? SizedBox(key: const ValueKey('none'), height: widget.minHeight)
+          : KeyedSubtree(key: const ValueKey('skel'), child: widget.loading);
     } else if (!r.ok || (r.data == null && null is! T)) {
       child = KeyedSubtree(key: const ValueKey('err'), child: widget.error());
     } else {

@@ -10,11 +10,14 @@ class ClientData {
   final String mId;
   ClientData(this.mId);
 
-  static ClientData? _current;
-  static ClientData of(String mId) {
-    if (_current?.mId != mId) _current = ClientData(mId);
-    return _current!;
-  }
+  /// Every client opened in this session keeps its loaded data, so going
+  /// back to an earlier client shows it at once (motion spec: loaded data is
+  /// never unloaded).
+  static final _all = <String, ClientData>{};
+  static ClientData of(String mId) => _all.putIfAbsent(mId, () => ClientData(mId));
+
+  /// Signed out: drop everything loaded for the last user.
+  static void clearAll() => _all.clear();
 
   final _memo = <String, Future<dynamic>>{};
 
@@ -29,7 +32,7 @@ class ClientData {
 
   /// Birth data changed (client edited): forget everything kept for them.
   static Future<void> forgetClient(String mId) async {
-    if (_current?.mId == mId) _current = null;
+    _all.remove(mId);
     await DiskCache.drop('m$mId');
   }
 
@@ -175,7 +178,14 @@ class ClientData {
 
   /// Daily values from [from] to [to] (inclusive), fetching every month the
   /// window touches. [kind] is 'sent' or 'sit'.
-  Future<List<MapEntry<DateTime, double>>> window(String kind, DateTime from, DateTime to) async {
+  /// The same window asked for again returns the same request, so a card
+  /// that is rebuilt shows its data at once instead of a second skeleton.
+  Future<List<MapEntry<DateTime, double>>> window(String kind, DateTime from, DateTime to) {
+    final f = DateFormat('yyyy-MM-dd');
+    return _m('win:$kind:${f.format(from)}:${f.format(to)}', () => _window(kind, from, to));
+  }
+
+  Future<List<MapEntry<DateTime, double>>> _window(String kind, DateTime from, DateTime to) async {
     final a = DateTime(from.year, from.month, from.day), b = DateTime(to.year, to.month, to.day);
     final months = <DateTime>[];
     for (var m = DateTime(a.year, a.month); !m.isAfter(DateTime(b.year, b.month)); m = DateTime(m.year, m.month + 1)) {
