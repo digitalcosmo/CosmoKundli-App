@@ -1512,7 +1512,7 @@ class _DailyWState extends State<_DailyW> {
                   padding: const EdgeInsets.fromLTRB(9, 6, 9, 6),
                   decoration: BoxDecoration(color: const Color(0x0FFFFFFF), borderRadius: BorderRadius.circular(9)),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(k.toUpperCase(), style: CkText.label.copyWith(fontSize: 9.5)),
+                    Text(k.toUpperCase(), style: CkText.label.copyWith(fontSize: 10)),
                     const SizedBox(height: 2),
                     StatText(_fmt(v, signed), style: CkText.mono(14, color: signed && k == 'Average' ? Colors.white : col(v))),
                   ]),
@@ -1567,7 +1567,7 @@ class _DailyWState extends State<_DailyW> {
                   child: Center(
                     child: Text(
                       dense && e.key.day != 1 && e.key.day % 5 != 0 && e.key != today ? '' : few && e.key == today ? 'Today' : '${e.key.day}',
-                      style: CkText.mono(9.5, color: e.key == today ? CkColors.cyan : CkColors.labelMono),
+                      style: CkText.mono(10, color: e.key == today ? CkColors.cyan : CkColors.labelMono),
                     ),
                   ),
                 ),
@@ -1829,7 +1829,7 @@ class _FiveDWState extends State<_FiveDW> {
                       Expanded(
                         child: Center(
                           child: Text(dense && e.key.day != 1 && e.key.day % 5 != 0 && e.key != _today ? '' : few && e.key == _today ? 'Today' : '${e.key.day}',
-                              style: CkText.mono(9.5, color: e.key == _today ? CkColors.cyan : CkColors.labelMono)),
+                              style: CkText.mono(10, color: e.key == _today ? CkColors.cyan : CkColors.labelMono)),
                         ),
                       ),
                   ]),
@@ -1846,7 +1846,7 @@ class _FiveDWState extends State<_FiveDW> {
                     padding: const EdgeInsets.fromLTRB(9, 6, 9, 6),
                     decoration: BoxDecoration(color: const Color(0x0FFFFFFF), borderRadius: BorderRadius.circular(9)),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(k.toUpperCase(), style: CkText.label.copyWith(fontSize: 9.5)),
+                      Text(k.toUpperCase(), style: CkText.label.copyWith(fontSize: 10)),
                       const SizedBox(height: 2),
                       StatText(pct(v), style: CkText.mono(14, color: fiveDColor(v, signed: signed))),
                     ]),
@@ -1882,7 +1882,7 @@ class _PanchangW extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const _WHead('Panchang', trailing: Text('AT BIRTH', style: TextStyle(fontSize: 9.5, color: CkColors.cyan, letterSpacing: 1))),
+        const _WHead('Panchang', trailing: Text('AT BIRTH', style: TextStyle(fontSize: 10, color: CkColors.cyan, letterSpacing: 1))),
         const SizedBox(height: 6),
         Expanded(
           child: _future<ClientPanchang>(() => ClientPanchang.of(mId), skel: _skelRows(size == WSize.s ? 3 : 6, mid: false), (p) {
@@ -1968,12 +1968,19 @@ class _MelapakWState extends State<_MelapakW> {
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: on,
-          child: Container(
-            width: 30,
-            height: 30,
-            margin: const EdgeInsets.only(left: 6),
-            decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0x0EFFFFFF), border: Border.all(color: const Color(0x1FFFFFFF))),
-            child: Icon(i, size: 15, color: c),
+          // the circle stays 30 px; the tap area around it is 40 x 36 (R)
+          child: SizedBox(
+            width: 40,
+            height: 36,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0x0EFFFFFF), border: Border.all(color: const Color(0x1FFFFFFF))),
+                child: Icon(i, size: 15, color: c),
+              ),
+            ),
           ),
         ),
       );

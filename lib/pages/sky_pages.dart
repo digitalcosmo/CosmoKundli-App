@@ -336,7 +336,7 @@ class SkyArc extends StatelessWidget {
               right: 0,
               top: height + 6,
               child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                for (final h in ['00', '06', '12', '18', '24']) Text(h, style: CkText.mono(9.5, color: CkColors.labelMono)),
+                for (final h in ['00', '06', '12', '18', '24']) Text(h, style: CkText.mono(10, color: CkColors.labelMono)),
               ]),
             ),
             Positioned(left: 0, right: 0, top: height + 26, child: Container(height: 2, color: const Color(0x338CBEFF))),

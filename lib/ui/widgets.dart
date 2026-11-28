@@ -825,7 +825,7 @@ class StatTile extends StatelessWidget {
           shadow: false,
           padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(upper(label), style: CkText.label.copyWith(fontSize: 9.5)),
+            Text(upper(label), style: CkText.label.copyWith(fontSize: 10)),
             const SizedBox(height: 2),
             FittedBox(fit: BoxFit.scaleDown, child: StatText(value, style: CkText.h(19, color: color))),
             Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, color: CkColors.textSecondary)),
@@ -845,7 +845,7 @@ class InfoPill extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
           decoration: BoxDecoration(color: CkColors.glassFill, borderRadius: BorderRadius.circular(14)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(upper(label), style: CkText.label.copyWith(fontSize: 9.5)),
+            Text(upper(label), style: CkText.label.copyWith(fontSize: 10)),
             const SizedBox(height: 2),
             Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5, color: color)),
           ]),
@@ -1563,8 +1563,8 @@ class _HScrollState extends State<HScroll> {
           behavior: HitTestBehavior.opaque,
           onTap: on ? () => _step(dir) : null,
           child: SizedBox(
-            width: 22,
-            height: 18,
+            width: 40,
+            height: 28,
             child: Center(
               child: AnimatedDefaultTextStyle(
                 duration: CkMotion.base,
@@ -1775,7 +1775,7 @@ class DailyBarChartState extends State<DailyBarChart> {
               Positioned(
                 top: _y(t) - 7,
                 right: 6,
-                child: Text(_lab(t), style: CkText.mono(9.5, color: CkColors.labelMono)),
+                child: Text(_lab(t), style: CkText.mono(10, color: CkColors.labelMono)),
               ),
           ]),
         ),
@@ -2007,7 +2007,7 @@ class GrahBarChart extends StatelessWidget {
                   Positioned(
                       bottom: t / 100 * h - 6,
                       right: 4,
-                      child: Text('$t%', style: CkText.mono(9, color: CkColors.labelMono))),
+                      child: Text('$t%', style: CkText.mono(9.5, color: CkColors.labelMono))),
               ]),
             ),
           Expanded(

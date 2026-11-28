@@ -465,7 +465,7 @@ class ReportRow extends StatelessWidget {
             label: 'Share',
             child: Pressable(
               onTap: () => _runPdf(context, it, _PdfAction.share),
-              child: const SizedBox(width: 36, height: 38, child: Icon(Icons.ios_share_rounded, size: 18, color: CkColors.textTertiary)),
+              child: const SizedBox(width: 44, height: 44, child: Icon(Icons.ios_share_rounded, size: 18, color: CkColors.textTertiary)),
             ),
           ),
           Semantics(
@@ -473,11 +473,14 @@ class ReportRow extends StatelessWidget {
             label: 'Open',
             child: Pressable(
               onTap: () => _runPdf(context, it, _PdfAction.open),
-              child: Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(color: CkColors.cyan, borderRadius: BorderRadius.circular(11)),
-                child: const Icon(Icons.open_in_new_rounded, size: 18, color: Color(0xFF06204F)),
+              child: Padding(
+                padding: const EdgeInsets.all(3), // 44 px tap area (R)
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(color: CkColors.cyan, borderRadius: BorderRadius.circular(11)),
+                  child: const Icon(Icons.open_in_new_rounded, size: 18, color: Color(0xFF06204F)),
+                ),
               ),
             ),
           ),
@@ -701,7 +704,7 @@ class _SoonTag extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(borderRadius: BorderRadius.circular(5), border: Border.all(color: CkColors.panelStroke)),
-        child: Text(text, style: CkText.mono(9.5, color: CkColors.textSecondary)),
+        child: Text(text, style: CkText.mono(10, color: CkColors.textSecondary)),
       );
 }
 

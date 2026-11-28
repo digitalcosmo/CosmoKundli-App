@@ -352,7 +352,7 @@ class TransitBodyState extends State<TransitBody> {
                       Pressable(
                         onTap: () => openClient(_cmp!),
                         child: Container(
-                          height: 34,
+                          height: 40,
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           alignment: Alignment.center,
                           decoration: BoxDecoration(color: CkColors.cyanTint, borderRadius: BorderRadius.circular(10), border: Border.all(color: CkColors.cyanStroke)),
@@ -369,8 +369,8 @@ class TransitBodyState extends State<TransitBody> {
                             _birth = null;
                           }),
                           child: Container(
-                            width: 34,
-                            height: 34,
+                            width: 40,
+                            height: 40,
                             decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: CkColors.panelStroke)),
                             child: const Icon(Icons.close_rounded, size: 17, color: CkColors.textTertiary),
                           ),
