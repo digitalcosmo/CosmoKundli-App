@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'core/session.dart';
 import 'pages/auth_pages.dart';
 import 'pages/app_shell.dart';
+import 'pages/labs.dart';
 import 'ui/ck_theme.dart';
 import 'ui/glass.dart';
 import 'ui/widgets.dart';
@@ -23,6 +24,7 @@ Future<void> main() async {
   GoogleFonts.config.allowRuntimeFetching = false;
   await Session.init();
   await LiquidGlass.preload();
+  registerLabs();
   runApp(const CosmoKundliApp());
 }
 
@@ -40,7 +42,7 @@ class CosmoKundliApp extends StatelessWidget {
       theme: CkTheme.dark(),
       darkTheme: CkTheme.dark(),
       themeMode: ThemeMode.dark,
-      // Every page: slides in from the right as one solid piece (glass.dart
+      // Every page: content moves, the sky stays (glass.dart
       // ckPageTransition). cupertinoDialog is the GetX value that hands over
       // to customTransition.
       defaultTransition: Transition.cupertinoDialog,
@@ -53,8 +55,8 @@ class CosmoKundliApp extends StatelessWidget {
         data: MediaQuery.of(context).copyWith(
           textScaler: MediaQuery.of(context).textScaler.clamp(maxScaleFactor: 1.15),
         ),
-        // each page paints its own background (ckPageTransition)
-        child: child!,
+        // the one sky, under every page; pages never paint a background
+        child: CkSky(child: child!),
       ),
     ),
     );

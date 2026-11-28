@@ -9,45 +9,36 @@ import 'widgets.dart' show perfOff;
 
 const String kCkBackground = 'assets/images/ck_bg.jpg';
 
-/// Deep-space backdrop shared by every page (same art as the software).
-///
-/// Motion spec (Phase 1b): a page is fully drawn from its first frame, with
-/// its own background; it arrives by sliding in ([CkRoute]), never by fading
-/// from empty. Inside a shell that already paints the background for its
-/// tabs ([SharedBackdrop]), a page draws only its content.
+/// The sky (background) is painted once, under every page, by [CkSky] in
+/// main.dart. Pages never draw their own, so opening or closing a page can
+/// never redraw it. Kept as a no-op wrapper for existing call sites.
 class CkBackground extends StatelessWidget {
   final Widget child;
-  const CkBackground({super.key, required this.child}) : paint = true;
-
-  /// [paint] false: a container screen whose pages each draw their own
-  /// background draws none itself.
-  final bool paint;
-  const CkBackground.none({super.key, required this.child}) : paint = false;
-
+  const CkBackground({super.key, required this.child});
+  const CkBackground.none({super.key, required this.child});
   @override
-  Widget build(BuildContext context) {
-    final content = BackdropGroup(child: child);
-    if (!paint || SharedBackdrop.covers(context)) return content;
-    return ColoredBox(
-      color: CkColors.deepSpace,
-      child: Stack(fit: StackFit.expand, children: [const CosmicBackground(), content]),
-    );
-  }
+  Widget build(BuildContext context) => child;
 }
 
-/// The background alone, for a shell to paint once behind all its tabs.
-class CkBackdrop extends StatelessWidget {
-  const CkBackdrop({super.key});
+/// The app's one sky: background art plus the space colour, under the
+/// navigator. Nothing above it ever paints a background.
+class CkSky extends StatelessWidget {
+  final Widget child;
+  const CkSky({super.key, required this.child});
   @override
-  Widget build(BuildContext context) =>
-      const ColoredBox(color: CkColors.deepSpace, child: SizedBox.expand(child: CosmicBackground()));
+  Widget build(BuildContext context) => ColoredBox(
+        color: CkColors.deepSpace,
+        child: Stack(fit: StackFit.expand, children: [
+          const RepaintBoundary(child: CosmicBackground()),
+          child,
+        ]),
+      );
 }
 
-/// Marks a tab page whose shell already paints the background behind all
-/// its tabs, so cross-fading tabs never fade the background itself.
+/// Marks content whose background is already drawn (kept for call sites).
 class SharedBackdrop extends InheritedWidget {
   const SharedBackdrop({super.key, required super.child});
-  static bool covers(BuildContext c) => c.getInheritedWidgetOfExactType<SharedBackdrop>() != null;
+  static bool covers(BuildContext c) => true;
   @override
   bool updateShouldNotify(SharedBackdrop old) => false;
 }
@@ -93,7 +84,7 @@ class CkScaffold extends StatelessWidget {
         statusBarColor: Colors.transparent,
         systemNavigationBarColor: CkColors.deepSpace,
       ),
-      child: (background ? CkBackground.new : CkBackground.none)(
+      child: CkBackground(
         child: Scaffold(
           backgroundColor: Colors.transparent,
           appBar: appBar,
@@ -168,26 +159,33 @@ class Glass extends StatelessWidget {
       ),
       child: Container(alignment: alignment, padding: padding, child: child),
     );
-    // Entrance: fade the face only (see [entranceFade]); a card inside a card
-    // that is already fading does not fade a second time.
-    final fade = entranceFade(context);
+    // Entrance: the app fades each card as a whole, blur included, as
+    // MyAcharyaji does ([FadeSlideIn]). The motion lab can try two other
+    // ways ([EntranceStyle]): the face fades and the blur stays, or the
+    // face fades and the blur grows with it.
+    final style = EntranceScope.of(context);
+    final fade = style == EntranceStyle.whole ? null : entranceFade(context);
     final shown = fade == null || context.getInheritedWidgetOfExactType<_Faded>() != null
         ? face
         : FadeTransition(opacity: fade, child: _Faded(child: face));
-    // Real backdrop blur is expensive (one full-screen pass per card), so
-    // only surfaces that float over moving content (dock, sheets) ask for
-    // it. Cards get the same look from a tinted, pre-blurred background.
     // Cards: frosted blur through the page's shared BackdropGroup (one
     // backdrop read for every card on screen, as in MyAcharyaji). Floating
     // surfaces pass `liquid: true` for the refracting lens on top.
     final Widget body;
+    final double sigma = blur > 0 ? blur : 14;
     if (liquid) {
       body = LiquidGlass(radius: radius, blur: blur > 0 ? blur : 20, child: shown);
     } else if (frost && !perfOff(4)) {
-      final f = ImageFilter.blur(sigmaX: blur > 0 ? blur : 14, sigmaY: blur > 0 ? blur : 14);
+      final grouped = BackdropGroup.of(context) != null;
+      Widget filter(double sg) {
+        final f = ImageFilter.blur(sigmaX: sg, sigmaY: sg);
+        return grouped ? BackdropFilter.grouped(filter: f, child: shown) : BackdropFilter(filter: f, child: shown);
+      }
       body = ClipRRect(
         borderRadius: r,
-        child: BackdropGroup.of(context) != null ? BackdropFilter.grouped(filter: f, child: shown) : BackdropFilter(filter: f, child: shown),
+        child: style == EntranceStyle.blurGrows && fade != null
+            ? AnimatedBuilder(animation: fade, builder: (_, __) => filter(sigma * fade.value.clamp(0.0, 1.0)))
+            : filter(sigma),
       );
     } else {
       body = shown;
@@ -254,14 +252,44 @@ class _PressableState extends State<Pressable> {
   }
 }
 
-/// Fade + rise entrance, staggered by [index] (motion spec, MyAcharyaji:
-/// 550 ms, rise 16 px, scale 98 -> 100%, 70 ms apart, curve kEase).
+/// How a card's frosted blur arrives with it. The app uses [whole]
+/// (MyAcharyaji exact); the motion lab shows the other two for comparison.
+enum EntranceStyle {
+  /// One fade over the whole card, blur included (MyAcharyaji).
+  whole,
+  /// The face fades and the blur strength grows from 0 with it.
+  blurGrows,
+  /// The face fades; the blur is there from the first frame.
+  faceOnly,
+}
+
+/// Sets the [EntranceStyle] for the cards below it (motion lab).
+class EntranceScope extends InheritedWidget {
+  final EntranceStyle style;
+  const EntranceScope({super.key, required this.style, required super.child});
+  static EntranceStyle of(BuildContext c) =>
+      c.getInheritedWidgetOfExactType<EntranceScope>()?.style ?? EntranceStyle.whole;
+  @override
+  bool updateShouldNotify(EntranceScope old) => old.style != style;
+}
+
+/// Gap between cards in the wave below it: [CkMotion.waveTab] on a tab,
+/// [CkMotion.wavePage] on a pushed page.
+class EntranceWave extends InheritedWidget {
+  final int stepMs;
+  const EntranceWave({super.key, required this.stepMs, required super.child});
+  static int of(BuildContext c) => c.getInheritedWidgetOfExactType<EntranceWave>()?.stepMs ?? CkMotion.waveTab;
+  @override
+  bool updateShouldNotify(EntranceWave old) => old.stepMs != stepMs;
+}
+
+/// The card entrance, exactly as MyAcharyaji: 550 ms, rise 16 px, scale
+/// 0.98 to 1, one fade over the whole card, cards [EntranceWave] apart.
 ///
 /// One entrance per card: inside another entrance that is still running it
-/// does nothing, so a card never plays two entrances at once; cards that
-/// arrive later (data loaded) play their own. Only the first [kEntranceCount]
-/// items animate (later ones are usually off screen and must not animate
-/// while scrolling). Plays once when it is built; with the phone's
+/// does nothing. It plays when built, again when its tab is visited, and
+/// again when the page above it closes. Items past [kEntranceCount] (rows
+/// reached by scrolling) appear without animating. With the phone's
 /// "remove animations" setting it shows at once.
 class FadeSlideIn extends StatefulWidget {
   final Widget child;
@@ -272,13 +300,13 @@ class FadeSlideIn extends StatefulWidget {
   State<FadeSlideIn> createState() => _FadeSlideInState();
 }
 
-const int kEntranceCount = 6;
+/// Rows past this index are reached by scrolling and never animate.
+const int kEntranceCount = 12;
 
 class _InEntrance extends InheritedWidget {
   /// The fade cards use here: this one combined with any outer fade.
   final Animation<double> t;
-  /// An entrance (or data swap) is running here, so entrances below it
-  /// don't play again. A tab switch alone doesn't count.
+  /// An entrance is running here, so entrances below it don't play again.
   final bool nests;
   const _InEntrance({required this.t, required this.nests, required super.child});
 
@@ -295,15 +323,12 @@ class _InEntrance extends InheritedWidget {
   bool updateShouldNotify(_InEntrance old) => !identical(old.t, t);
 }
 
-/// Fades the cards under it in with [t] the way an entrance does: each
-/// [Glass] fades its face and keeps its blur steady. For data swapping in.
+/// Publishes [t] as the fade of the cards under it (motion lab styles).
 class CardFade extends StatelessWidget {
   final Animation<double> t;
   final Widget child;
   final bool entrance;
   const CardFade({super.key, required this.t, required this.child}) : entrance = true;
-
-  /// For a tab switch: cards fade, but entrances below still play.
   const CardFade.tab({super.key, required this.t, required this.child}) : entrance = false;
   @override
   Widget build(BuildContext context) => _InEntrance.wrap(context, t, entrance: entrance, child: child);
@@ -316,18 +341,16 @@ class _Faded extends InheritedWidget {
 }
 
 /// The fade of the card entrance this widget sits in (null outside one).
-/// [Glass] fades only its face with it and keeps the blur steady: a blur
-/// inside a part-transparent layer has nothing behind it to blur, so a
-/// card fading as a whole looks clear first and gets its blur at the end.
 Animation<double>? entranceFade(BuildContext c) => c.getInheritedWidgetOfExactType<_InEntrance>()?.t;
 
 class _FadeSlideInState extends State<FadeSlideIn>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 550));
+  late final AnimationController _c = AnimationController(vsync: this, duration: CkMotion.enter);
   late final Animation<double> _t = CurvedAnimation(parent: _c, curve: kEase);
   bool _decided = false;
   bool _nested = false;
+  EntranceStyle _style = EntranceStyle.whole;
+  int _step = CkMotion.waveTab;
 
   @override
   void didChangeDependencies() {
@@ -335,6 +358,8 @@ class _FadeSlideInState extends State<FadeSlideIn>
     if (_decided) return;
     _decided = true;
     final i = widget.index;
+    _style = EntranceScope.of(context);
+    _step = EntranceWave.of(context);
     final still = (MediaQuery.maybeDisableAnimationsOf(context) ?? false) || perfOff(32);
     final outer = context.getInheritedWidgetOfExactType<_InEntrance>();
     final nested = _nested = outer != null && outer.nests && outer.t.value < 1;
@@ -342,9 +367,9 @@ class _FadeSlideInState extends State<FadeSlideIn>
       _c.value = 1;
       return;
     }
-    _play(0);
+    _play();
     // Coming back to this page (the page above is closing): the cards rise
-    // in again, one after another, as in MyAcharyaji.
+    // in again, one after another.
     _cover = ModalRoute.of(context)?.secondaryAnimation;
     _cover?.addStatusListener(_onCover);
     // Switching to this tab: the cards rise in again too.
@@ -356,18 +381,16 @@ class _FadeSlideInState extends State<FadeSlideIn>
   Listenable? _visit;
   int _run = 0;
 
-  // switching to this tab: the cards rise in again with the tab
-  void _onVisit() => _play(0, from: 0);
+  void _onVisit() => _play(from: 0);
 
   void _onCover(AnimationStatus s) {
-    // the page above starts sliding away: this page's cards rise in again
-    if (s == AnimationStatus.reverse) _play(0, from: 0);
+    if (s == AnimationStatus.reverse) _play(from: 0);
   }
 
-  void _play(int waitMs, {double? from}) {
+  void _play({double? from}) {
     final run = ++_run;
     if (from != null) _c.value = from;
-    final wait = waitMs + 70 * widget.index;
+    final wait = _step * widget.index;
     if (wait == 0) {
       _c.forward();
       return;
@@ -389,26 +412,24 @@ class _FadeSlideInState extends State<FadeSlideIn>
   Widget build(BuildContext context) {
     // Inside another entrance: the outer one moves and fades this too.
     if (_nested) return widget.child;
-    // No fade layer around the whole item: cards ([Glass]) fade their own
-    // face through [entranceFade] and keep their blur from the first frame.
+    // Always the same widget shape: returning the bare child once the
+    // entrance ends would tear the whole card down and build it again.
+    final moved = AnimatedBuilder(
+      animation: _t,
+      child: widget.child,
+      builder: (_, c) {
+        final v = _t.value;
+        return Transform.translate(
+          offset: Offset(0, (1 - v) * CkMotion.rise),
+          child: Transform.scale(scale: CkMotion.scaleFrom + (1 - CkMotion.scaleFrom) * v, child: c),
+        );
+      },
+    );
     return _InEntrance.wrap(
       context,
       _t,
       entrance: true,
-      child: AnimatedBuilder(
-        animation: _t,
-        child: widget.child,
-        builder: (_, c) {
-          final v = _t.value;
-          // Always the same widget shape: returning the bare child once the
-          // entrance ends would tear the whole card down and build it again
-          // (a heavy frame, and charts inside restarting from zero).
-          return Transform.translate(
-            offset: Offset(0, (1 - v) * 16),
-            child: Transform.scale(scale: .98 + .02 * v, child: c),
-          );
-        },
-      ),
+      child: _style == EntranceStyle.whole ? FadeTransition(opacity: _t, child: moved) : moved,
     );
   }
 }
@@ -581,9 +602,8 @@ class LiquidGlass extends StatelessWidget {
   }
 }
 
-/// Page transition (motion spec): the new page slides in from the right,
-/// fully drawn, while the old one shifts a little left; back reverses it.
-/// Same feel as MyAcharyaji's pushed pages (iOS-style slide, 300 ms).
+/// Every pushed page (module pages inside a client tab use this; GetX
+/// pages get the same motion through main.dart).
 class CkRoute<T> extends PageRouteBuilder<T> {
   CkRoute({required WidgetBuilder builder, super.settings})
       : super(
@@ -594,62 +614,79 @@ class CkRoute<T> extends PageRouteBuilder<T> {
         );
 }
 
-/// Page open/close length (MyAcharyaji: 550 ms, one curve).
-const Duration kPageDuration = Duration(milliseconds: 550);
+/// Page open/close length.
+const Duration kPageDuration = CkMotion.push;
 
-/// Every page in the app, opening and closing, as in MyAcharyaji:
-/// - each page is one solid piece with its own background (the background
-///   runs on one shared clock, so two pages show the same sky and the seam
-///   never shows);
-/// - the new page slides in from the right; the page under it moves 28% to
-///   the left and dims; back reverses both;
-/// - the cards of the new page rise in one after another while it slides.
-/// Used by GetX routes (main.dart) and by [CkRoute].
-Widget ckPageTransition(BuildContext c, Animation<double> a, Animation<double> b, Widget child) {
-  final page = _SolidPage(child: child);
+/// Push and back, at every level (family plan: "content moves, sky stays"):
+/// - the sky never moves; pages have no background of their own;
+/// - the arriving page fades in while drifting from 8% to the right, and
+///   its cards rise in one after another (60 ms apart);
+/// - the page underneath fades out while drifting 8% to the left;
+/// - back is the exact mirror, and the cards of the page you return to
+///   rise in again.
+/// Docks stay where they are ([StayPut]) and simply cross-fade.
+/// [wave] is the card gap for the page (tab roots keep the tab gap).
+Widget ckPageTransition(BuildContext c, Animation<double> a, Animation<double> b, Widget child,
+    {int wave = CkMotion.wavePage}) {
+  final page = EntranceWave(stepMs: wave, child: BackdropGroup(child: child));
   if (MediaQuery.maybeDisableAnimationsOf(c) ?? false) return page;
   final into = CurvedAnimation(parent: a, curve: kEase, reverseCurve: kEase.flipped);
   final under = CurvedAnimation(parent: b, curve: kEase, reverseCurve: kEase.flipped);
-  return SlideTransition(
-    position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(into),
-    child: SlideTransition(
-      position: Tween(begin: Offset.zero, end: const Offset(-.28, 0)).animate(under),
-      child: Stack(fit: StackFit.passthrough, children: [
-        page,
-        // dimming the page underneath: a cheap dark veil, not a fade layer
-        // (a fade layer would drop the cards' blur)
-        Positioned.fill(
-          child: IgnorePointer(
-            child: AnimatedBuilder(
-              animation: under,
-              builder: (_, __) => ColoredBox(color: Color.fromRGBO(0, 0, 0, .35 * under.value)),
-            ),
-          ),
-        ),
-      ]),
+  final shift = _PageShift(into: into, under: under);
+  return _PageShiftScope(
+    shift: shift,
+    child: AnimatedBuilder(
+      animation: shift.both,
+      child: page,
+      // always the same widget shape, so the page is never rebuilt
+      builder: (_, k) => Opacity(
+        opacity: shift.opacity,
+        child: FractionalTranslation(translation: Offset(shift.dx, 0), child: k),
+      ),
     ),
   );
 }
 
-/// A page with its own background; pages inside it draw only content.
-class _SolidPage extends StatelessWidget {
-  final Widget child;
-  const _SolidPage({required this.child});
-  @override
-  Widget build(BuildContext context) => ColoredBox(
-        color: CkColors.deepSpace,
-        child: Stack(fit: StackFit.expand, children: [
-          const RepaintBoundary(child: CosmicBackground()),
-          SharedBackdrop(child: BackdropGroup(child: child)),
-        ]),
-      );
+/// Where a page is in its push/back motion.
+class _PageShift {
+  final Animation<double> into;
+  final Animation<double> under;
+  final Listenable both;
+  _PageShift({required this.into, required this.under}) : both = Listenable.merge([into, under]);
+  /// Horizontal drift, as a share of the page width.
+  double get dx => CkMotion.pushShift * (1 - into.value) - CkMotion.pushShift * under.value;
+  double get opacity => (into.value * (1 - under.value)).clamp(0.0, 1.0);
 }
 
-/// Keeps every tab alive and switches as in MyAcharyaji: the new tab fades
-/// in over 400 ms while rising 16 px (450 ms), and its cards rise in one
-/// after another; the old tab gets out of the way in 150 ms. Cards fade only
-/// their face ([CardFade]) so their blur never pops in late. Hidden tabs are
-/// not painted, take no touches and pause their animations.
+class _PageShiftScope extends InheritedWidget {
+  final _PageShift shift;
+  const _PageShiftScope({required this.shift, required super.child});
+  @override
+  bool updateShouldNotify(_PageShiftScope old) => !identical(old.shift, shift);
+}
+
+/// Keeps a floating surface (a dock) in place while its page drifts during
+/// push and back, so two docks cross-fade on the same spot.
+class StayPut extends StatelessWidget {
+  final Widget child;
+  const StayPut({super.key, required this.child});
+  @override
+  Widget build(BuildContext context) {
+    final s = context.getInheritedWidgetOfExactType<_PageShiftScope>()?.shift;
+    if (s == null) return child;
+    return AnimatedBuilder(
+      animation: s.both,
+      child: child,
+      builder: (c, k) => Transform.translate(offset: Offset(-s.dx * MediaQuery.sizeOf(c).width, 0), child: k),
+    );
+  }
+}
+
+/// Keeps every tab alive and switches exactly as MyAcharyaji: the old and
+/// the new tab cross-fade over 400 ms while sliding 2.5% of the screen
+/// height over 450 ms (the new one rises into place, the old one sinks
+/// away), and the new tab's cards rise in one after another, 70 ms apart.
+/// Hidden tabs are not painted, take no touches and pause their animations.
 class TabFader extends StatefulWidget {
   final int index;
   final List<Widget> children;
@@ -675,22 +712,20 @@ class _TabFaderState extends State<TabFader> with SingleTickerProviderStateMixin
     return _visits[i];
   }
 
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 450), value: 1)
+  late final AnimationController _c = AnimationController(vsync: this, duration: CkMotion.tabSlide, value: 1)
     ..addStatusListener((s) {
       if (s == AnimationStatus.completed && _prev != null && mounted) setState(() => _prev = null);
     });
-  // old tab: gone within the first third (150 ms), ease-in
-  late final Animation<double> _out = ReverseAnimation(CurvedAnimation(parent: _c, curve: const Interval(0, 1 / 3, curve: Curves.easeIn)));
-  // new tab: fade 400 ms, rise 450 ms
-  late final Animation<double> _in = CurvedAnimation(parent: _c, curve: const Interval(0, 400 / 450, curve: kEase));
-  late final Animation<double> _rise = CurvedAnimation(parent: _c, curve: kEase);
-  static const _shown = AlwaysStoppedAnimation<double>(1);
+  late final Animation<double> _fade = CurvedAnimation(
+      parent: _c, curve: Interval(0, CkMotion.tabFade.inMilliseconds / CkMotion.tabSlide.inMilliseconds, curve: kEase));
+  late final Animation<double> _slide = CurvedAnimation(parent: _c, curve: kEase);
   int? _prev;
 
   @override
   void didUpdateWidget(TabFader old) {
     super.didUpdateWidget(old);
     if (old.index == widget.index) return;
+    _v(widget.index).value++;
     if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
       _prev = null;
       _c.value = 1;
@@ -698,7 +733,6 @@ class _TabFaderState extends State<TabFader> with SingleTickerProviderStateMixin
     }
     _prev = old.index;
     _c.forward(from: 0);
-    _v(widget.index).value++;
   }
 
   @override
@@ -710,26 +744,10 @@ class _TabFaderState extends State<TabFader> with SingleTickerProviderStateMixin
     super.dispose();
   }
 
-  // One fixed fade per tab, pointed at the right curve on each switch, so
-  // cards built earlier keep following it.
-  final _fade = <ProxyAnimation>[];
-
-  ProxyAnimation _f(int i) {
-    while (_fade.length <= i) {
-      _fade.add(ProxyAnimation(_shown));
-    }
-    return _fade[i];
-  }
-
   @override
   Widget build(BuildContext context) {
     final cur = widget.index;
     final prev = _prev;
-    for (var i = 0; i < widget.children.length; i++) {
-      final want = i == prev ? _out : (i == cur && prev != null ? _in : _shown);
-      final f = _f(i);
-      if (!identical(f.parent, want)) f.parent = want;
-    }
     // Every tab keeps the same widget shape at all times, so switching
     // never rebuilds a tab from scratch.
     return Stack(children: [
@@ -741,14 +759,24 @@ class _TabFaderState extends State<TabFader> with SingleTickerProviderStateMixin
               enabled: i == cur || i == prev,
               child: AnimatedBuilder(
                 animation: _c,
-                child: _TabVisit(visits: _v(i), child: CardFade.tab(t: _f(i), child: widget.children[i])),
-                builder: (_, c) {
-                  final leaving = i == prev && _c.value < 1 / 3;
-                  final arriving = i == cur && prev != null;
-                  final hidden = !(i == cur || leaving);
+                child: _TabVisit(
+                  visits: _v(i),
+                  child: EntranceWave(stepMs: CkMotion.waveTab, child: widget.children[i]),
+                ),
+                builder: (_, k) {
+                  final moving = prev != null;
+                  final arriving = moving && i == cur;
+                  final leaving = moving && i == prev;
+                  final opacity = arriving ? _fade.value : (leaving ? 1 - _fade.value : 1.0);
+                  final dy = arriving
+                      ? CkMotion.tabShift * (1 - _slide.value)
+                      : (leaving ? CkMotion.tabShift * _slide.value : 0.0);
                   return Offstage(
-                    offstage: hidden,
-                    child: Transform.translate(offset: Offset(0, arriving ? (1 - _rise.value) * 16 : 0), child: c),
+                    offstage: !(i == cur || leaving),
+                    child: Opacity(
+                      opacity: opacity.clamp(0.0, 1.0),
+                      child: FractionalTranslation(translation: Offset(0, dy), child: k),
+                    ),
                   );
                 },
               ),

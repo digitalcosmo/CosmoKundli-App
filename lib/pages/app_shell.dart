@@ -110,7 +110,8 @@ class _AppShellState extends State<AppShell> {
           left: 12,
           right: 12,
           bottom: bottom > 0 ? bottom : 14,
-          child: RepaintBoundary(
+          // the dock stays on its spot while the page moves (push and back)
+          child: StayPut(child: RepaintBoundary(
             child: Glass(
               radius: 20,
               blur: 22,
@@ -190,7 +191,7 @@ class _AppShellState extends State<AppShell> {
                 ]);
               }),
             ),
-          ),
+          )),
         ),
       ]),
       ),

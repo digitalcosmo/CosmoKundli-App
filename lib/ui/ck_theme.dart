@@ -74,11 +74,63 @@ class CkRadius {
   static const double input = 14;
 }
 
+/// The motion constitution: every duration, curve and distance in the app
+/// (copied from MyAcharyaji; see the family plan). Pages use these names and
+/// never type a value of their own.
 class CkMotion {
+  /// The one curve: cubic-bezier(.22, 1, .36, 1).
+  static const Curve ease = Cubic(.22, 1, .36, 1);
+
+  /// Press feedback (scale 0.97).
   static const Duration fast = Duration(milliseconds: 150);
   static const Duration base = Duration(milliseconds: 280);
   static const Duration slow = Duration(milliseconds: 450);
-  static const Curve ease = Cubic(.22, 1, .36, 1);
+
+  /// Card entrance: 550 ms, rise 16 px, scale 0.98 to 1, one fade.
+  static const Duration enter = Duration(milliseconds: 550);
+  static const double rise = 16;
+  static const double scaleFrom = .98;
+
+  /// Wave: gap between cards on a tab, and on a pushed page.
+  static const int waveTab = 70;
+  static const int wavePage = 60;
+
+  /// Tab change: both tabs fade over 400 ms and slide 2.5% of the screen
+  /// height over 450 ms, at the same time.
+  static const Duration tabFade = Duration(milliseconds: 400);
+  static const Duration tabSlide = Duration(milliseconds: 450);
+  static const double tabShift = .025;
+
+  /// Push and back: the content moves 8% of the width while it fades; the
+  /// sky stays.
+  static const Duration push = Duration(milliseconds: 450);
+  static const double pushShift = .08;
+
+  /// Loading to data, data to error.
+  static const Duration state = Duration(milliseconds: 350);
+
+  /// A value moving to its new size.
+  static const Duration glide = Duration(milliseconds: 1000);
+
+  /// Horizontal meters and percentages.
+  static const Duration meter = Duration(milliseconds: 1100);
+  static const int meterStep = 90;
+
+  /// A value still loading pulses between these opacities.
+  static const Duration pulse = Duration(milliseconds: 900);
+
+  /// Value labels on charts.
+  static const Duration label = Duration(milliseconds: 250);
+
+  /// Period label: slides 25% and fades.
+  static const Duration period = Duration(milliseconds: 380);
+
+  /// Segmented thumb and chip colour.
+  static const Duration segment = Duration(milliseconds: 450);
+  static const Duration chip = Duration(milliseconds: 300);
+
+  /// Sheets: dark veil behind them.
+  static const double sheetVeil = .55;
 }
 
 class CkTheme {
@@ -124,7 +176,8 @@ class CkTheme {
       useMaterial3: true,
       brightness: Brightness.dark,
       colorScheme: scheme,
-      scaffoldBackgroundColor: CkColors.deepSpace,
+      // the sky is painted once under every page (main.dart)
+      scaffoldBackgroundColor: Colors.transparent,
       canvasColor: CkColors.navySheet,
       textTheme: _text(),
       splashFactory: InkSparkle.splashFactory,

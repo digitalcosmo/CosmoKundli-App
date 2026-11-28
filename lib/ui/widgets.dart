@@ -387,27 +387,13 @@ class _FastFutureState<T> extends State<FastFuture<T>> {
       child = KeyedSubtree(key: const ValueKey('ok'), child: widget.builder(r.data as T));
     }
     if (!_skel) return child;
-    // Skeleton -> data: the data fades in on its own. The skeleton leaves at
-    // once instead of cross-fading, so the page never shows both at the
-    // same time (the "chart appears twice" look).
+    // Skeleton -> data, as MyAcharyaji's ResultSwitch: the data fades in
+    // over 350 ms. The skeleton leaves at once instead of cross-fading, so
+    // the page never shows both at the same time.
     return AnimatedSwitcher(
-      duration: _still(context) ? Duration.zero : const Duration(milliseconds: 550),
-      switchInCurve: kEase,
-      // Cards fade their face only, so their blur is there from frame one.
-      // Data lands with the card entrance (rise 16 px, 0.98 to 1, fade);
-      // cards inside still play their one-after-another entrance.
-      transitionBuilder: (c, a) => CardFade.tab(
-        t: a,
-        child: AnimatedBuilder(
-          animation: a,
-          child: c,
-          // same widget shape all the way, so the content is never rebuilt
-          builder: (_, k) => Transform.translate(
-            offset: Offset(0, (1 - a.value) * 16),
-            child: Transform.scale(scale: .98 + .02 * a.value, child: k),
-          ),
-        ),
-      ),
+      duration: _still(context) ? Duration.zero : CkMotion.state,
+      switchInCurve: Curves.easeOut,
+      transitionBuilder: (c, a) => FadeTransition(opacity: a, child: c),
       layoutBuilder: (cur, prev) => cur ?? const SizedBox.shrink(),
       child: child,
     );
@@ -2353,6 +2339,9 @@ final perfOverlay = ValueNotifier<bool>(false);
 final perfFlags = ValueNotifier<int>(0);
 bool perfOff(int bit) => perfFlags.value & bit != 0;
 
+/// Extra entries for the speed sheet (labs register themselves).
+final perfLabs = <(String, void Function(BuildContext))>[];
+
 void showPerfSheet(BuildContext context) {
   showModalBottomSheet(
     context: context,
@@ -2373,6 +2362,15 @@ void showPerfSheet(BuildContext context) {
             sw('Glows OFF (bar and dot shadows)', perfOff(8), (v) => flip(8, v)),
             sw('Dock blur OFF', perfOff(16), (v) => flip(16, v)),
             sw('Card entrances OFF', perfOff(32), (v) => flip(32, v)),
+            for (final l in perfLabs)
+              ListTile(
+                title: Text(l.$1),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () {
+                  Navigator.of(c).pop();
+                  l.$2(context);
+                },
+              ),
             const SizedBox(height: 8),
           ]);
         },

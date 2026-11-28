@@ -104,9 +104,14 @@ class _ClientShellState extends State<ClientShell> {
                   child: Navigator(
                     key: _keys[i],
                     observers: [UnfocusObserver()],
+                    // the tab's first page: already in place, and it moves
+                    // out of the way like any page when a module opens
                     onGenerateRoute: (s) => PageRouteBuilder(
-                        pageBuilder: (_, __, ___) => SharedBackdrop(child: _tabs[i].root()),
-                        transitionDuration: Duration.zero),
+                        pageBuilder: (_, __, ___) => _tabs[i].root(),
+                        transitionsBuilder: (c, a, b, child) =>
+                            ckPageTransition(c, kAlwaysCompleteAnimation, b, child, wave: CkMotion.waveTab),
+                        transitionDuration: Duration.zero,
+                        reverseTransitionDuration: Duration.zero),
                   ),
                 ),
               );
@@ -127,7 +132,8 @@ class _ClientShellState extends State<ClientShell> {
                   child: child,
                 ),
               ),
-              child: RepaintBoundary(child: _Dock(index: _index, onTap: _select)),
+              // the dock stays on its spot while the page moves (push and back)
+              child: StayPut(child: RepaintBoundary(child: _Dock(index: _index, onTap: _select))),
             ),
           ),
         ]),
