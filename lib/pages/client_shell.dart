@@ -315,12 +315,7 @@ class ClientPage extends StatelessWidget {
   }
 
   Future<void> _switch(BuildContext context) async {
-    final c = await showModalBottomSheet<Client>(
-      useRootNavigator: true,
-      context: context,
-      isScrollControlled: true,
-      builder: (s) => _SwitchSheet(),
-    );
+    final c = await pickClient(context, title: 'Switch client', subtitle: 'Open another client\'s workspace', markCurrent: true);
     if (c != null) {
       Session.open(c);
       Get.off(() => const ClientShell(), preventDuplicates: false);
@@ -371,57 +366,6 @@ class ClientPage extends StatelessWidget {
 
 void pushModule(BuildContext context, Widget page) =>
     Navigator.of(context).push(CkRoute(builder: (_) => page));
-
-class _SwitchSheet extends StatefulWidget {
-  @override
-  State<_SwitchSheet> createState() => _SwitchSheetState();
-}
-
-class _SwitchSheetState extends State<_SwitchSheet> {
-  final _f = fetchClients();
-  String _q = '';
-  @override
-  Widget build(BuildContext context) => SafeArea(
-        child: SizedBox(
-          height: MediaQuery.of(context).size.height * .72,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Center(child: Container(width: 44, height: 5, decoration: BoxDecoration(color: CkColors.glassStroke, borderRadius: BorderRadius.circular(3)))),
-              const SizedBox(height: 12),
-              Text('Switch client', style: CkText.h(18)),
-              const SizedBox(height: 10),
-              CkSearchField(
-                onChanged: (v) => setState(() => _q = v.toLowerCase()),
-                decoration: const InputDecoration(hintText: 'Search', prefixIcon: Icon(Icons.search_rounded)),
-              ),
-              const SizedBox(height: 6),
-              Expanded(
-                child: DataBuilder<List<Client>>(
-                  future: _f,
-                  builder: (c, s) {
-                    if (!s.hasData) return const SkeletonList(rows: 7);
-                    final l = s.data!.where((e) => e.name.toLowerCase().contains(_q)).toList();
-                    return ListView.builder(
-                      itemCount: l.length,
-                      itemBuilder: (c, i) => ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                        title: Text(l[i].name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        subtitle: Text(l[i].subtitle, style: CkText.muted.copyWith(fontSize: 12)),
-                        trailing: Session.client.value?.mId == l[i].mId
-                            ? const Icon(Icons.check_rounded, color: CkColors.cyan)
-                            : null,
-                        onTap: () => Navigator.pop(context, l[i]),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ]),
-          ),
-        ),
-      );
-}
 
 class _DetailsSheet extends StatelessWidget {
   const _DetailsSheet();

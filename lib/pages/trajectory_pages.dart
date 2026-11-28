@@ -354,81 +354,9 @@ class TransitBodyState extends State<TransitBody> {
   }
 }
 
-/// Bottom sheet listing clients, with search.
-Future<Client?> pickClientSheet(BuildContext context) => showModalBottomSheet<Client>(
-      useRootNavigator: true,
-      context: context,
-      isScrollControlled: true,
-      builder: (s) => const _PickClient(),
-    );
-
-class _PickClient extends StatefulWidget {
-  const _PickClient();
-  @override
-  State<_PickClient> createState() => _PickClientState();
-}
-
-class _PickClientState extends State<_PickClient> {
-  final _f = fetchClients();
-  String _q = '';
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: SafeArea(
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height * .7,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 18, 0),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Compare with a client', style: CkText.h(18)),
-                const SizedBox(height: 12),
-                CkSearchField(
-                  onChanged: (v) => setState(() => _q = v.trim().toLowerCase()),
-                  decoration: const InputDecoration(hintText: 'Search name, year, place', prefixIcon: Icon(Icons.search_rounded)),
-                ),
-                Expanded(
-                  child: DataBuilder<List<Client>>(
-                    future: _f,
-                    builder: (c, s) {
-                      if (s.hasError) return const Center(child: Text('Couldn\'t load clients', style: CkText.muted));
-                      if (!s.hasData) return Skels.table(10);
-                      final l = s.data!.where((e) => _q.isEmpty || '${e.name} ${e.city} ${e.dobRaw}'.toLowerCase().contains(_q)).toList();
-                      return ListView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, children: [
-                        Padding(padding: const EdgeInsets.only(top: 14, bottom: 4), child: Text('${l.length} CLIENTS', style: CkText.label)),
-                        for (final cl in l)
-                          InkWell(
-                            onTap: () => Navigator.pop(context, cl),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 11),
-                              decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x1F8CBEFF)))),
-                              child: Row(children: [
-                                Container(
-                                  width: 34,
-                                  height: 34,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0x598CBEFF))),
-                                  child: Text(cl.initials, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    Text(cl.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
-                                    Text(cl.subtitle, style: CkText.mono(11.5, color: CkColors.textSecondary)),
-                                  ]),
-                                ),
-                              ]),
-                            ),
-                          ),
-                      ]);
-                    },
-                  ),
-                ),
-              ]),
-            ),
-          ),
-        ),
-      );
-}
+/// Compare: the shared client picker (kit).
+Future<Client?> pickClientSheet(BuildContext context) =>
+    pickClient(context, title: 'Compare with a client', subtitle: 'Transits over their birth chart');
 
 class CoordTable extends StatelessWidget {
   final List<GrahPos> birth;

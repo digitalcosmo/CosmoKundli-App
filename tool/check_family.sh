@@ -29,6 +29,7 @@ hits=$(grep -nE '\bPopupMenuButton\b|\bMenuAnchor\b|\bshowMenu\(|\bDropdownButto
 if [ -n "$hits" ]; then echo "FAMILY CHECK: dropdowns in the kit go through menu.dart"; echo "$hits" | sed 's/^/  /'; fail=1; fi
 hits=$(grep -nE -A5 '\bTextField\(' ./*.dart | grep -E "hintText: .Search" | grep -v 'family-ok:' || true)
 if [ -n "$hits" ]; then echo "FAMILY CHECK: a search box is CkSearchField (kit): search key, clear button, keyboard closes"; echo "$hits" | sed 's/^/  /'; fail=1; fi
+check 'showModalBottomSheet<(Client|Map<String, dynamic>)>' 'picking a person is showPickSheet / pickClient (kit), one sheet for every place'
 if [ $fail -ne 0 ]; then
   echo "Family check failed. See the family plan: every stat, list and screen comes from the kit."
   exit 1

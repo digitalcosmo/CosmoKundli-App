@@ -24,6 +24,19 @@ class ClientsPage extends StatefulWidget {
 Future<List<Client>> fetchClients({bool force = false}) =>
     Api.shared('clients:${Session.uid}', _fetchClients, force: force);
 
+/// Pick a saved client with the shared sheet (kit: showPickSheet).
+Future<Client?> pickClient(BuildContext context, {required String title, String? subtitle, bool markCurrent = false}) async {
+  final r = await showPickSheet<Client>(context,
+      title: title,
+      subtitle: subtitle,
+      load: fetchClients,
+      name: (c) => c.name,
+      sub: (c) => c.subtitle,
+      searchText: (c) => '${c.name} ${c.city} ${c.dobRaw}',
+      isCurrent: markCurrent ? (c) => Session.client.value?.mId == c.mId : null);
+  return r?.item;
+}
+
 Future<List<Client>> _fetchClients() async {
   final r = await Api.post(Endpoints.memberList, {'uID': Session.uid});
   final list = Api.list(r, ['members', 'list']).map(Client.fromJson).where((c) => c.mId.isNotEmpty).toList();

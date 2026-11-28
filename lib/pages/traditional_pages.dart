@@ -109,27 +109,29 @@ class ClientPanchang {
 /// Picks a partner for [c] from their Melapak list (opposite gender first)
 /// and returns the match result, or null if cancelled.
 Future<Map<String, dynamic>?> pickMelapakMatch(BuildContext context, Client c) async {
-  final m = await showModalBottomSheet<Map<String, dynamic>>(
-    context: context,
-    useRootNavigator: true,
-    isScrollControlled: true,
-    builder: (_) => SafeArea(
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height * .7,
-        child: _PickList<Map<String, dynamic>>(
-          title: 'Match ${c.name} with',
-          load: () async {
-            final l = Api.list(await Api.post(Endpoints.melapakOppList, {'mID': c.mId}), ['members', 'list']);
-            final want = c.isFemale ? 'm' : 'f';
-            final f = l.where((e) => (e['Gender'] ?? '').toString().toLowerCase().startsWith(want)).toList();
-            return f.isEmpty ? l : f;
-          },
-          name: (e) => '${e['Name'] ?? ''}',
-          sub: (e) => '${e['Gender'] ?? ''}',
-        ),
-      ),
-    ),
-  );
+  final want = c.isFemale ? 'm' : 'f';
+  final p = await showPickSheet<Map<String, dynamic>>(context,
+      title: 'Match ${c.name.split(' ').first} with',
+      subtitle: 'Opposite gender shown first',
+      load: () async => Api.list(await Api.post(Endpoints.melapakOppList, {'mID': c.mId}), ['members', 'list']),
+      name: (e) => '${e['Name'] ?? ''}',
+      sub: (e) => '${e['Gender'] ?? ''}',
+      filters: [
+        PickFilter('Opposite gender', (e) => (e['Gender'] ?? '').toString().toLowerCase().startsWith(want)),
+        PickFilter('Everyone', (_) => true),
+      ],
+      countLabel: 'PEOPLE',
+      footer: 'Type birth details instead');
+  if (p == null) return null;
+  if (p.footer) {
+    if (!context.mounted) return null;
+    final f = await Navigator.of(context).push<Future<Map<String, dynamic>>>(CkRoute(builder: (_) => _NewPersonPage(clientId: c.mId)));
+    if (f == null) return null;
+    final r = await f;
+    LastMatch.save(c.mId, r);
+    return r;
+  }
+  final m = p.item;
   if (m == null) return null;
   final r = await Api.post(Endpoints.melapakExisting, {'mID': c.mId, 'oID': '${m['oID']}'});
   LastMatch.save(c.mId, r);
@@ -617,20 +619,8 @@ class _MelapakToolPageState extends State<MelapakToolPage> {
   Client? _a;
   Map<String, dynamic>? _b;
 
-  Future<T?> _sheet<T>(Widget child) => showModalBottomSheet<T>(
-        context: context,
-        useRootNavigator: true,
-        isScrollControlled: true,
-        builder: (_) => SafeArea(child: SizedBox(height: MediaQuery.of(context).size.height * .7, child: child)),
-      );
-
   Future<void> _pickA() async {
-    final c = await _sheet<Client>(_PickList<Client>(
-      title: 'Choose person 1',
-      load: fetchClients,
-      name: (e) => e.name,
-      sub: (e) => e.subtitle,
-    ));
+    final c = await pickClient(context, title: 'Choose person 1', subtitle: 'Any saved client');
     if (c != null) setState(() {
       _a = c;
       _b = null;
@@ -640,13 +630,22 @@ class _MelapakToolPageState extends State<MelapakToolPage> {
   Future<void> _pickB() async {
     final a = _a;
     if (a == null) return;
-    final m = await _sheet<Map<String, dynamic>>(_PickList<Map<String, dynamic>>(
-      title: 'Choose person 2',
-      load: () async => Api.list(await Api.post(Endpoints.melapakOppList, {'mID': a.mId}), ['members', 'list']),
-      name: (e) => '${e['Name'] ?? ''}',
-      sub: (e) => '${e['Gender'] ?? ''}',
-    ));
-    if (m != null) setState(() => _b = m);
+    final want = a.isFemale ? 'm' : 'f';
+    final p = await showPickSheet<Map<String, dynamic>>(context,
+        title: 'Choose person 2',
+        subtitle: 'Matched against ${a.name}',
+        load: () async => Api.list(await Api.post(Endpoints.melapakOppList, {'mID': a.mId}), ['members', 'list']),
+        name: (e) => '${e['Name'] ?? ''}',
+        sub: (e) => '${e['Gender'] ?? ''}',
+        filters: [
+          PickFilter('Opposite gender', (e) => (e['Gender'] ?? '').toString().toLowerCase().startsWith(want)),
+          PickFilter('Everyone', (_) => true),
+        ],
+        countLabel: 'PEOPLE',
+        footer: 'Type birth details instead');
+    if (p == null) return;
+    if (p.footer) return _typeB();
+    setState(() => _b = p.item);
   }
 
   Future<void> _typeB() async {
@@ -743,48 +742,3 @@ class _MelapakToolPageState extends State<MelapakToolPage> {
       );
 }
 
-class _PickList<T> extends StatefulWidget {
-  final String title;
-  final Future<List<T>> Function() load;
-  final String Function(T) name;
-  final String Function(T) sub;
-  const _PickList({super.key, required this.title, required this.load, required this.name, required this.sub});
-  @override
-  State<_PickList<T>> createState() => _PickListState<T>();
-}
-
-class _PickListState<T> extends State<_PickList<T>> {
-  late final Future<List<T>> _f = widget.load();
-  String _q = '';
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(widget.title, style: CkText.h(18)),
-          const SizedBox(height: 10),
-          CkSearchField(
-            onChanged: (v) => setState(() => _q = v.toLowerCase()),
-            decoration: const InputDecoration(hintText: 'Search', prefixIcon: Icon(Icons.search_rounded)),
-          ),
-          Expanded(
-            child: DataBuilder<List<T>>(
-              future: _f,
-              builder: (c, s) {
-                if (s.hasError) return const Center(child: Text('Couldn\'t load', style: CkText.muted));
-                if (!s.hasData) return const SkeletonList(rows: 5);
-                final l = s.data!.where((e) => widget.name(e).toLowerCase().contains(_q)).toList();
-                return ListView(children: [
-                  for (final e in l)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(widget.name(e)),
-                      subtitle: Text(widget.sub(e), style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
-                      onTap: () => Navigator.pop(context, e),
-                    ),
-                ]);
-              },
-            ),
-          ),
-        ]),
-      );
-}
