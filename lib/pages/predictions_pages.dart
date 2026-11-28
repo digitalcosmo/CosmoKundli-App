@@ -109,11 +109,13 @@ class _SentimentsPageState extends State<SentimentsPage> {
         title: 'Sentiments',
         children: [
           MonthBar(month: _month, onChanged: _setMonth),
-          LoadView<List<MapEntry<DateTime, double>>>(
+          // Month change keeps this card on screen: bars glide to the new
+          // month (or sink and pulse until it lands), numbers glide too.
+          KeepLoad<List<MapEntry<DateTime, double>>>(
             future: _f,
             skeleton: Skels.daily(),
             onRetry: () => _setMonth(_month),
-            builder: (l) {
+            builder: (l, loading) {
               if (l.isEmpty) {
                 return const EmptyBox(icon: Icons.event_busy_rounded, title: 'No readings', body: 'There are no Sentiments for this month.');
               }
@@ -165,7 +167,7 @@ class _SentimentsPageState extends State<SentimentsPage> {
                     ),
                     DailyBarChart(
                       key: _chart,
-                      days: l.map((e) => DayValue(e.key, e.value)).toList(),
+                      days: _daysOf(_month, l, loading),
                       signed: true,
                       selected: sel,
                       today: todayIdx >= 0 ? todayIdx : null,
@@ -236,6 +238,13 @@ class _SentimentsPageState extends State<SentimentsPage> {
       );
 }
 
+/// Bars for the chart: the month's days, with no values while it loads.
+List<DayValue> _daysOf(DateTime month, List<MapEntry<DateTime, double>> l, bool loading) {
+  if (!loading) return l.map((e) => DayValue(e.key, e.value)).toList();
+  final n = DateTime(month.year, month.month + 1, 0).day;
+  return [for (var d = 1; d <= n; d++) DayValue(DateTime(month.year, month.month, d), null)];
+}
+
 class _Key extends StatelessWidget {
   final Color c;
   final String t;
@@ -293,11 +302,13 @@ class _SituationsPageState extends State<SituationsPage> {
         title: 'Situations',
         children: [
           MonthBar(month: _month, onChanged: _setMonth),
-          LoadView<List<MapEntry<DateTime, double>>>(
+          // Month change keeps this card on screen: bars glide to the new
+          // month (or sink and pulse until it lands), numbers glide too.
+          KeepLoad<List<MapEntry<DateTime, double>>>(
             future: _f,
             skeleton: Skels.daily(signed: false),
             onRetry: () => _setMonth(_month),
-            builder: (l) {
+            builder: (l, loading) {
               if (l.isEmpty) {
                 return const EmptyBox(icon: Icons.event_busy_rounded, title: 'No readings', body: 'There are no Situations for this month.');
               }
@@ -345,7 +356,7 @@ class _SituationsPageState extends State<SituationsPage> {
                     RepaintBoundary(
                       child: DailyBarChart(
                         key: _chart,
-                        days: l.map((e) => DayValue(e.key, e.value)).toList(),
+                        days: _daysOf(_month, l, loading),
                         signed: false,
                         selected: sel,
                         today: todayIdx >= 0 ? todayIdx : null,

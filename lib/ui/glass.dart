@@ -217,7 +217,7 @@ class Pressable extends StatefulWidget {
       required this.child,
       this.onTap,
       this.scale = .97,
-      this.haptic = true});
+      this.haptic = false});
 
   @override
   State<Pressable> createState() => _PressableState();

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -277,15 +278,20 @@ class ChoiceChips<T> extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: Pressable(
+                      haptic: true,
                       onTap: () => onChanged(v),
+                      // selected: lifts 3 px with a glow in its own colour
                       child: AnimatedContainer(
-                        duration: CkMotion.fast,
+                        duration: const Duration(milliseconds: 300),
+                        curve: kEase,
                         height: 44,
                         alignment: Alignment.center,
+                        transform: Matrix4.translationValues(0, v == selected ? -3 : 0, 0),
                         decoration: BoxDecoration(
                           color: v == selected ? CkColors.orangeTint : CkColors.glassFill,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: v == selected ? CkColors.orangeStroke : CkColors.glassStroke),
+                          boxShadow: [BoxShadow(color: const Color(0xFFF07E22).withValues(alpha: v == selected ? .35 : 0), blurRadius: 18, offset: const Offset(0, 8))],
                         ),
                         child: Text(label(v),
                             style: TextStyle(
@@ -426,6 +432,87 @@ class LoadView<T> extends StatelessWidget {
         loading: skeleton ?? (minHeight >= 300 ? SkeletonCard(height: minHeight) : const SkeletonList(rows: 5)),
         error: () => ErrorBox(message: 'Couldn\'t load this. Check your connection and try again.', onRetry: onRetry),
       );
+}
+
+/// Loading that belongs to the data, not to the request (MyAcharyaji rule):
+/// the first load shows [skeleton]; after that, a new [future] (another
+/// month, a refresh) keeps the last data on screen and calls
+/// `builder(last, true)` until the answer lands, then `builder(new, false)`
+/// in the same widget tree, so bars and numbers glide from where they are.
+/// Data already loaded shows at once.
+class KeepLoad<T> extends StatefulWidget {
+  final Future<T> future;
+  final Widget Function(T data, bool loading) builder;
+  final Widget skeleton;
+  final VoidCallback? onRetry;
+  const KeepLoad({super.key, required this.future, required this.builder, required this.skeleton, this.onRetry});
+  @override
+  State<KeepLoad<T>> createState() => _KeepLoadState<T>();
+}
+
+class _KeepLoadState<T> extends State<KeepLoad<T>> {
+  T? _data;
+  bool _has = false;
+  bool _loading = true;
+  Object? _err;
+
+  @override
+  void initState() {
+    super.initState();
+    _watch();
+  }
+
+  @override
+  void didUpdateWidget(KeepLoad<T> old) {
+    super.didUpdateWidget(old);
+    if (!identical(old.future, widget.future)) _watch();
+  }
+
+  void _watch() {
+    final f = widget.future;
+    final hit = _done[f];
+    if (hit != null && hit.ok) {
+      _data = hit.data as T;
+      _has = true;
+      _loading = false;
+      _err = null;
+      if (!_first.isCompleted) _first.complete(true);
+      return;
+    }
+    _loading = true;
+    _err = null;
+    f.then((v) {
+      _done[f] = _Done(v, null, true);
+      if (mounted && identical(widget.future, f)) {
+        setState(() {
+          _data = v;
+          _has = true;
+          _loading = false;
+        });
+        if (!_first.isCompleted) _first.complete(true);
+      }
+    }, onError: (Object e) {
+      if (mounted && identical(widget.future, f)) setState(() => _err = e);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_err != null && !_has) {
+      return ErrorBox(message: 'Couldn\'t load this. Check your connection and try again.', onRetry: widget.onRetry);
+    }
+    // First load: skeleton, then the data fades and rises in once.
+    return FastFuture<bool>(
+      future: _firstDone,
+      loading: widget.skeleton,
+      error: () => const SizedBox.shrink(),
+      builder: (_) => widget.builder(_data as T, _loading && _err == null),
+    );
+  }
+
+  // completes once the first data is in; never changes after that
+  final _first = Completer<bool>();
+  Future<bool> get _firstDone => _first.future;
 }
 
 class ErrorBox extends StatelessWidget {
@@ -659,10 +746,26 @@ class InfoPill extends StatelessWidget {
 }
 
 /// Month stepper with a picker sheet.
-class MonthBar extends StatelessWidget {
+class MonthBar extends StatefulWidget {
   final DateTime month;
   final ValueChanged<DateTime> onChanged;
   const MonthBar({super.key, required this.month, required this.onChanged});
+  @override
+  State<MonthBar> createState() => _MonthBarState();
+}
+
+class _MonthBarState extends State<MonthBar> {
+  int _dir = 1; // 1: moved forward (new month comes in from the right)
+
+  @override
+  void didUpdateWidget(MonthBar old) {
+    super.didUpdateWidget(old);
+    if (old.month != widget.month) _dir = widget.month.isAfter(old.month) ? 1 : -1;
+  }
+
+  DateTime get month => widget.month;
+  ValueChanged<DateTime> get onChanged => widget.onChanged;
+
   @override
   Widget build(BuildContext context) => Row(children: [
         CircleBtn(Icons.chevron_left_rounded, size: 40, label: 'Previous month',
@@ -686,10 +789,17 @@ class MonthBar extends StatelessWidget {
               child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 const Icon(Icons.calendar_month_rounded, size: 17, color: CkColors.orangeSoft),
                 const SizedBox(width: 8),
-                Text(DateFormat('MMMM').format(month), style: CkText.h(16)),
-                const SizedBox(width: 6),
-                Text('${month.year}',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: CkColors.textSecondary)),
+                // the month name slides in from the side you moved towards
+                DirectionalSwitcher(
+                  switchKey: month,
+                  direction: _dir,
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(DateFormat('MMMM').format(month), style: CkText.h(16)),
+                    const SizedBox(width: 6),
+                    Text('${month.year}',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: CkColors.textSecondary)),
+                  ]),
+                ),
               ]),
             ),
           ),
@@ -698,6 +808,33 @@ class MonthBar extends StatelessWidget {
         CircleBtn(Icons.chevron_right_rounded, size: 40, label: 'Next month',
             onTap: () => onChanged(DateTime(month.year, month.month + 1))),
       ]);
+}
+
+/// Swaps [child] with a sideways slide in the direction of travel
+/// (MyAcharyaji DirectionalSwitcher): 380 ms, new one slides 25% in from
+/// the side you moved towards, old one leaves the other way with ease-in.
+class DirectionalSwitcher extends StatelessWidget {
+  final Widget child;
+  final Object switchKey;
+  final int direction; // 1 = forward (new content enters from the right)
+  const DirectionalSwitcher({super.key, required this.child, required this.switchKey, required this.direction});
+
+  @override
+  Widget build(BuildContext context) => AnimatedSwitcher(
+        duration: _still(context) ? Duration.zero : const Duration(milliseconds: 380),
+        switchInCurve: kEase,
+        switchOutCurve: Curves.easeIn,
+        layoutBuilder: (cur, prev) => Stack(alignment: Alignment.center, children: [...prev, if (cur != null) cur]),
+        transitionBuilder: (c, a) {
+          final incoming = c.key == ValueKey(switchKey);
+          final dx = incoming ? .25 * direction : -.25 * direction;
+          return FadeTransition(
+            opacity: a,
+            child: SlideTransition(position: Tween(begin: Offset(dx, 0), end: Offset.zero).animate(a), child: c),
+          );
+        },
+        child: KeyedSubtree(key: ValueKey(switchKey), child: child),
+      );
 }
 
 /// Month picker sheet: ‹ year ▾ › above a 4×3 month grid. Tapping a month
@@ -1210,7 +1347,8 @@ void showZonesSheet(BuildContext context) {
 
 class DayValue {
   final DateTime date;
-  final double value;
+  /// null while this day's data is loading: the bar sinks to 0 and pulses.
+  final double? value;
   const DayValue(this.date, this.value);
 }
 
@@ -1313,26 +1451,24 @@ class DailyBarChartState extends State<DailyBarChart> {
   Widget _bar(int i, double w) {
     final d = widget.days[i];
     final signed = widget.signed;
-    final v = d.value.clamp(signed ? -100.0 : 0.0, 100.0);
+    final raw = d.value;
+    final loading = raw == null;
+    // Same slot, new value: the bar glides from where it is to the new
+    // value (another month already loaded), sinks to 0 while a month loads,
+    // and rises when it lands (MyAcharyaji Planner bars).
+    final v = (raw ?? 0).clamp(signed ? -100.0 : 0.0, 100.0);
     final sel = widget.selected == i;
     final today = widget.today == i;
-    final up = v >= 0;
     final mid = _pt + _ph / 2, base = _pt + _ph;
-    final full = signed ? v.abs() / 100 * _ph / 2 : v / 100 * _ph;
-    final zc = signed ? null : zoneOf(v).color;
-    // Software: .sps-bar--pos linear-gradient(0deg,#73F4C4,#10B981); .sps-bar--neg linear-gradient(0deg,#EF4444,#F6B8B8)
-    final grad = signed
-        ? LinearGradient(
-            begin: Alignment.bottomCenter,
-            end: Alignment.topCenter,
-            colors: up ? const [Color(0xFF73F4C4), Color(0xFF10B981)] : const [Color(0xFFEF4444), Color(0xFFF6B8B8)],
-          )
-        : LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [zc!, zc.withValues(alpha: .35)]);
-    final glow = signed ? (up ? const Color(0xFF10B981) : const Color(0xFFEF4444)) : zc!;
     String label(double x) => signed ? '${x > 0.5 ? '+' : ''}${x.round()}%' : '${x.round()}%';
     final bw = math.max(10.0, w * .46);
     return GestureDetector(
-      onTap: widget.onSelect == null ? null : () => widget.onSelect!(i),
+      onTap: widget.onSelect == null
+          ? null
+          : () {
+              if (widget.selected != i) HapticFeedback.selectionClick();
+              widget.onSelect!(i);
+            },
       child: Column(children: [
         Container(
           height: height,
@@ -1342,13 +1478,31 @@ class DailyBarChartState extends State<DailyBarChart> {
             border: today ? Border.all(color: CkColors.cyanStroke) : null,
             borderRadius: BorderRadius.circular(10),
           ),
-          // bars rise from the baseline as a wave, numbers count up beside them
+          // first time: bars rise from the baseline as a wave (60 ms apart);
+          // after that every change glides from the current height
           child: GrowIn(
-            value: 1,
+            value: v,
             delay: Duration(milliseconds: 60 * (i % 12)),
-            builder: (k) {
-              final h = full * k;
+            builder: (x) {
+              final up = x >= 0;
+              final h = signed ? x.abs() / 100 * _ph / 2 : x / 100 * _ph;
+              final zc = signed ? null : zoneOf(x).color;
+              // Software: .sps-bar--pos linear-gradient(0deg,#73F4C4,#10B981); .sps-bar--neg linear-gradient(0deg,#EF4444,#F6B8B8)
+              final grad = signed
+                  ? LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: up ? const [Color(0xFF73F4C4), Color(0xFF10B981)] : const [Color(0xFFEF4444), Color(0xFFF6B8B8)],
+                    )
+                  : LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [zc!, zc.withValues(alpha: .35)]);
+              final glow = signed ? (up ? const Color(0xFF10B981) : const Color(0xFFEF4444)) : zc!;
               return Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
+                // loading: a soft pulse where the bar will be
+                Positioned(
+                  top: signed ? mid - 6 : base - 12,
+                  height: 12,
+                  child: _PulseStub(on: loading, width: bw),
+                ),
                 Positioned(
                   top: signed ? (up ? mid - h : mid) : base - h,
                   height: math.max(h, 3),
@@ -1368,12 +1522,17 @@ class DailyBarChartState extends State<DailyBarChart> {
                 Positioned(
                   top: signed && !up ? mid + h + 3 : null,
                   bottom: signed ? (up ? height - mid + h + 3 : null) : height - base + h + 3,
-                  child: signed
-                      ? Text(label(v * k), style: CkText.mono(10, color: Colors.white))
-                      : Column(mainAxisSize: MainAxisSize.min, children: [
-                          ZoneArrows(zoneOf(v), size: 13),
-                          Text(label(v * k), style: CkText.mono(10, color: Colors.white)),
-                        ]),
+                  // the number fades out while loading, back in when it lands
+                  child: AnimatedOpacity(
+                    opacity: loading ? 0 : 1,
+                    duration: const Duration(milliseconds: 250),
+                    child: signed
+                        ? Text(label(x), style: CkText.mono(10, color: Colors.white))
+                        : Column(mainAxisSize: MainAxisSize.min, children: [
+                            ZoneArrows(zoneOf(x), size: 13),
+                            Text(label(x), style: CkText.mono(10, color: Colors.white)),
+                          ]),
+                  ),
                 ),
               ]);
             },
@@ -1385,6 +1544,55 @@ class DailyBarChartState extends State<DailyBarChart> {
       ]),
     );
   }
+}
+
+/// Loading stub in a bar slot: opacity 0.15 to 0.45 and back, 900 ms
+/// (MyAcharyaji _PulseStub); fades away when the data lands.
+class _PulseStub extends StatefulWidget {
+  final bool on;
+  final double width;
+  const _PulseStub({required this.on, required this.width});
+  @override
+  State<_PulseStub> createState() => _PulseStubState();
+}
+
+class _PulseStubState extends State<_PulseStub> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
+  @override
+  void initState() {
+    super.initState();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(_PulseStub old) {
+    super.didUpdateWidget(old);
+    _sync();
+  }
+
+  void _sync() {
+    if (widget.on && !_c.isAnimating) _c.repeat(reverse: true);
+    if (!widget.on && _c.isAnimating) _c.stop();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedOpacity(
+        opacity: widget.on ? 1 : 0,
+        duration: const Duration(milliseconds: 250),
+        child: FadeTransition(
+          opacity: Tween(begin: .15, end: .45).animate(_c),
+          child: Container(
+            width: widget.width,
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
+          ),
+        ),
+      );
 }
 
 /// Planet bars on the software's grid (0,15,35,45,55,65,85,100) with % at the bar end.

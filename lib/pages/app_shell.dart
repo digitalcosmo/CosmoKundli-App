@@ -163,6 +163,7 @@ class _AppShellState extends State<AppShell> {
                           label: _items[i].$2,
                           child: Pressable(
                             scale: .92,
+                            haptic: true,
                             onTap: () => _go(i),
                             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                               AnimatedSlide(
