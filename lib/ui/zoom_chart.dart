@@ -4,33 +4,51 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Claims every pointer that lands on the chart straight away, so the page's
-/// ListView never steals a two-finger pinch. Page scrolling is not lost:
-/// [ZoomChart] hands one-finger drags back to the parent scrollable itself.
-class _EagerScale extends ScaleGestureRecognizer {
-  _EagerScale({super.debugOwner});
+/// Gesture arbitration for charts (Gestures family): one finger belongs to
+/// the page (tap opens, swipe switches tabs, drag scrolls); two fingers
+/// belong to the chart. The recognizer stays in the arena quietly with one
+/// finger and claims the gesture the moment a second finger lands, before
+/// the page's scroll can take it. Once zoomed in, one finger pans the chart.
+class _PinchScale extends ScaleGestureRecognizer {
+  _PinchScale({super.debugOwner, required this.zoomed});
+  final bool Function() zoomed;
+  int _down = 0;
   @override
   void addAllowedPointer(PointerDownEvent event) {
     super.addAllowedPointer(event);
-    resolvePointer(event.pointer, GestureDisposition.accepted);
+    _down++;
+    if (_down >= 2 || zoomed()) resolve(GestureDisposition.accepted);
   }
 
   @override
-  String get debugDescription => 'eager scale';
+  void didStopTrackingLastPointer(int pointer) {
+    _down = 0;
+    super.didStopTrackingLastPointer(pointer);
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (event is PointerUpEvent || event is PointerCancelEvent) _down = (_down - 1).clamp(0, 10);
+    super.handleEvent(event);
+  }
+
+  @override
+  String get debugDescription => 'pinch scale';
 }
 
 /// Pinch-zoom / pan chart that lives inside a scrolling page.
 ///
 /// * Two fingers: zoom around the fingers' midpoint (1×–5×) and pan.
 /// * One finger, zoomed in: pan the chart.
-/// * One finger, not zoomed: scrolls the page exactly like a normal drag,
-///   with the same fling, because the drag is forwarded to the parent
-///   [Scrollable]'s position.
+/// * One finger, not zoomed: the page's own gestures win (tap, swipe
+///   between tabs, scroll).
 /// * Long-press (not zoomed): an iPhone-style loupe follows the finger.
-/// * Double-tap: zoom to 2.5× at that point, or back to fit.
+/// * Double-tap ([doubleTapZoom]): zoom to 2.5× at that point, or back to
+///   fit. Off on cards that open a page on tap, so the tap is not delayed.
 class ZoomChart extends StatefulWidget {
   final Widget child;
-  const ZoomChart({super.key, required this.child});
+  final bool doubleTapZoom;
+  const ZoomChart({super.key, required this.child, this.doubleTapZoom = true});
 
   @override
   State<ZoomChart> createState() => _ZoomChartState();
@@ -120,15 +138,6 @@ class _ZoomChartState extends State<ZoomChart> with SingleTickerProviderStateMix
     _downPos = d.localFocalPoint;
     _moved = 0;
     _pinching = d.pointerCount >= 2;
-    _pressTimer?.cancel();
-    if (!_pinching && !_zoomed) {
-      _pressTimer = Timer(const Duration(milliseconds: 380), () {
-        if (_moved < 10 && !_pinching && mounted) {
-          HapticFeedback.selectionClick();
-          setState(() => _loupe = _downPos);
-        }
-      });
-    }
   }
 
   void _onUpdate(ScaleUpdateDetails d) {
@@ -163,8 +172,6 @@ class _ZoomChartState extends State<ZoomChart> with SingleTickerProviderStateMix
 
     if (_zoomed) {
       setState(() => _offset = _clamp(_offset + d.focalPointDelta, _scale));
-    } else if (!_pinching && _moved > 4) {
-      _scrollBy(d);
     }
   }
 
@@ -183,28 +190,18 @@ class _ZoomChartState extends State<ZoomChart> with SingleTickerProviderStateMix
     }
     if (d.pointerCount == 0) {
       if (_scale < 1.05 && _scale != 1) _animateTo(1, Offset.zero);
-      if (_moved < 8 && !_pinching) _maybeDoubleTap();
       _pinching = false;
     }
   }
 
-  void _maybeDoubleTap() {
-    final now = DateTime.now();
-    final quick = now.difference(_lastTap) < const Duration(milliseconds: 300) &&
-        (_downPos - _lastTapPos).distance < 40;
-    if (quick) {
-      _lastTap = DateTime(0);
-      HapticFeedback.lightImpact();
-      if (_zoomed) {
-        _animateTo(1, Offset.zero);
-      } else {
-        const s = 2.5;
-        final c = Offset(_size.width / 2, _size.height / 2);
-        _animateTo(s, -(_downPos - c) * (s - 1));
-      }
+  void _doubleTap() {
+    HapticFeedback.lightImpact();
+    if (_zoomed) {
+      _animateTo(1, Offset.zero);
     } else {
-      _lastTap = now;
-      _lastTapPos = _downPos;
+      const s = 2.5;
+      final c = Offset(_size.width / 2, _size.height / 2);
+      _animateTo(s, -(_downPos - c) * (s - 1));
     }
   }
 
@@ -220,13 +217,34 @@ class _ZoomChartState extends State<ZoomChart> with SingleTickerProviderStateMix
             child: RawGestureDetector(
               behavior: HitTestBehavior.opaque,
               gestures: {
-                _EagerScale: GestureRecognizerFactoryWithHandlers<_EagerScale>(
-                  () => _EagerScale(debugOwner: this),
+                _PinchScale: GestureRecognizerFactoryWithHandlers<_PinchScale>(
+                  () => _PinchScale(debugOwner: this, zoomed: () => _zoomed),
                   (r) => r
                     ..onStart = _onStart
                     ..onUpdate = _onUpdate
                     ..onEnd = _onEnd,
                 ),
+                LongPressGestureRecognizer: GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
+                  () => LongPressGestureRecognizer(debugOwner: this, duration: const Duration(milliseconds: 380)),
+                  (r) => r
+                    ..onLongPressStart = (d) {
+                      if (_zoomed) return;
+                      HapticFeedback.selectionClick();
+                      setState(() => _loupe = d.localPosition);
+                    }
+                    ..onLongPressMoveUpdate = (d) {
+                      if (_loupe == null) return;
+                      setState(() => _loupe = Offset(d.localPosition.dx.clamp(0.0, _size.width), d.localPosition.dy.clamp(0.0, _size.height)));
+                    }
+                    ..onLongPressEnd = (_) => setState(() => _loupe = null),
+                ),
+                if (widget.doubleTapZoom)
+                  DoubleTapGestureRecognizer: GestureRecognizerFactoryWithHandlers<DoubleTapGestureRecognizer>(
+                    () => DoubleTapGestureRecognizer(debugOwner: this),
+                    (r) => r
+                      ..onDoubleTapDown = ((d) => _downPos = d.localPosition)
+                      ..onDoubleTap = _doubleTap,
+                  ),
               },
               child: ClipRect(
                 child: Transform(

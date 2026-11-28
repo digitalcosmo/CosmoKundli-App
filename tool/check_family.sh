@@ -23,6 +23,10 @@ check '\bLinearProgressIndicator\b'  'a stat shown as a bar uses Meter (kit), no
 check '\bFutureBuilder\b'            'loading data uses DataBuilder / FastFuture / LoadView (kit)'
 check '\bBackdropFilter\b|ImageFilter\.blur' 'blur belongs to Glass (kit) only'
 check '\bCustomPaint\b'              'stats are drawn by kit pieces (StatValue, Meter, RingMeter, GrahBarChart, DailyBarChart)'
+check '\bPopupMenuButton\b|\bMenuAnchor\b|\bshowMenu\(|\bDropdownButton\b|\bDropdownMenu\b' 'every dropdown is the kit menu (CkMenuButton / showCkMenu in lib/ui/menu.dart)'
+# the kit itself may only open menus through menu.dart
+hits=$(grep -nE '\bPopupMenuButton\b|\bMenuAnchor\b|\bshowMenu\(|\bDropdownButton\b' ../ui/*.dart | grep -v 'menu.dart' | grep -v 'family-ok:' || true)
+if [ -n "$hits" ]; then echo "FAMILY CHECK: dropdowns in the kit go through menu.dart"; echo "$hits" | sed 's/^/  /'; fail=1; fi
 if [ $fail -ne 0 ]; then
   echo "Family check failed. See the family plan: every stat, list and screen comes from the kit."
   exit 1

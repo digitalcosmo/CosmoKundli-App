@@ -592,7 +592,7 @@ class GlassTile extends StatelessWidget {
 
 /// Liquid-glass lens: blur + edge refraction through a fragment shader where
 /// the engine supports shader image filters (Impeller); plain blur elsewhere.
-class LiquidGlass extends StatelessWidget {
+class LiquidGlass extends StatefulWidget {
   final Widget child;
   final double radius;
   final double blur;
@@ -610,36 +610,59 @@ class LiquidGlass extends StatelessWidget {
   }
 
   @override
+  State<LiquidGlass> createState() => _LiquidGlassState();
+}
+
+class _LiquidGlassState extends State<LiquidGlass> {
+  Offset? _at; // where the lens sits on screen, once laid out
+
+  @override
   Widget build(BuildContext context) {
-    if (perfOff(16)) return ClipRRect(borderRadius: BorderRadius.circular(radius), child: child);
-    final blurF = ImageFilter.blur(sigmaX: blur, sigmaY: blur);
+    final r = BorderRadius.circular(widget.radius);
+    if (perfOff(16)) return ClipRRect(borderRadius: r, child: widget.child);
+    final blurF = ImageFilter.blur(sigmaX: widget.blur, sigmaY: widget.blur);
     return LayoutBuilder(builder: (context, box) {
       ImageFilter filter = blurF;
-      final prog = program;
+      final prog = LiquidGlass.program;
       final ro = context.findRenderObject();
-      if (prog != null && !perfOff(1) && box.hasBoundedWidth && box.hasBoundedHeight) {
+      final known = ro is RenderBox && ro.hasSize;
+      if (known) _at = ro.localToGlobal(Offset.zero);
+      if (!known || _at == null) {
+        // First frame: the lens does not know where it is yet. Refracting
+        // with a guessed position samples off-screen and paints a dark rim
+        // (the dock's black top edge on first open). Plain blur for this
+        // one frame, then the lens, in the right place.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() {});
+        });
+      } else if (prog != null && !perfOff(1) && box.hasBoundedWidth && box.hasBoundedHeight) {
         try {
           final shader = prog.fragmentShader();
           final dpr = MediaQuery.of(context).devicePixelRatio;
-          // The filter input covers the screen; place the lens where this
-          // widget sits (falls back to local coordinates on the first frame).
-          Offset o = Offset.zero;
-          if (ro is RenderBox && ro.hasSize) o = ro.localToGlobal(Offset.zero);
+          final o = _at!;
           shader
             ..setFloat(2, o.dx * dpr)
             ..setFloat(3, o.dy * dpr)
             ..setFloat(4, box.maxWidth * dpr)
             ..setFloat(5, box.maxHeight * dpr)
-            ..setFloat(6, radius * dpr)
-            ..setFloat(7, depth * dpr);
+            ..setFloat(6, widget.radius * dpr)
+            ..setFloat(7, widget.depth * dpr);
           filter = ImageFilter.compose(outer: ImageFilter.shader(shader), inner: blurF);
         } catch (_) {
           filter = blurF;
         }
       }
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: BackdropFilter(filter: filter, child: child),
+      final glass = ClipRRect(borderRadius: r, child: BackdropFilter(filter: filter, child: widget.child));
+      // While its page fades in or out, the page is drawn into its own
+      // layer, and a backdrop read inside that layer sees only transparent
+      // black: the lens would paint a dark rim. During the move the glass
+      // shows just its tint, and the lens returns the moment the page lands.
+      final shift = context.getInheritedWidgetOfExactType<_PageShiftScope>()?.shift;
+      if (shift == null) return glass;
+      final plain = ClipRRect(borderRadius: r, child: widget.child);
+      return AnimatedBuilder(
+        animation: shift.both,
+        builder: (_, __) => shift.opacity >= .999 ? glass : plain,
       );
     });
   }

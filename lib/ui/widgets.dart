@@ -12,6 +12,8 @@ import '../core/astro.dart';
 import '../core/session.dart';
 import 'ck_theme.dart';
 import 'glass.dart';
+import 'menu.dart';
+export 'menu.dart';
 
 // ───────────────────────── basics
 
@@ -2208,63 +2210,23 @@ class FilterDropdown<T> extends StatelessWidget {
   final int? allCount;
   const FilterDropdown({super.key, required this.label, required this.options, required this.values, required this.onChanged, this.allLabel = 'All', this.allCount});
 
-  Widget _row(String text, bool on, {int? count, bool radio = false}) => SizedBox(
-        width: 220,
-        child: Row(children: [
-          Container(
-            width: 18,
-            height: 18,
-            decoration: BoxDecoration(
-              color: on ? CkColors.cyan : Colors.transparent,
-              borderRadius: BorderRadius.circular(radio ? 9 : 5),
-              border: Border.all(color: on ? CkColors.cyan : const Color(0x808CBEFF), width: 1.5),
-            ),
-            child: on ? const Icon(Icons.check_rounded, size: 13, color: Color(0xFF06204F)) : null,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(text,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 14, fontWeight: on ? FontWeight.w600 : FontWeight.w400, color: on ? Colors.white : CkColors.textTertiary)),
-          ),
-          if (count != null) Text('$count', style: CkText.mono(11, color: CkColors.labelMono)),
-        ]),
-      );
-
   @override
   Widget build(BuildContext context) {
     final on = values.isNotEmpty;
     final picked = options.where((o) => values.contains(o.value)).toList();
     final text = picked.isEmpty ? allLabel : (picked.length == 1 ? picked.first.label : '${picked.length} selected');
-    return MenuAnchor(
-      alignmentOffset: const Offset(0, 6),
-      style: MenuStyle(
-        backgroundColor: const WidgetStatePropertyAll(CkColors.navySheet),
-        maximumSize: const WidgetStatePropertyAll(Size(280, 300)),
-        shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: CkColors.panelStroke))),
-        padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 6)),
-      ),
-      menuChildren: [
-        MenuItemButton(
-          closeOnActivate: true,
-          onPressed: () => onChanged(<T>{}),
-          child: _row(allLabel, !on, count: allCount, radio: true),
-        ),
-        const Divider(height: 8, color: CkColors.panelStroke),
-        for (final o in options)
-          MenuItemButton(
-            closeOnActivate: false,
-            onPressed: () {
-              final next = {...values};
-              if (!next.remove(o.value)) next.add(o.value);
-              onChanged(next);
-            },
-            child: _row(o.label, values.contains(o.value), count: o.count),
-          ),
-      ],
-      builder: (c, ctl, _) => GestureDetector(
-        onTap: () => ctl.isOpen ? ctl.close() : ctl.open(),
+    // the shared menu (kit): "All" clears, each option toggles, stays open
+    return Builder(
+      builder: (c) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => showCkMenu<T?>(c,
+            minWidth: 220,
+            items: [
+              CkMenuItem<T?>(null, allLabel, trailing: allCount?.toString(), exclusive: true),
+              for (final (i, o) in options.indexed) CkMenuItem<T?>(o.value, o.label, trailing: o.count?.toString(), divider: i == 0),
+            ],
+            multi: {if (!on) null, ...values},
+            onToggle: (s) => onChanged(s.whereType<T>().toSet())),
         child: Container(
           height: 40,
           padding: const EdgeInsets.only(left: 12, right: 8),
@@ -2349,27 +2311,11 @@ class SortButton<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final cur = options.firstWhere((o) => o.value == value, orElse: () => options.first);
     final on = value != (defaultValue ?? options.first.value);
-    return PopupMenuButton<T>(
-      tooltip: 'Sort',
-      position: PopupMenuPosition.under,
-      color: CkColors.navySheet,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: CkColors.panelStroke)),
+    return CkMenuButton<T>(
+      value: value,
+      minWidth: 200,
+      items: [for (final o in options) CkMenuItem(o.value, o.label, icon: o.ascending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded)],
       onSelected: onChanged,
-      itemBuilder: (c) => [
-        for (final o in options)
-          PopupMenuItem<T>(
-            value: o.value,
-            child: Row(children: [
-              Icon(o.ascending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, size: 16, color: o.value == value ? CkColors.cyan : CkColors.labelMono),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(o.label,
-                    style: TextStyle(fontSize: 14, fontWeight: o.value == value ? FontWeight.w600 : FontWeight.w400, color: o.value == value ? Colors.white : CkColors.textTertiary)),
-              ),
-              SizedBox(width: 18, child: o.value == value ? const Icon(Icons.check_rounded, size: 18, color: CkColors.cyan) : null),
-            ]),
-          ),
-      ],
       child: Container(
         width: 40,
         height: 40,

@@ -1224,7 +1224,7 @@ class _KundliW extends StatelessWidget {
                 ]);
               case WSize.l:
                 return Column(children: [
-                  Expanded(child: Center(child: ZoomChart(child: chart))),
+                  Expanded(child: Center(child: ZoomChart(doubleTapZoom: false, child: chart))),
                   const SizedBox(height: 8),
                   Row(children: [
                     for (var i = 0; i < 3; i++) ...[
@@ -1363,13 +1363,11 @@ class _TransitWState extends State<_TransitW> {
   /// shows about four steps at a time and scrolls.
   Widget _stepper() => Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         _arrow(Icons.chevron_left_rounded, () => setState(() => _at = _move(_at ?? DateTime.now(), -1))),
-        PopupMenuButton<int>(
-          initialValue: _step,
-          color: CkColors.navySheet,
-          position: PopupMenuPosition.under,
-          constraints: const BoxConstraints(maxHeight: 4 * 44.0 + 12, minWidth: 120),
+        CkMenuButton<int>(
+          value: _step,
+          minWidth: 140,
+          items: [for (var i = 0; i < _steps.length; i++) CkMenuItem(i, _steps[i].$1)],
           onSelected: (v) => setState(() => _step = v),
-          itemBuilder: (c) => [for (var i = 0; i < _steps.length; i++) PopupMenuItem(value: i, height: 44, child: Text(_steps[i].$1))],
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -1411,7 +1409,7 @@ class _TransitWState extends State<_TransitW> {
           final ps = _ordered(t);
           if (size == WSize.l) {
             return _future<List<GrahPos>>(() => ClientData.of(mId).chart(), skel: _skelCircle(),
-                (b) => Center(child: ZoomChart(child: KundliChart(b, transit: t))));
+                (b) => Center(child: ZoomChart(doubleTapZoom: false, child: KundliChart(b, transit: t))));
           }
           if (size == WSize.s) {
             return Column(children: [for (final p in ps.where((e) => const ['Su', 'Mo', 'Ju', 'Ra', 'Ke'].contains(e.id))) _row(p, rashi: false)]);
@@ -1721,21 +1719,19 @@ class _FiveDWState extends State<_FiveDW> {
           trailing: Row(mainAxisSize: MainAxisSize.min, children: [
             _MonthChip(shown: _month ?? _today, picked: _month != null, short: true, onChanged: (v) => setState(() => _month = v)),
             const SizedBox(width: 6),
-            PopupMenuButton<String>(
-            initialValue: _dim,
-            color: CkColors.navySheet,
-            position: PopupMenuPosition.under,
-            onSelected: (v) => setState(() {
-              _dim = v;
-              Session.prefs.setString(_key, v);
-            }),
-            itemBuilder: (c) => [for (final d in ClientData.kDims) PopupMenuItem(value: d, child: Text(d))],
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: CkColors.cyanStroke)),
-              child: Text('${_dim.toUpperCase()} ▾', style: CkText.mono(10, color: CkColors.cyan)),
+            CkMenuButton<String>(
+              value: _dim,
+              items: [for (final d in ClientData.kDims) CkMenuItem(d, d)],
+              onSelected: (v) => setState(() {
+                _dim = v;
+                Session.prefs.setString(_key, v);
+              }),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: CkColors.cyanStroke)),
+                child: Text('${_dim.toUpperCase()} ▾', style: CkText.mono(10, color: CkColors.cyan)),
+              ),
             ),
-          ),
           ])),
       const SizedBox(height: 8),
       Expanded(

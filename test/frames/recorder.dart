@@ -28,15 +28,16 @@ void tolerateOverflow() {
 Widget stage(Widget child, {Size size = const Size(390, 300)}) => MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(),
-      home: Material(type: MaterialType.transparency, child: RepaintBoundary(
+      // the boundary wraps the navigator, so menus and pages are recorded too
+      builder: (c, nav) => RepaintBoundary(
         key: _key,
-        child: Container(
-          color: const Color(0xFF070B1E),
-          alignment: Alignment.topLeft,
-          child: SizedBox(width: size.width, height: size.height, child: child),
-        ),
+        child: Container(color: const Color(0xFF070B1E), alignment: Alignment.topLeft, child: nav),
       ),
-    ));
+      home: Material(
+        type: MaterialType.transparency,
+        child: Align(alignment: Alignment.topLeft, child: SizedBox(width: size.width, height: size.height, child: child)),
+      ),
+    );
 
 class Sheet {
   final String name;

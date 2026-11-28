@@ -36,6 +36,36 @@ void main() {
     await t.pump(const Duration(seconds: 3));
   });
 
+  testWidgets('dropdown near the dock', (t) async {
+    tolerateOverflow();
+    await t.binding.setSurfaceSize(const Size(390, 520));
+    final s = Sheet('dropdown');
+    String v = '1 Day';
+    await t.pumpWidget(stage(
+        StatefulBuilder(
+          builder: (c, set) => Stack(children: [
+            Positioned(left: 0, right: 0, bottom: 0, height: 92, child: Container(color: const Color(0xFF1B2A55))),
+            Positioned(
+              left: 120,
+              top: 330,
+              child: CkMenuButton<String>(
+                value: v,
+                items: [for (final x in ['1 Hour', '1 Day', '1 Week', '1 Month', '1 Year', '10 Years']) CkMenuItem(x, x)],
+                onSelected: (x) => set(() => v = x),
+                child: Text('STEP $v ▾'),
+              ),
+            ),
+          ]),
+        ),
+        size: const Size(390, 520)));
+    await s.grab(t, 'closed');
+    await t.tap(find.textContaining('STEP'));
+    await s.play(t, 'open', 300, step: 50);
+    await t.tap(find.text('1 Week').last);
+    await s.play(t, 'pick', 200, step: 50);
+    await t.runAsync(s.save);
+  });
+
   testWidgets('skeleton then data, then refresh', (t) async {
     tolerateOverflow();
     await t.binding.setSurfaceSize(const Size(390, 300));
