@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../core/known.dart';
+import 'menu.dart' show kDockClearance;
 import '../core/astro.dart';
 import '../core/session.dart';
 import 'ck_theme.dart';
@@ -29,10 +30,17 @@ class CkText {
 
 String upper(String s) => s.toUpperCase();
 
+/// The one way an action reports its result (Build 5, K): a short line
+/// with a green tick or a red mark, floating clear of the dock. Success
+/// stays 3 s with a light tap; an error stays 5 s with a firmer one, so it
+/// can be read.
 void toast(BuildContext context, String msg, {bool error = false}) {
+  error ? HapticFeedback.mediumImpact() : HapticFeedback.lightImpact();
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, kDockClearance),
+      duration: Duration(seconds: error ? 5 : 3),
       content: Row(children: [
         Icon(error ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
             color: error ? CkColors.red : CkColors.green, size: 20),
@@ -41,6 +49,9 @@ void toast(BuildContext context, String msg, {bool error = false}) {
       ]),
     ));
 }
+
+/// The same words everywhere when the server can't be reached.
+void toastOffline(BuildContext context) => toast(context, 'Couldn\'t reach the server. Check your connection and try again.', error: true);
 
 Future<bool> confirm(BuildContext context, String title, String body, {String ok = 'Yes', bool danger = false}) async {
   final r = await showDialog<bool>(
@@ -603,21 +614,36 @@ class ErrorBox extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         child: Column(children: [
           const Icon(Icons.cloud_off_rounded, color: CkColors.textSecondary, size: 30),
+          const SizedBox(height: 4),
+          Text('Something didn\'t load', style: CkText.h(15)),
           const SizedBox(height: 8),
           Text(message, textAlign: TextAlign.center, style: CkText.muted),
           if (onRetry != null) ...[
             const SizedBox(height: 12),
-            TextButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: const Text('Try again')),
+            SizedBox(width: 180, child: GhostButton('Try again', icon: Icons.refresh_rounded, onTap: onRetry)),
           ]
         ]),
       );
 }
 
+/// The handle at the top of every bottom sheet (one size, one colour).
+class SheetGrabber extends StatelessWidget {
+  const SheetGrabber({super.key});
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Container(width: 44, height: 5, decoration: BoxDecoration(color: CkColors.glassStroke, borderRadius: BorderRadius.circular(3))),
+      );
+}
+
+/// The one empty state (Build 5, I): what is missing, why, and, when there
+/// is one, the single next step as a button.
 class EmptyBox extends StatelessWidget {
   final IconData icon;
   final String title;
   final String body;
-  const EmptyBox({super.key, required this.icon, required this.title, required this.body});
+  final String? action;
+  final VoidCallback? onAction;
+  const EmptyBox({super.key, required this.icon, required this.title, required this.body, this.action, this.onAction});
   @override
   Widget build(BuildContext context) => Glass(
         margin: const EdgeInsets.only(top: 12),
@@ -628,6 +654,10 @@ class EmptyBox extends StatelessWidget {
           Text(title, style: CkText.h(16)),
           const SizedBox(height: 4),
           Text(body, textAlign: TextAlign.center, style: CkText.muted),
+          if (action != null && onAction != null) ...[
+            const SizedBox(height: 14),
+            SizedBox(width: 200, child: GhostButton(action!, onTap: onAction!)),
+          ],
         ]),
       );
 }
@@ -1650,7 +1680,7 @@ void showZonesSheet(BuildContext context) {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Center(child: Container(width: 44, height: 5, decoration: BoxDecoration(color: CkColors.glassStroke, borderRadius: BorderRadius.circular(3)))),
+          const SheetGrabber(),
           const SizedBox(height: 14),
           Text('7 Zones of Situations', style: CkText.h(19)),
           const SizedBox(height: 4),

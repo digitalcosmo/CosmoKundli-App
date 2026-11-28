@@ -311,6 +311,9 @@ class TransitBodyState extends State<TransitBody> {
           if (_srcId == null) {
             return const Padding(padding: EdgeInsets.all(40), child: Center(child: Text('Add a client first to read the sky.', style: CkText.muted)));
           }
+          if (s.hasError && _last == null) {
+            return ErrorBox(message: 'Couldn\'t load the sky for this moment. Check your connection and try again.', onRetry: () => setState(_load));
+          }
           final t = s.hasData ? s.data![0] as List<GrahPos> : _last;
           final birth = s.hasData ? s.data![1] as List<GrahPos> : const <GrahPos>[];
           if (t == null || (t.isEmpty && !s.hasData)) return const SkeletonCard(height: 340);

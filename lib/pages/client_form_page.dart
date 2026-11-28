@@ -250,7 +250,7 @@ class _ClientFormPageState extends State<ClientFormPage> {
   Future<void> _save({bool open = false}) async {
     if (_gender == null) {
       setState(() => _personalOpen = true);
-      return toast(context, 'Select gender', error: true);
+      return toast(context, 'Choose a gender', error: true);
     }
     if (!_personalOpen && !_personalDone) setState(() => _personalOpen = true);
     if (!_form.currentState!.validate()) return;
@@ -403,6 +403,7 @@ class _ClientFormPageState extends State<ClientFormPage> {
                 : Form(
                     key: _form,
                     child: ListView(
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
                       children: [
                         AnimatedSize(

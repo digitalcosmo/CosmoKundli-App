@@ -50,6 +50,7 @@ class CosmoKundliApp extends StatelessWidget {
       transitionDuration: kPageDuration,
       home: const SplashPage(),
       navigatorObservers: [UnfocusObserver()],
+      scrollBehavior: const _CkScroll(),
       builder: (context, child) => MediaQuery(
         // keep layouts stable on large system font settings
         data: MediaQuery.of(context).copyWith(
@@ -65,6 +66,16 @@ class CosmoKundliApp extends StatelessWidget {
 
 void goHome() => Get.offAll(() => const AppShell());
 void goLogin() => Get.offAll(() => const LoginPage());
+
+/// One feel for every list (Build 5, T): the same soft bounce at both ends
+/// on every screen, short lists included, and no Android glow.
+class _CkScroll extends MaterialScrollBehavior {
+  const _CkScroll();
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) => const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+  @override
+  Widget buildOverscrollIndicator(BuildContext context, Widget child, ScrollableDetails details) => child;
+}
 
 class _CkTransition extends CustomTransition {
   @override

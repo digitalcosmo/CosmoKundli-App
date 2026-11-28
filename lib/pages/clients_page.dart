@@ -57,13 +57,13 @@ Future<void> clientMenu(BuildContext context, Client c, {VoidCallback? onChanged
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Center(child: Container(width: 44, height: 5, decoration: BoxDecoration(color: CkColors.glassStroke, borderRadius: BorderRadius.circular(3)))),
+          const SheetGrabber(),
           const SizedBox(height: 12),
           Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: Text(c.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: CkText.h(17))),
           const SizedBox(height: 8),
           ListTile(
-            leading: const Icon(Icons.edit_outlined, color: Color(0xFFFFB27A)),
-            title: const Text('Edit details'),
+            leading: const Icon(Icons.edit_outlined, color: CkColors.cyan),
+            title: const Text('Edit client'),
             onTap: () => Navigator.pop(s, 'edit'),
           ),
           ListTile(
@@ -313,9 +313,19 @@ class _ClientsPageState extends State<ClientsPage> {
                           child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: EmptyBox(
-                            icon: Icons.people_outline_rounded,
-                            title: _q.isEmpty ? 'No clients yet' : 'No match',
-                            body: _q.isEmpty ? 'Add your first client to see their CosmoKundli.' : 'Try another name or city.'),
+                            icon: _q.isEmpty ? Icons.people_outline_rounded : Icons.search_off_rounded,
+                            title: _q.isEmpty ? 'No clients yet' : 'No clients match',
+                            body: _q.isEmpty ? 'Add your first client to see their CosmoKundli.' : 'Try another name, city or birth year.',
+                            action: _q.isEmpty ? 'Add client' : 'Clear search',
+                            onAction: _q.isEmpty
+                                ? () async {
+                                    final r = await Get.to(() => const ClientFormPage());
+                                    if (r != null) _reload();
+                                  }
+                                : () {
+                                    _search.clear();
+                                    setState(() => _q = '');
+                                  }),
                       ))
                     else
                       SliverPadding(
@@ -496,7 +506,7 @@ class _ClientCardState extends State<_ClientCard> {
                       IconButton(
                         tooltip: 'More for ${cl.name}',
                         onPressed: () => clientMenu(context, cl, onChanged: widget.onChanged),
-                        icon: const Icon(Icons.more_vert_rounded, color: CkColors.textSecondary),
+                        icon: const Icon(Icons.more_horiz_rounded, color: CkColors.textSecondary),
                       ),
                     ]),
                   ),

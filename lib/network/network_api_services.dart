@@ -5,7 +5,8 @@ import 'app_exceptions.dart';
 import 'base_api_services.dart';
 
 class NetworkApiServices extends BaseApiServices {
-  Dio dio = Dio(BaseOptions(baseUrl: AppUrls.baseUrl));
+  // Build 5 (J): a dead or captive network fails in 15 s, not 90.
+  Dio dio = Dio(BaseOptions(baseUrl: AppUrls.baseUrl, connectTimeout: const Duration(seconds: 15)));
 
   @override
   Future getApi(String url, {Map<String, dynamic>? qp}) async {

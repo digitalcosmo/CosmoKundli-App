@@ -473,7 +473,7 @@ class _Sheet extends StatelessWidget {
           border: Border(top: BorderSide(color: Color(0x4DA0C8FF))),
         ),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: const Color(0x4DFFFFFF), borderRadius: BorderRadius.circular(2)))),
+          const SheetGrabber(),
           const SizedBox(height: 18),
           ...children,
         ]),
@@ -878,6 +878,7 @@ class _SearchPageState extends State<SearchPage> {
   _Kind _k = _Kind.all;
   late final Future<List<Client>> _clients = fetchClients();
   late final Future<List<ReportItem>> _reports = fetchReports();
+  late final Future<List<Object>> _both = Future.wait<Object>([_clients, _reports]);
 
   @override
   void initState() {
@@ -1021,9 +1022,10 @@ class _SearchPageState extends State<SearchPage> {
                       () => t.open(context),
                     ),
                 ],
+                if (_q.isNotEmpty) _NoHits(q: _q, both: _both, tools: tools.length, kind: _k.index, hit: _hit),
                 const Padding(
                   padding: EdgeInsets.only(top: 18),
-                  child: Text('Search by name, birth year or place. Tools open directly.', style: TextStyle(fontSize: 12, color: CkColors.textDim)),
+                  child: Text('Search by name, birth year or place. Tools open directly.', style: TextStyle(fontSize: 12, color: CkColors.textSecondary)),
                 ),
               ],
             ),
@@ -1032,6 +1034,29 @@ class _SearchPageState extends State<SearchPage> {
       ),
     );
   }
+}
+
+/// Search found nothing in any group (Build 5, I): say so, instead of a
+/// blank list under the query.
+class _NoHits extends StatelessWidget {
+  final String q;
+  final Future<List<Object>> both;
+  final int tools;
+  final int kind; // 0 all, 1 clients, 2 reports, 3 tools
+  final bool Function(String) hit;
+  const _NoHits({required this.q, required this.both, required this.tools, required this.kind, required this.hit});
+  @override
+  Widget build(BuildContext context) => DataBuilder<List<Object>>(
+        future: both,
+        builder: (c, s) {
+          if (!s.hasData) return const SizedBox();
+          final cl = (s.data![0] as List<Client>).any((e) => hit(e.name) || hit(e.city) || hit(e.dobRaw));
+          final rp = (s.data![1] as List<ReportItem>).any((e) => hit('${e.name} ${e.title}'));
+          final any = switch (kind) { 1 => cl, 2 => rp, 3 => tools > 0, _ => cl || rp || tools > 0 };
+          if (any) return const SizedBox();
+          return EmptyBox(icon: Icons.search_off_rounded, title: 'Nothing found', body: 'No clients, reports or tools match "$q".');
+        },
+      );
 }
 
 /// Small helper so other files can draw the moon phase disk.

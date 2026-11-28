@@ -701,7 +701,7 @@ class _WorkspacePageState extends State<WorkspacePage> {
                 padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
                 child: Row(children: [
                   Expanded(child: Text('$_undoName removed', style: const TextStyle(fontSize: 13.5))),
-                  TextButton(onPressed: _restore, child: const Text('UNDO', style: TextStyle(color: CkColors.cyan, fontWeight: FontWeight.w700))),
+                  TextButton(onPressed: _restore, child: const Text('Undo', style: TextStyle(color: CkColors.cyan, fontWeight: FontWeight.w700))),
                 ]),
               ),
             ),
@@ -972,7 +972,7 @@ class _Chip extends StatelessWidget {
             ],
             if (edit) ...[
               const SizedBox(width: 6),
-              Icon(Icons.edit_rounded, size: 13, color: selected ? CkColors.cyan : CkColors.textSecondary),
+              Icon(Icons.edit_outlined, size: 13, color: selected ? CkColors.cyan : CkColors.textSecondary),
             ],
           ]),
         ),
@@ -992,7 +992,7 @@ class _AddSheet extends StatelessWidget {
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: const Color(0x4DFFFFFF), borderRadius: BorderRadius.circular(2)))),
+          const SheetGrabber(),
           const SizedBox(height: 14),
           Text('Workspace modules', style: CkText.h(18)),
           const SizedBox(height: 4),

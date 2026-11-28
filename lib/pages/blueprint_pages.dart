@@ -323,7 +323,7 @@ class _GrahSheetState extends State<_GrahSheet> {
         border: Border(top: BorderSide(color: Color(0x4DA0C8FF))),
       ),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: const Color(0x4DFFFFFF), borderRadius: BorderRadius.circular(2)))),
+        const SheetGrabber(),
         const SizedBox(height: 16),
         Row(children: [
           Container(

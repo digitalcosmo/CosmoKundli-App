@@ -72,7 +72,7 @@ class _PlannerPageState extends State<PlannerPage> {
       toast(context, Api.msg(r, Api.ok(r) ? 'Report requested. You\'ll find it in Report history.' : 'Couldn\'t generate the report'),
           error: !Api.ok(r));
     } catch (_) {
-      if (mounted) toast(context, 'Couldn\'t reach the server.', error: true);
+      if (mounted) toastOffline(context);
     }
     if (mounted) setState(() => _busy = false);
   }
@@ -926,7 +926,7 @@ class _ConfirmSheetState extends State<_ConfirmSheet> {
         return;
       }
     } catch (_) {
-      if (mounted) toast(context, 'Couldn\'t reach the server.', error: true);
+      if (mounted) toastOffline(context);
     }
     if (mounted) setState(() => _busy = false);
   }
@@ -945,7 +945,7 @@ class _ConfirmSheetState extends State<_ConfirmSheet> {
         border: Border(top: BorderSide(color: Color(0x4DA0C8FF))),
       ),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: const Color(0x4DFFFFFF), borderRadius: BorderRadius.circular(2)))),
+        const SheetGrabber(),
         const SizedBox(height: 16),
         Row(children: [
           _Cover(widget.type.coverAsset, width: 48),
@@ -1149,9 +1149,19 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
                     else if (!s.hasData)
                       Skels.reportRows(6)
                     else if (l.isEmpty)
-                      const Padding(
-                          padding: EdgeInsets.only(top: 14),
-                          child: EmptyBox(icon: Icons.description_outlined, title: 'No reports', body: 'Nothing matches these filters.'))
+                      Padding(
+                          padding: const EdgeInsets.only(top: 14),
+                          child: all.isEmpty
+                              ? const EmptyBox(icon: Icons.description_outlined, title: 'No reports yet', body: 'Reports you generate for any client show here.')
+                              : EmptyBox(
+                                  icon: Icons.search_off_rounded,
+                                  title: 'No reports match',
+                                  body: _state.isEmpty && _type.isEmpty ? 'Try other words.' : 'Nothing matches these filters.',
+                                  action: _state.isEmpty && _type.isEmpty ? null : 'Clear filters',
+                                  onAction: () => setState(() {
+                                        _state = {};
+                                        _type = {};
+                                      })))
                     else if (!grouped)
                       // list family: the first rows rise as a wave, like Clients
                       for (var i = 0; i < l.length; i++)

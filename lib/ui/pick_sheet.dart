@@ -149,7 +149,7 @@ class _PickSheetState<T> extends State<_PickSheet<T>> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Center(child: Container(width: 44, height: 5, decoration: BoxDecoration(color: CkColors.glassStroke, borderRadius: BorderRadius.circular(3)))),
+              const SheetGrabber(),
               const SizedBox(height: 12),
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Expanded(

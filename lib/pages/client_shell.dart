@@ -288,8 +288,8 @@ class ClientPage extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: const Color(0x4DFFFFFF), borderRadius: BorderRadius.circular(2)))),
-            const SizedBox(height: 10),
+            const SheetGrabber(),
+            const SizedBox(height: 12),
             ListTile(
               leading: const Icon(Icons.edit_outlined, color: CkColors.cyan),
               title: const Text('Edit client'),
@@ -388,7 +388,7 @@ class _DetailsSheet extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 10, 18, 16),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: const Color(0x4DFFFFFF), borderRadius: BorderRadius.circular(2)))),
+          const SheetGrabber(),
           const SizedBox(height: 14),
           Row(children: [
             Container(

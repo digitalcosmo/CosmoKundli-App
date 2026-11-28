@@ -40,6 +40,7 @@ class AccountFrame extends StatelessWidget {
             ),
             Expanded(
               child: ListView(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 physics: const BouncingScrollPhysics(),
                 padding: EdgeInsets.fromLTRB(16, 6, 16, action == null ? (embedded ? 120 : 30) : 110),
                 children: [for (var i = 0; i < children.length; i++) i < 7 ? FadeSlideIn(index: i, child: children[i]) : children[i]],
@@ -130,7 +131,7 @@ class _AccountPageState extends State<AccountPage> {
                               style: CkText.mono(24)),
                         ]),
                       ),
-                      SizedBox(width: 120, child: PrimaryButton('Buy credit', height: 42, onTap: () => _buy(context))),
+                      SizedBox(width: 120, child: PrimaryButton('Buy credits', height: 42, onTap: () => _buy(context))),
                     ]),
                   ),
                 ]),
@@ -183,8 +184,8 @@ class _AccountPageState extends State<AccountPage> {
             onLongPress: () {
               showPerfSheet(context);
             },
-            child: GhostButton('Log out', icon: Icons.logout_rounded, color: const Color(0xFFFF8A8A), onTap: () async {
-              if (await confirm(context, 'Log out?', 'You can sign in again any time.', ok: 'Log out', danger: true)) {
+            child: GhostButton('Sign out', icon: Icons.logout_rounded, color: const Color(0xFFFF8A8A), onTap: () async {
+              if (await confirm(context, 'Sign out?', 'You can sign in again any time.', ok: 'Sign out', danger: true)) {
                 await Session.signOut();
                 goLogin();
               }
@@ -252,7 +253,7 @@ class _PersonalPageState extends State<PersonalPage> {
       });
       if (mounted) toast(context, Api.msg(r, Api.ok(r) ? 'Saved' : 'Couldn\'t save'), error: !Api.ok(r));
     } catch (_) {
-      if (mounted) toast(context, 'Couldn\'t reach the server.', error: true);
+      if (mounted) toastOffline(context);
     }
     if (mounted) setState(() => _busy = false);
   }
@@ -351,7 +352,7 @@ class _DisplayPageState extends State<DisplayPage> {
         toast(context, Api.msg(r), error: true);
       }
     } catch (_) {
-      if (mounted) toast(context, 'Upload failed. Try again.', error: true);
+      if (mounted) toast(context, 'Couldn\'t upload the image. Try again.', error: true);
     }
     if (mounted) setState(() => _uploading = false);
   }
@@ -369,7 +370,7 @@ class _DisplayPageState extends State<DisplayPage> {
       });
       if (mounted) toast(context, Api.msg(r, Api.ok(r) ? 'Saved' : 'Couldn\'t save'), error: !Api.ok(r));
     } catch (_) {
-      if (mounted) toast(context, 'Couldn\'t reach the server.', error: true);
+      if (mounted) toastOffline(context);
     }
     if (mounted) setState(() => _busy = false);
   }
@@ -749,7 +750,7 @@ class _AppDetailsPageState extends State<AppDetailsPage> {
         toast(context, Api.msg(r), error: true);
       }
     } catch (_) {
-      if (mounted) toast(context, 'Upload failed. Try again.', error: true);
+      if (mounted) toast(context, 'Couldn\'t upload the image. Try again.', error: true);
     }
     if (mounted) setState(() => _uploading = false);
   }
@@ -760,7 +761,7 @@ class _AppDetailsPageState extends State<AppDetailsPage> {
       final r = await Api.post(Endpoints.appUpdate, {'uID': Session.uid, 'description': _desc.text.trim()});
       if (mounted) toast(context, Api.msg(r, Api.ok(r) ? 'Saved' : 'Couldn\'t save'), error: !Api.ok(r));
     } catch (_) {
-      if (mounted) toast(context, 'Couldn\'t reach the server.', error: true);
+      if (mounted) toastOffline(context);
     }
     if (mounted) setState(() => _busy = false);
   }
@@ -1091,7 +1092,7 @@ class _PasswordPageState extends State<PasswordPage> {
       toast(context, Api.msg(r, Api.ok(r) ? 'Password updated' : 'Couldn\'t update password'), error: !Api.ok(r));
       if (Api.ok(r)) Get.back();
     } catch (_) {
-      if (mounted) toast(context, 'Couldn\'t reach the server.', error: true);
+      if (mounted) toastOffline(context);
     }
     if (mounted) setState(() => _busy = false);
   }

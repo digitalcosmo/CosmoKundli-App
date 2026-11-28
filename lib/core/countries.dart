@@ -109,7 +109,7 @@ class _CountrySheetState extends State<_CountrySheet> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: const Color(0x4DFFFFFF), borderRadius: BorderRadius.circular(2)))),
+            const SheetGrabber(),
             const SizedBox(height: 14),
             Text('Country code', style: CkText.h(18)),
             const SizedBox(height: 10),

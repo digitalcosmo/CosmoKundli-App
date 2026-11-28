@@ -93,7 +93,7 @@ class Api {
     return s == true || s == 1 || s == '1' || s.toString().toLowerCase() == 'true';
   }
 
-  static String msg(Map<String, dynamic> m, [String fallback = 'Something went wrong']) {
+  static String msg(Map<String, dynamic> m, [String fallback = 'That didn\'t work. Try again.']) {
     final v = m['msg'] ?? m['message'];
     return (v == null || v.toString().isEmpty) ? fallback : v.toString();
   }
