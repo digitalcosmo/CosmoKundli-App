@@ -1881,7 +1881,7 @@ class DailyBarChartState extends State<DailyBarChart> {
                     decoration: BoxDecoration(
                       gradient: grad,
                       border: sel ? Border.all(color: Colors.white, width: 1.5) : null,
-                      boxShadow: perfOff(8) ? null : [BoxShadow(color: glow.withValues(alpha: today || sel ? .6 : .3), blurRadius: today || sel ? 14 : 8)],
+                      boxShadow: [BoxShadow(color: glow.withValues(alpha: today || sel ? .6 : .3), blurRadius: today || sel ? 14 : 8)],
                       borderRadius: BorderRadius.vertical(
                         top: Radius.circular(signed && !up ? 2 : 6),
                         bottom: Radius.circular(signed && !up ? 6 : 2),
@@ -2043,7 +2043,7 @@ class GrahBarChart extends StatelessWidget {
                                 borderRadius: const BorderRadius.vertical(top: Radius.circular(8), bottom: Radius.circular(2)),
                                 gradient: LinearGradient(
                                     begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [c, c.withValues(alpha: .25)]),
-                                boxShadow: perfOff(8) ? null : [BoxShadow(color: c.withValues(alpha: .35), blurRadius: 10)],
+                                boxShadow: [BoxShadow(color: c.withValues(alpha: .35), blurRadius: 10)],
                               ),
                             ),
                           ]),
@@ -2096,7 +2096,7 @@ class GrahDot extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(color: c, shape: BoxShape.circle, boxShadow: perfOff(8) ? null : [BoxShadow(color: c.withOpacity(.6), blurRadius: 8)]),
+      decoration: BoxDecoration(color: c, shape: BoxShape.circle, boxShadow: [BoxShadow(color: c.withOpacity(.6), blurRadius: 8)]),
     );
   }
 }
@@ -2685,55 +2685,6 @@ Widget greyed(Widget child, {bool on = true, double opacity = .42}) {
         0, 0, 0, 1, 0,
       ]),
       child: child,
-    ),
-  );
-}
-
-final perfOverlay = ValueNotifier<bool>(false);
-
-/// Test-only switches for measuring what costs frame time (hidden sheet on
-/// long-press of Log out). Bits: 1 dock refraction off, 2 background still,
-/// 4 card blur off, 8 glows off, 16 dock blur off, 32 entrances off. Nothing here is on by default.
-final perfFlags = ValueNotifier<int>(0);
-bool perfOff(int bit) => perfFlags.value & bit != 0;
-
-/// Extra entries for the speed sheet (labs register themselves).
-final perfLabs = <(String, void Function(BuildContext))>[];
-
-void showPerfSheet(BuildContext context) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: const Color(0xF2101634),
-    builder: (c) => SafeArea(
-      child: ListenableBuilder(
-        listenable: Listenable.merge([perfOverlay, perfFlags]),
-        builder: (c, _) {
-          Widget sw(String t, bool v, void Function(bool) f) =>
-              SwitchListTile(title: Text(t), value: v, onChanged: (x) { f(x); WidgetsBinding.instance.reassembleApplication(); });
-          void flip(int bit, bool on) => perfFlags.value = on ? perfFlags.value | bit : perfFlags.value & ~bit;
-          return SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Padding(padding: EdgeInsets.all(16), child: Text('Speed test (only for testing)')),
-            for (final l in perfLabs)
-              ListTile(
-                title: Text(l.$1),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () {
-                  Navigator.of(c).pop();
-                  l.$2(context);
-                },
-              ),
-            sw('Frame graph', perfOverlay.value, (v) => perfOverlay.value = v),
-            sw('Dock refraction OFF', perfOff(1), (v) => flip(1, v)),
-            sw('Background animation OFF', perfOff(2), (v) => flip(2, v)),
-            sw('Card blur OFF', perfOff(4), (v) => flip(4, v)),
-            sw('Glows OFF (bar and dot shadows)', perfOff(8), (v) => flip(8, v)),
-            sw('Dock blur OFF', perfOff(16), (v) => flip(16, v)),
-            sw('Card entrances OFF', perfOff(32), (v) => flip(32, v)),
-            const SizedBox(height: 8),
-          ]));
-        },
-      ),
     ),
   );
 }

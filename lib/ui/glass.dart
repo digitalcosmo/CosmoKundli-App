@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 
 import 'ck_theme.dart';
 import 'cosmic_background.dart';
-import 'widgets.dart' show perfOff;
 
 const String kCkBackground = 'assets/images/ck_bg.jpg';
 
@@ -175,7 +174,7 @@ class Glass extends StatelessWidget {
     final Widget body;
     if (liquid) {
       body = LiquidGlass(radius: radius, blur: blur > 0 ? blur : 20, child: face);
-    } else if (!frost || perfOff(4) || nested) {
+    } else if (!frost || nested) {
       body = face;
     } else if (context.getInheritedWidgetOfExactType<_OverSky>() != null) {
       body = ClipRRect(
@@ -408,7 +407,7 @@ class _FadeSlideInState extends State<FadeSlideIn>
     _decided = true;
     final i = widget.index;
     _step = EntranceWave.of(context);
-    final still = (MediaQuery.maybeDisableAnimationsOf(context) ?? false) || perfOff(32);
+    final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final outer = context.getInheritedWidgetOfExactType<_InEntrance>();
     final nested = _nested = outer != null && outer.nests && outer.t.value < 1;
     if (still || nested || i < 0 || i >= kEntranceCount) {
@@ -624,7 +623,6 @@ class _LiquidGlassState extends State<LiquidGlass> {
   @override
   Widget build(BuildContext context) {
     final r = BorderRadius.circular(widget.radius);
-    if (perfOff(16)) return ClipRRect(borderRadius: r, child: widget.child);
     final blurF = ImageFilter.blur(sigmaX: widget.blur, sigmaY: widget.blur);
     return LayoutBuilder(builder: (context, box) {
       ImageFilter filter = blurF;
@@ -640,7 +638,7 @@ class _LiquidGlassState extends State<LiquidGlass> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) setState(() {});
         });
-      } else if (prog != null && !perfOff(1) && box.hasBoundedWidth && box.hasBoundedHeight) {
+      } else if (prog != null && box.hasBoundedWidth && box.hasBoundedHeight) {
         try {
           final shader = prog.fragmentShader();
           final dpr = MediaQuery.of(context).devicePixelRatio;
