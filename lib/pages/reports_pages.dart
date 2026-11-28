@@ -954,7 +954,7 @@ class _ConfirmSheetState extends State<_ConfirmSheet> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${widget.type.title} · ${widget.months} months', style: CkText.h(18)),
               const SizedBox(height: 2),
-              Text('for ${c?.name ?? ''}', style: const TextStyle(fontSize: 13, color: CkColors.textSecondary)),
+              Text('for ${c?.name ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: CkColors.textSecondary)),
             ]),
           ),
         ]),

@@ -412,7 +412,7 @@ class _PickClientState extends State<_PickClient> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    Text(cl.name, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
+                                    Text(cl.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
                                     Text(cl.subtitle, style: CkText.mono(11.5, color: CkColors.textSecondary)),
                                   ]),
                                 ),

@@ -600,7 +600,7 @@ class _PanchangNowCardState extends State<PanchangNowCard> {
             if (known) ...[
               const Icon(Icons.place_outlined, size: 13, color: CkColors.textSecondary),
               const SizedBox(width: 3),
-              Text(Here.name, style: const TextStyle(fontSize: 11.5, color: CkColors.textSecondary)),
+              Flexible(child: Text(Here.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, color: CkColors.textSecondary))),
             ],
           ]),
           if (!known)

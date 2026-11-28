@@ -491,7 +491,7 @@ class SkyNowPage extends StatelessWidget {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('Transit', style: CkText.h(19)),
-                    if (Here.name.isNotEmpty) Text(Here.name, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
+                    if (Here.name.isNotEmpty) Text(Here.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
                   ]),
                 ),
               ]),

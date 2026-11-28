@@ -457,7 +457,7 @@ class _DetailsSheet extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(c.name, style: CkText.h(18)),
+                Text(c.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: CkText.h(18)),
                 const SizedBox(height: 3),
                 DataBuilder<List<GrahPos>>(
                   future: data.chart(),

@@ -46,7 +46,7 @@ Future<void> clientMenu(BuildContext context, Client c, {VoidCallback? onChanged
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Center(child: Container(width: 44, height: 5, decoration: BoxDecoration(color: CkColors.glassStroke, borderRadius: BorderRadius.circular(3)))),
           const SizedBox(height: 12),
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: Text(c.name, style: CkText.h(17))),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: Text(c.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: CkText.h(17))),
           const SizedBox(height: 8),
           ListTile(
             leading: const Icon(Icons.edit_outlined, color: Color(0xFFFFB27A)),

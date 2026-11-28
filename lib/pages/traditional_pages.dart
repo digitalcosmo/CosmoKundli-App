@@ -291,7 +291,7 @@ class _MelapakPageState extends State<MelapakPage> {
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('${_female ? 'BRIDE' : 'GROOM'} · THIS CLIENT', style: CkText.label.copyWith(fontSize: 9.5)),
-                  Text(_client.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                  Text(_client.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                   Text(_client.subtitle, style: CkText.muted.copyWith(fontSize: 11.5)),
                 ]),
               ),
