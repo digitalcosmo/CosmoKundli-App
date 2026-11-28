@@ -662,4 +662,3 @@ class _TabFaderState extends State<TabFader> with SingleTickerProviderStateMixin
     ]);
   }
 }
-}
