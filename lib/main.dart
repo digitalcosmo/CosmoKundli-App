@@ -6,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'core/session.dart';
 import 'pages/auth_pages.dart';
 import 'pages/app_shell.dart';
-import 'pages/labs.dart';
 import 'ui/ck_theme.dart';
 import 'ui/glass.dart';
 import 'ui/widgets.dart';
@@ -24,7 +23,6 @@ Future<void> main() async {
   GoogleFonts.config.allowRuntimeFetching = false;
   await Session.init();
   await LiquidGlass.preload();
-  registerLabs();
   runApp(const CosmoKundliApp());
 }
 
@@ -33,10 +31,7 @@ class CosmoKundliApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: perfOverlay,
-      builder: (c, perf, _) => GetMaterialApp(
-      showPerformanceOverlay: perf,
+    return GetMaterialApp(
       title: 'CosmoKundli',
       debugShowCheckedModeBanner: false,
       theme: CkTheme.dark(),
@@ -59,7 +54,6 @@ class CosmoKundliApp extends StatelessWidget {
         // the one sky, under every page; pages never paint a background
         child: CkSky(child: child!),
       ),
-    ),
     );
   }
 }

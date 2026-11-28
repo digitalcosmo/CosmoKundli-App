@@ -4,7 +4,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'widgets.dart' show perfOff;
 
 /// Deep-space scene behind every page: navy depth, slowly turning orbit
 /// rings, a large blue sphere and a small amber planet drifting, and a
@@ -68,7 +67,7 @@ class _CosmicBackgroundState extends State<CosmicBackground> with WidgetsBinding
   void didChangeAppLifecycleState(AppLifecycleState s) => _sync();
 
   void _sync() {
-    final still = !mounted || MediaQuery.of(context).disableAnimations || perfOff(2);
+    final still = !mounted || MediaQuery.of(context).disableAnimations;
     final awake = SchedulerBinding.instance.lifecycleState == AppLifecycleState.resumed ||
         SchedulerBinding.instance.lifecycleState == null;
     if (!still && awake) {
@@ -87,7 +86,7 @@ class _CosmicBackgroundState extends State<CosmicBackground> with WidgetsBinding
   /// Draws the scene small, blurred, into [SkyFrost.image].
   void _makeFrost() {
     final s = _size;
-    if (s == null || s.isEmpty || perfOff(4)) return;
+    if (s == null || s.isEmpty) return;
     const k = SkyFrost.scale;
     final w = (s.width * k).ceil(), h = (s.height * k).ceil();
     final rec = ui.PictureRecorder();

@@ -179,18 +179,12 @@ class _AccountPageState extends State<AccountPage> {
             ]),
           ),
           const SizedBox(height: 14),
-          // long-press: hidden switch for Flutter's frame-time graph (testing)
-          GestureDetector(
-            onLongPress: () {
-              showPerfSheet(context);
-            },
-            child: GhostButton('Sign out', icon: Icons.logout_rounded, color: const Color(0xFFFF8A8A), onTap: () async {
-              if (await confirm(context, 'Sign out?', 'You can sign in again any time.', ok: 'Sign out', danger: true)) {
-                await Session.signOut();
-                goLogin();
-              }
-            }),
-          ),
+          GhostButton('Sign out', icon: Icons.logout_rounded, color: const Color(0xFFFF8A8A), onTap: () async {
+            if (await confirm(context, 'Sign out?', 'You can sign in again any time.', ok: 'Sign out', danger: true)) {
+              await Session.signOut();
+              goLogin();
+            }
+          }),
         ],
       );
 
