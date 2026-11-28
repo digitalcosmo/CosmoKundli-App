@@ -2706,3 +2706,65 @@ void showPerfSheet(BuildContext context) {
     ),
   );
 }
+
+/// The one search field (Forms family): search key on the keyboard, no
+/// autocorrect, keyboard closes on search, and a clear (✕) button whenever
+/// there is text. Drop-in for a search TextField.
+class CkSearchField extends StatefulWidget {
+  final TextEditingController? controller;
+  final FocusNode? focusNode;
+  final ValueChanged<String>? onChanged;
+  final InputDecoration decoration;
+  final bool autofocus;
+  const CkSearchField({super.key, this.controller, this.focusNode, this.onChanged, this.decoration = const InputDecoration(), this.autofocus = false});
+  @override
+  State<CkSearchField> createState() => _CkSearchFieldState();
+}
+
+class _CkSearchFieldState extends State<CkSearchField> {
+  late final TextEditingController _c = widget.controller ?? TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _c.addListener(_changed);
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _c.removeListener(_changed);
+    if (widget.controller == null) _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => TextField(
+        controller: _c,
+        focusNode: widget.focusNode,
+        autofocus: widget.autofocus,
+        onChanged: widget.onChanged,
+        textInputAction: TextInputAction.search,
+        autocorrect: false,
+        enableSuggestions: false,
+        onSubmitted: (_) => FocusScope.of(context).unfocus(),
+        onTapOutside: (_) => FocusScope.of(context).unfocus(),
+        decoration: widget.decoration.copyWith(
+          prefixIcon: widget.decoration.prefixIcon ?? const Icon(Icons.search_rounded),
+          suffixIcon: widget.decoration.suffixIcon ??
+              (_c.text.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Clear',
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      onPressed: () {
+                        _c.clear();
+                        widget.onChanged?.call('');
+                      },
+                    )),
+        ),
+      );
+}

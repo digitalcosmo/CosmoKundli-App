@@ -26,7 +26,7 @@ class CkColors {
   static const Color panelBottom = Color(0x16FFFFFF);
   static const Color panelStroke = Color(0x1FFFFFFF);
   static const Color field = Color(0x8C0A1E50);
-  static const Color labelMono = Color(0xFF93A8CF);
+  static const Color labelMono = Color(0xFFB3C3E3); // lifted for contrast (Build 4 audit, O)
 
   // Space
   static const Color deepSpace = Color(0xFF0C2C68);
@@ -35,10 +35,10 @@ class CkColors {
 
   // Text
   static const Color text = Color(0xFFFFFFFF);
-  static const Color textSecondary = Color(0xFFA9BADB);
+  static const Color textSecondary = Color(0xFFC4D1EC); // lifted for contrast (Build 4 audit, O)
   static const Color textTertiary = Color(0xFFDFE2EB);
-  static const Color textMuted = Color(0x80FFFFFF);
-  static const Color textDim = Color(0x59FFFFFF);
+  static const Color textMuted = Color(0xA8FFFFFF); // 66%, was 50%
+  static const Color textDim = Color(0x73FFFFFF); // 45%, was 35%
 
   // Glass
   static const Color glassFill = Color(0x14FFFFFF);

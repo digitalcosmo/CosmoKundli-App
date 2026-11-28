@@ -21,7 +21,7 @@ class ModulesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final children = <Widget>[
-      Text('TAP A MODULE TO OPEN IT FULL SCREEN', style: CkText.label.copyWith(fontSize: 9.5)),
+      Text('TAP A MODULE TO OPEN IT FULL SCREEN', style: CkText.label),
     ];
     for (final g in _groups.entries) {
       children.add(Padding(padding: const EdgeInsets.only(top: 16, bottom: 7), child: Text(g.key.toUpperCase(), style: CkText.label)));

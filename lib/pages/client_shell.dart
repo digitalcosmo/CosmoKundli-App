@@ -391,7 +391,7 @@ class _SwitchSheetState extends State<_SwitchSheet> {
               const SizedBox(height: 12),
               Text('Switch client', style: CkText.h(18)),
               const SizedBox(height: 10),
-              TextField(
+              CkSearchField(
                 onChanged: (v) => setState(() => _q = v.toLowerCase()),
                 decoration: const InputDecoration(hintText: 'Search', prefixIcon: Icon(Icons.search_rounded)),
               ),

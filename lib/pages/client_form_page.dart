@@ -162,7 +162,7 @@ class _BirthFieldsState extends State<BirthFields> {
           padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
           decoration: BoxDecoration(color: CkColors.field, borderRadius: BorderRadius.circular(10)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(upper(label), maxLines: 1, overflow: TextOverflow.ellipsis, style: CkText.label.copyWith(fontSize: 9)),
+            Text(upper(label), maxLines: 1, overflow: TextOverflow.ellipsis, style: CkText.label),
             const SizedBox(height: 2),
             Text(v.isEmpty ? '—' : (v.length > 8 ? v.substring(0, 8) : v), style: CkText.mono(12.5)),
           ]),

@@ -679,7 +679,7 @@ class _WorkspacePageState extends State<WorkspacePage> {
                 _tabs(),
                 const SizedBox(height: 8),
                 Text('DRAG ⋮⋮ TO MOVE · DRAG A CORNER TO RESIZE · LONG-PRESS A TAB TO RENAME',
-                    textAlign: TextAlign.center, style: CkText.label.copyWith(fontSize: 9)),
+                    textAlign: TextAlign.center, style: CkText.label),
               ]),
             ),
             Expanded(
@@ -1399,7 +1399,7 @@ class _TransitWState extends State<_TransitW> {
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => setState(() => _at = null),
-                child: const Padding(padding: EdgeInsets.fromLTRB(6, 2, 0, 2), child: Icon(Icons.restart_alt_rounded, size: 16, color: CkColors.cyan)),
+                child: const Padding(padding: EdgeInsets.fromLTRB(10, 6, 4, 6), child: Icon(Icons.restart_alt_rounded, size: 16, color: CkColors.cyan)),
               ),
           ])),
       const SizedBox(height: 6),
@@ -1458,7 +1458,7 @@ class _MonthChip extends StatelessWidget {
           GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => onChanged(null),
-            child: const Padding(padding: EdgeInsets.fromLTRB(6, 2, 0, 2), child: Icon(Icons.restart_alt_rounded, size: 16, color: CkColors.cyan)),
+            child: const Padding(padding: EdgeInsets.fromLTRB(10, 6, 4, 6), child: Icon(Icons.restart_alt_rounded, size: 16, color: CkColors.cyan)),
           ),
       ]);
 }
@@ -1512,7 +1512,7 @@ class _DailyWState extends State<_DailyW> {
                   padding: const EdgeInsets.fromLTRB(9, 6, 9, 6),
                   decoration: BoxDecoration(color: const Color(0x0FFFFFFF), borderRadius: BorderRadius.circular(9)),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(k.toUpperCase(), style: CkText.label.copyWith(fontSize: 8.5)),
+                    Text(k.toUpperCase(), style: CkText.label.copyWith(fontSize: 9.5)),
                     const SizedBox(height: 2),
                     StatText(_fmt(v, signed), style: CkText.mono(14, color: signed && k == 'Average' ? Colors.white : col(v))),
                   ]),
@@ -1846,7 +1846,7 @@ class _FiveDWState extends State<_FiveDW> {
                     padding: const EdgeInsets.fromLTRB(9, 6, 9, 6),
                     decoration: BoxDecoration(color: const Color(0x0FFFFFFF), borderRadius: BorderRadius.circular(9)),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(k.toUpperCase(), style: CkText.label.copyWith(fontSize: 8.5)),
+                      Text(k.toUpperCase(), style: CkText.label.copyWith(fontSize: 9.5)),
                       const SizedBox(height: 2),
                       StatText(pct(v), style: CkText.mono(14, color: fiveDColor(v, signed: signed))),
                     ]),
@@ -1874,7 +1874,7 @@ class _PanchangW extends StatelessWidget {
         child: Container(
           decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x1A8CBEFF)))),
           child: Row(children: [
-            SizedBox(width: 74, child: Text(k.toUpperCase(), style: CkText.label.copyWith(fontSize: 9))),
+            SizedBox(width: 74, child: Text(k.toUpperCase(), style: CkText.label)),
             Expanded(child: Text(v.isEmpty ? '—' : v, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: fs, fontWeight: FontWeight.w600))),
           ]),
         ),

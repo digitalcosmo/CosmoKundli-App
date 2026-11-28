@@ -27,6 +27,8 @@ check '\bPopupMenuButton\b|\bMenuAnchor\b|\bshowMenu\(|\bDropdownButton\b|\bDrop
 # the kit itself may only open menus through menu.dart
 hits=$(grep -nE '\bPopupMenuButton\b|\bMenuAnchor\b|\bshowMenu\(|\bDropdownButton\b' ../ui/*.dart | grep -v 'menu.dart' | grep -v 'family-ok:' || true)
 if [ -n "$hits" ]; then echo "FAMILY CHECK: dropdowns in the kit go through menu.dart"; echo "$hits" | sed 's/^/  /'; fail=1; fi
+hits=$(grep -nE -A5 '\bTextField\(' ./*.dart | grep -E "hintText: .Search" | grep -v 'family-ok:' || true)
+if [ -n "$hits" ]; then echo "FAMILY CHECK: a search box is CkSearchField (kit): search key, clear button, keyboard closes"; echo "$hits" | sed 's/^/  /'; fail=1; fi
 if [ $fail -ne 0 ]; then
   echo "Family check failed. See the family plan: every stat, list and screen comes from the kit."
   exit 1

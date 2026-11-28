@@ -1094,7 +1094,7 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
                       ),
                     ]),
                     const SizedBox(height: 14),
-                    TextField(
+                    CkSearchField(
                       onChanged: (v) => setState(() => _q = v.trim().toLowerCase()),
                       decoration: const InputDecoration(hintText: 'Search client or report', prefixIcon: Icon(Icons.search_rounded)),
                     ),

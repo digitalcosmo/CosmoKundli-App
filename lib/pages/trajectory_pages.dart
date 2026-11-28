@@ -382,7 +382,7 @@ class _PickClientState extends State<_PickClient> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Compare with a client', style: CkText.h(18)),
                 const SizedBox(height: 12),
-                TextField(
+                CkSearchField(
                   onChanged: (v) => setState(() => _q = v.trim().toLowerCase()),
                   decoration: const InputDecoration(hintText: 'Search name, year, place', prefixIcon: Icon(Icons.search_rounded)),
                 ),

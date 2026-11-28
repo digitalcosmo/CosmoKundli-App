@@ -78,8 +78,7 @@ class CkMenuButton<T> extends StatelessWidget {
             final v = await showCkMenu<T>(context, items: items, selected: value, minWidth: minWidth);
             if (v != null) onSelected(v);
           },
-          // at least a 44 px touch target, whatever the child's size
-          child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 44), child: Center(widthFactor: 1, child: child)),
+          child: child,
         ),
       );
 }

@@ -387,7 +387,7 @@ Widget _cell(String l, String v) => Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       decoration: BoxDecoration(color: CkColors.field, borderRadius: BorderRadius.circular(11), border: Border.all(color: CkColors.panelStroke)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-        Text(upper(l), style: CkText.label.copyWith(fontSize: 9.5)),
+        Text(upper(l), style: CkText.label),
         const SizedBox(height: 3),
         Text(v, maxLines: 1, overflow: TextOverflow.ellipsis, style: CkText.h(14.5, w: FontWeight.w600)),
       ]),

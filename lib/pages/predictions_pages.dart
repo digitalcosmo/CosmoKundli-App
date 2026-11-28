@@ -216,7 +216,7 @@ class _SentimentsPageState extends State<SentimentsPage> {
                         shadow: false,
                         padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('WEEK ${i + 1}', style: CkText.label.copyWith(fontSize: 9.5)),
+                          Text('WEEK ${i + 1}', style: CkText.label),
                           StatText(_pct(a), index: i, style: CkText.h(19, color: col)),
                           Text('${DateFormat('d MMM').format(w.first.key)} – ${DateFormat('d MMM').format(w.last.key)}',
                               style: const TextStyle(fontSize: 10.5, color: CkColors.textSecondary)),
@@ -280,7 +280,7 @@ class _SituationsPageState extends State<SituationsPage> {
         radius: 18,
         padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label.toUpperCase(), style: CkText.label.copyWith(fontSize: 9.5)),
+          Text(label.toUpperCase(), style: CkText.label),
           const SizedBox(height: 3),
           Row(children: [
             ZoneArrows(z, size: 13),
@@ -438,7 +438,7 @@ class _Sentiments5DPageState extends State<Sentiments5DPage> {
           radius: 18,
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label.toUpperCase(), style: CkText.label.copyWith(fontSize: 9.5)),
+            Text(label.toUpperCase(), style: CkText.label),
             const SizedBox(height: 3),
             if (e == null)
               const Skeleton(width: 70, height: 16, radius: 4)

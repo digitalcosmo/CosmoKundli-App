@@ -290,7 +290,7 @@ class _MelapakPageState extends State<MelapakPage> {
               const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('${_female ? 'BRIDE' : 'GROOM'} · THIS CLIENT', style: CkText.label.copyWith(fontSize: 9.5)),
+                  Text('${_female ? 'BRIDE' : 'GROOM'} · THIS CLIENT', style: CkText.label),
                   Text(_client.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                   Text(_client.subtitle, style: CkText.muted.copyWith(fontSize: 11.5)),
                 ]),
@@ -312,9 +312,9 @@ class _MelapakPageState extends State<MelapakPage> {
             stroke: CkColors.orangeStroke,
             padding: const EdgeInsets.all(12),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${_female ? 'GROOM' : 'BRIDE'} · MATCH WITH', style: CkText.label.copyWith(fontSize: 9.5)),
+              Text('${_female ? 'GROOM' : 'BRIDE'} · MATCH WITH', style: CkText.label),
               const SizedBox(height: 6),
-              TextField(
+              CkSearchField(
                 onChanged: (v) => setState(() => _q = v.toLowerCase()),
                 decoration: InputDecoration(
                     hintText: 'Search ${_female ? 'male' : 'female'} clients', prefixIcon: const Icon(Icons.search_rounded)),
@@ -762,7 +762,7 @@ class _PickListState<T> extends State<_PickList<T>> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(widget.title, style: CkText.h(18)),
           const SizedBox(height: 10),
-          TextField(
+          CkSearchField(
             onChanged: (v) => setState(() => _q = v.toLowerCase()),
             decoration: const InputDecoration(hintText: 'Search', prefixIcon: Icon(Icons.search_rounded)),
           ),

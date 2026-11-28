@@ -274,20 +274,12 @@ class _ClientsPageState extends State<ClientsPage> {
                             ),
                           ]),
                           const SizedBox(height: 16),
-                          TextField(
+                          CkSearchField(
                             controller: _search,
                             onChanged: (v) => setState(() => _q = v),
                             decoration: InputDecoration(
                               hintText: 'Search name, city or date',
                               prefixIcon: const Icon(Icons.search_rounded),
-                              suffixIcon: _q.isEmpty
-                                  ? null
-                                  : IconButton(
-                                      onPressed: () => setState(() {
-                                            _search.clear();
-                                            _q = '';
-                                          }),
-                                      icon: const Icon(Icons.close_rounded)),
                             ),
                           ),
                           const SizedBox(height: 12),

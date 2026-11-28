@@ -996,7 +996,7 @@ class _HistoryPageState extends State<HistoryPage> {
   Widget build(BuildContext context) => AccountFrame(
         title: 'Report history',
         children: [
-          TextField(
+          CkSearchField(
             onChanged: (v) => setState(() => _q = v.toLowerCase()),
             decoration: const InputDecoration(hintText: 'Search client or report', prefixIcon: Icon(Icons.search_rounded)),
           ),

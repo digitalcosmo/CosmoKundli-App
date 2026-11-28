@@ -936,7 +936,7 @@ class _SearchPageState extends State<SearchPage> {
             padding: const EdgeInsets.fromLTRB(16, 10, 12, 0),
             child: Row(children: [
               Expanded(
-                child: TextField(
+                child: CkSearchField(
                   controller: _c,
                   focusNode: _focus,
                   onChanged: (v) => setState(() => _q = v.trim().toLowerCase()),
