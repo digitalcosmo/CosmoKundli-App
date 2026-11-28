@@ -157,7 +157,7 @@ class TransitBodyState extends State<TransitBody> {
 
   void _load() {
     if (_srcId == null) return;
-    _transit = ClientData(_srcId!).transit(_at)..then((v) => _last = v).catchError((_) => <GrahPos>[]);
+    _transit = ClientData.of(_srcId!).transit(_at)..then((v) => _last = v).catchError((_) => <GrahPos>[]);
   }
 
   void _set(DateTime t, {bool live = false}) => setState(() {

@@ -253,7 +253,8 @@ class _PressableState extends State<Pressable> {
 /// 550 ms, rise 16 px, scale 98 -> 100%, 70 ms apart, curve kEase).
 ///
 /// One entrance per card: inside another FadeSlideIn it does nothing, so a
-/// card never plays its entrance twice. Only the first [kEntranceCount]
+/// card never plays its entrance twice; on a page that is sliding in, the
+/// slide is the entrance and cards show at once. Only the first [kEntranceCount]
 /// items animate (later ones are usually off screen and must not animate
 /// while scrolling). Plays once when it is built; with the phone's
 /// "remove animations" setting it shows at once.
@@ -289,7 +290,11 @@ class _FadeSlideInState extends State<FadeSlideIn>
     final i = widget.index;
     final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final nested = context.getInheritedWidgetOfExactType<_InEntrance>() != null;
-    if (still || nested || i < 0 || i >= kEntranceCount) {
+    // A page that is sliding in already has its entrance (the slide), so
+    // its cards show at once. If the phone stalls on the first frames, the
+    // page then still arrives with its content instead of empty.
+    final sliding = ModalRoute.of(context)?.animation?.status == AnimationStatus.forward;
+    if (still || nested || sliding || i < 0 || i >= kEntranceCount) {
       _c.value = 1;
     } else if (i == 0) {
       _c.forward();
