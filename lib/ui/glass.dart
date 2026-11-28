@@ -172,7 +172,7 @@ class Glass extends StatelessWidget {
     // Entrance: fade the face only (see [entranceFade]); a card inside a card
     // that is already fading does not fade a second time.
     final fade = entranceFade(context);
-    final shown = fade == null || fade.isCompleted || context.getInheritedWidgetOfExactType<_Faded>() != null
+    final shown = fade == null || context.getInheritedWidgetOfExactType<_Faded>() != null
         ? face
         : FadeTransition(opacity: fade, child: _Faded(child: face));
     // Real backdrop blur is expensive (one full-screen pass per card), so
@@ -276,8 +276,22 @@ class FadeSlideIn extends StatefulWidget {
 const int kEntranceCount = 6;
 
 class _InEntrance extends InheritedWidget {
+  /// The fade cards use here: this one combined with any outer fade.
   final Animation<double> t;
-  const _InEntrance({required this.t, required super.child});
+  /// An entrance (or data swap) is running here, so entrances below it
+  /// don't play again. A tab switch alone doesn't count.
+  final bool nests;
+  const _InEntrance({required this.t, required this.nests, required super.child});
+
+  /// Publishes [t] under any outer fade (cards show the lower of the two).
+  static Widget wrap(BuildContext c, Animation<double> t, {required bool entrance, required Widget child}) {
+    final outer = c.getInheritedWidgetOfExactType<_InEntrance>();
+    return _InEntrance(
+      t: outer == null ? t : AnimationMin<double>(outer.t, t),
+      nests: entrance || (outer?.nests ?? false),
+      child: child,
+    );
+  }
   @override
   bool updateShouldNotify(_InEntrance old) => !identical(old.t, t);
 }
@@ -287,9 +301,13 @@ class _InEntrance extends InheritedWidget {
 class CardFade extends StatelessWidget {
   final Animation<double> t;
   final Widget child;
-  const CardFade({super.key, required this.t, required this.child});
+  final bool entrance;
+  const CardFade({super.key, required this.t, required this.child}) : entrance = true;
+
+  /// For a tab switch: cards fade, but entrances below still play.
+  const CardFade.tab({super.key, required this.t, required this.child}) : entrance = false;
   @override
-  Widget build(BuildContext context) => _InEntrance(t: t, child: child);
+  Widget build(BuildContext context) => _InEntrance.wrap(context, t, entrance: entrance, child: child);
 }
 
 class _Faded extends InheritedWidget {
@@ -319,7 +337,7 @@ class _FadeSlideInState extends State<FadeSlideIn>
     _decided = true;
     final i = widget.index;
     final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final nested = _nested = context.getInheritedWidgetOfExactType<_InEntrance>() != null;
+    final nested = _nested = context.getInheritedWidgetOfExactType<_InEntrance>()?.nests ?? false;
     // A page that is sliding in already has its entrance (the slide), so
     // its cards show at once. If the phone stalls on the first frames, the
     // page then still arrives with its content instead of empty.
@@ -347,8 +365,10 @@ class _FadeSlideInState extends State<FadeSlideIn>
     if (_nested) return widget.child;
     // No fade layer around the whole item: cards ([Glass]) fade their own
     // face through [entranceFade] and keep their blur from the first frame.
-    return _InEntrance(
-      t: _t,
+    return _InEntrance.wrap(
+      context,
+      _t,
+      entrance: true,
       child: AnimatedBuilder(
         animation: _t,
         child: widget.child,
@@ -552,38 +572,94 @@ class CkRoute<T> extends PageRouteBuilder<T> {
         );
 }
 
-/// Keeps every tab alive and switches like MyAcharyaji: the old tab fades
-/// out fast (the curve drops most of it within ~100 ms) while the new one
-/// fades in over 400 ms and rises 2.5% over 450 ms. Hidden tabs are not
-/// painted (opacity 0), don't take touches and have their animations paused.
-class TabFader extends StatelessWidget {
+/// Keeps every tab alive and switches by fade-through (Material): the old
+/// tab fades out in 90 ms, then the new one fades in over 210 ms while it
+/// grows from 92% to full size. The two never show half-visible together.
+/// Cards fade only their face ([CardFade]) so their blur never pops in late.
+/// Hidden tabs are not painted, take no touches and pause their animations.
+class TabFader extends StatefulWidget {
   final int index;
   final List<Widget> children;
   const TabFader({super.key, required this.index, required this.children});
+  @override
+  State<TabFader> createState() => _TabFaderState();
+}
+
+class _TabFaderState extends State<TabFader> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 300), value: 1)
+    ..addStatusListener((s) {
+      if (s == AnimationStatus.completed && _prev != null && mounted) setState(() => _prev = null);
+    });
+  late final Animation<double> _out = ReverseAnimation(CurvedAnimation(parent: _c, curve: const Interval(0, .3, curve: Curves.easeIn)));
+  late final Animation<double> _in = CurvedAnimation(parent: _c, curve: const Interval(.3, 1, curve: kEase));
+  static const _shown = AlwaysStoppedAnimation<double>(1);
+  int? _prev;
+
+  @override
+  void didUpdateWidget(TabFader old) {
+    super.didUpdateWidget(old);
+    if (old.index == widget.index) return;
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      _prev = null;
+      _c.value = 1;
+      return;
+    }
+    _prev = old.index;
+    _c.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  // One fixed fade per tab, pointed at the right curve on each switch, so
+  // cards built earlier keep following it.
+  final _fade = <ProxyAnimation>[];
+
+  ProxyAnimation _f(int i) {
+    while (_fade.length <= i) {
+      _fade.add(ProxyAnimation(_shown));
+    }
+    return _fade[i];
+  }
 
   @override
   Widget build(BuildContext context) {
-    final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final cur = widget.index;
+    final prev = _prev;
+    for (var i = 0; i < widget.children.length; i++) {
+      final want = i == prev ? _out : (i == cur && prev != null ? _in : _shown);
+      final f = _f(i);
+      if (!identical(f.parent, want)) f.parent = want;
+    }
+    // Every tab keeps the same widget shape at all times, so switching
+    // never rebuilds a tab from scratch.
     return Stack(children: [
-        for (var i = 0; i < children.length; i++)
-          Positioned.fill(
-            child: IgnorePointer(
-              ignoring: i != index,
-              // The fade itself must keep ticking after the tab is left, so
-              // only the tab's content is paused (TickerMode inside).
-              child: AnimatedOpacity(
-                opacity: i == index ? 1 : 0,
-                duration: still ? Duration.zero : const Duration(milliseconds: 400),
-                curve: kEase,
-                child: AnimatedSlide(
-                  offset: i == index ? Offset.zero : const Offset(0, 0.025),
-                  duration: still ? Duration.zero : const Duration(milliseconds: 450),
-                  curve: kEase,
-                  child: TickerMode(enabled: i == index, child: children[i]),
-                ),
+      for (var i = 0; i < widget.children.length; i++)
+        Positioned.fill(
+          child: IgnorePointer(
+            ignoring: i != cur,
+            child: TickerMode(
+              enabled: i == cur || i == prev,
+              child: AnimatedBuilder(
+                animation: _c,
+                child: CardFade.tab(t: _f(i), child: widget.children[i]),
+                builder: (_, c) {
+                  final leaving = i == prev && _c.value < .3;
+                  final arriving = i == cur && prev != null;
+                  final hidden = !(i == cur || leaving) || (arriving && _c.value < .3);
+                  return Offstage(
+                    offstage: hidden,
+                    child: Transform.scale(scale: arriving ? .92 + .08 * _in.value : 1, child: c),
+                  );
+                },
               ),
             ),
           ),
-      ]);
+        ),
+    ]);
   }
+}
 }
