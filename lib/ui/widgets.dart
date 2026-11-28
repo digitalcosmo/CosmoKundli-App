@@ -349,9 +349,15 @@ class _FastFutureState<T> extends State<FastFuture<T>> {
   void _watch() {
     final f = widget.future;
     _r = f == null ? null : _done[f];
-    _skel = f != null && _r == null;
-    if (!_skel) return;
-    f!.then((v) {
+    _skel = false;
+    if (f == null || _r != null) return;
+    // A future that is already done (kept in memory) answers before the
+    // next frame: show its data straight away, with no skeleton and no
+    // cross-fade. Only a real wait shows the skeleton, from frame two.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && identical(widget.future, f) && _r == null) setState(() => _skel = true);
+    });
+    f.then((v) {
       final d = _Done(v, null, true);
       _done[f] = d;
       if (mounted && identical(widget.future, f)) setState(() => _r = d);
@@ -366,7 +372,7 @@ class _FastFutureState<T> extends State<FastFuture<T>> {
     final r = _r;
     final Widget child;
     if (r == null) {
-      child = widget.future == null
+      child = widget.future == null || !_skel
           ? SizedBox(key: const ValueKey('none'), height: widget.minHeight)
           : KeyedSubtree(key: const ValueKey('skel'), child: widget.loading);
     } else if (!r.ok || (r.data == null && null is! T)) {
@@ -375,10 +381,13 @@ class _FastFutureState<T> extends State<FastFuture<T>> {
       child = KeyedSubtree(key: const ValueKey('ok'), child: widget.builder(r.data as T));
     }
     if (!_skel) return child;
+    // Skeleton -> data: the data fades in on its own. The skeleton leaves at
+    // once instead of cross-fading, so the page never shows both at the
+    // same time (the "chart appears twice" look).
     return AnimatedSwitcher(
       duration: _still(context) ? Duration.zero : const Duration(milliseconds: 300),
       switchInCurve: Curves.easeOut,
-      layoutBuilder: (cur, prev) => Stack(alignment: Alignment.topCenter, children: [...prev, if (cur != null) cur]),
+      layoutBuilder: (cur, prev) => cur ?? const SizedBox.shrink(),
       child: child,
     );
   }
