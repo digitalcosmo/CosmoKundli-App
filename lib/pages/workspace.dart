@@ -1585,9 +1585,9 @@ class _DailyWState extends State<_DailyW> {
     if (signed) {
       final half = h / 2;
       final bh = (half - topPad) * (v.abs() / maxAbs);
-      final glowC = end >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+      final glowC = v >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444);
       final up = v >= 0;
-      final grad = end >= 0
+      final grad = up
           ? const LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Color(0xFF73F4C4), Color(0xFF10B981)])
           : const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFF6B8B8), Color(0xFFEF4444)]);
       inner = Stack(children: [

@@ -468,15 +468,22 @@ class _FastFutureState<T> extends State<FastFuture<T>> {
     } else {
       child = KeyedSubtree(key: const ValueKey('ok'), child: widget.builder(r.data as T));
     }
-    if (!_skel) return child;
-    // Skeleton -> data, as MyAcharyaji's ResultSwitch: the data fades in
-    // over 350 ms. The skeleton leaves at once instead of cross-fading, so
-    // the page never shows both at the same time.
+    // Always the same switcher, so a refresh or a new period never rebuilds
+    // the content (no replayed entrance, no blank frame); only a real
+    // skeleton -> data change animates. Skeleton -> data: the data's cards
+    // rise in over the skeleton, which holds for half the switch and then
+    // fades, so there is never an empty frame between the two.
     return AnimatedSwitcher(
-      duration: _still(context) ? Duration.zero : CkMotion.state,
+      duration: _still(context) || !_skel ? Duration.zero : CkMotion.state,
+      reverseDuration: _still(context) || !_skel ? Duration.zero : CkMotion.enter,
       switchInCurve: Curves.easeOut,
+      // AnimatedSwitcher plays this flipped: the skeleton holds, then fades
+      switchOutCurve: const Interval(.5, 1, curve: Curves.easeIn),
       transitionBuilder: (c, a) => FadeTransition(opacity: a, child: c),
-      layoutBuilder: (cur, prev) => cur ?? const SizedBox.shrink(),
+      layoutBuilder: (cur, prev) => Stack(alignment: Alignment.topCenter, children: [
+        for (final p in prev) Positioned(left: 0, right: 0, top: 0, child: IgnorePointer(child: p)),
+        if (cur != null) cur,
+      ]),
       child: child,
     );
   }
@@ -1689,6 +1696,7 @@ class DailyBarChart extends StatefulWidget {
 
 class DailyBarChartState extends State<DailyBarChart> {
   final _sc = ScrollController();
+  final _lastVal = <int, double>{};
   double _colW = 44;
   double _viewW = 300;
 
@@ -1773,6 +1781,10 @@ class DailyBarChartState extends State<DailyBarChart> {
     final signed = widget.signed;
     final raw = d.value;
     final loading = raw == null;
+    // While a bar sinks for loading it keeps its last real colour, so it
+    // never flashes the zero colour.
+    if (raw != null) _lastVal[i] = raw;
+    final known = raw ?? _lastVal[i];
     // Same slot, new value: the bar glides from where it is to the new
     // value (another month already loaded), sinks to 0 while a month loads,
     // and rises when it lands (MyAcharyaji Planner bars).
@@ -1805,9 +1817,10 @@ class DailyBarChartState extends State<DailyBarChart> {
             delay: Duration(milliseconds: 60 * (i % 12)),
             builder: (x) {
               final up = x >= 0;
-              // colour is the final value's from the first frame: it never
-              // shifts while the bar grows or glides
-              final end = v ?? x;
+              // colour never shifts while a bar moves: zone colour is the
+              // final value's from frame one; a signed bar is coloured by its
+              // side of zero, which only changes at zero height (invisible)
+              final end = known ?? x;
               final zc = signed ? null : zoneOf(end).color;
               final h = signed ? x.abs() / 100 * _ph / 2 : x / 100 * _ph;
               // Software: .sps-bar--pos linear-gradient(0deg,#73F4C4,#10B981); .sps-bar--neg linear-gradient(0deg,#EF4444,#F6B8B8)
@@ -1815,10 +1828,10 @@ class DailyBarChartState extends State<DailyBarChart> {
                   ? LinearGradient(
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
-                      colors: end >= 0 ? const [Color(0xFF73F4C4), Color(0xFF10B981)] : const [Color(0xFFEF4444), Color(0xFFF6B8B8)],
+                      colors: up ? const [Color(0xFF73F4C4), Color(0xFF10B981)] : const [Color(0xFFEF4444), Color(0xFFF6B8B8)],
                     )
                   : LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [zc!, zc.withValues(alpha: .35)]);
-              final glow = signed ? (end >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444)) : zc!;
+              final glow = signed ? (up ? const Color(0xFF10B981) : const Color(0xFFEF4444)) : zc!;
               return Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
                 // loading: a soft pulse where the bar will be
                 Positioned(
@@ -1828,7 +1841,8 @@ class DailyBarChartState extends State<DailyBarChart> {
                 ),
                 Positioned(
                   top: signed ? (up ? mid - h : mid) : base - h,
-                  height: math.max(h, 3),
+                  // loading: no 3 px stub, so a sunk bar leaves nothing behind
+                  height: loading ? h : math.max(h, 3),
                   child: Container(
                     width: bw,
                     decoration: BoxDecoration(

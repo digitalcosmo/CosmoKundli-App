@@ -105,6 +105,9 @@ class CkMotion {
   /// sky stays.
   static const Duration push = Duration(milliseconds: 450);
   static const double pushShift = .08;
+  /// Share of a push/back in which the leaving page fades out before the
+  /// arriving one fades in (fade-through).
+  static const double fadeOut = .3;
 
   /// Loading to data, data to error.
   static const Duration state = Duration(milliseconds: 350);

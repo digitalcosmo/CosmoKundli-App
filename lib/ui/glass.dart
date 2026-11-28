@@ -675,7 +675,7 @@ Widget ckPageTransition(BuildContext c, Animation<double> a, Animation<double> b
   if (MediaQuery.maybeDisableAnimationsOf(c) ?? false) return page;
   final into = CurvedAnimation(parent: a, curve: kEase, reverseCurve: kEase.flipped);
   final under = CurvedAnimation(parent: b, curve: kEase, reverseCurve: kEase.flipped);
-  final shift = _PageShift(into: into, under: under);
+  final shift = _PageShift(into: into, under: under, a: a, b: b);
   return _PageShiftScope(
     shift: shift,
     child: AnimatedBuilder(
@@ -694,11 +694,25 @@ Widget ckPageTransition(BuildContext c, Animation<double> a, Animation<double> b
 class _PageShift {
   final Animation<double> into;
   final Animation<double> under;
+  final Animation<double> a, b;
   final Listenable both;
-  _PageShift({required this.into, required this.under}) : both = Listenable.merge([into, under]);
+  _PageShift({required this.into, required this.under, required this.a, required this.b}) : both = Listenable.merge([into, under]);
   /// Horizontal drift, as a share of the page width.
   double get dx => CkMotion.pushShift * (1 - into.value) - CkMotion.pushShift * under.value;
-  double get opacity => (into.value * (1 - under.value)).clamp(0.0, 1.0);
+
+  /// Fade-through: the leaving page is gone in the first 30% of the motion,
+  /// and only then does the arriving page fade in, so two pages never show
+  /// on top of each other (no ghosted text mid-transition).
+  static double _seg(double t, double from, double to) => Curves.easeOut.transform(((t - from) / (to - from)).clamp(0.0, 1.0));
+  double get opacity {
+    final leaving = a.status == AnimationStatus.reverse;
+    // this page's own route: arriving (push) or leaving (back)
+    final self = leaving ? _seg(a.value, 1 - CkMotion.fadeOut, 1) : _seg(a.value, CkMotion.fadeOut, 1);
+    // the page above it: covering (push) or uncovering (back)
+    final uncovering = b.status == AnimationStatus.reverse;
+    final cover = uncovering ? 1 - _seg(1 - b.value, CkMotion.fadeOut, 1) : _seg(b.value, 0, CkMotion.fadeOut);
+    return (self * (1 - cover)).clamp(0.0, 1.0);
+  }
 }
 
 class _PageShiftScope extends InheritedWidget {

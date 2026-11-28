@@ -51,3 +51,4 @@ android/local.properties
 android/key.properties
 *.jks
 ios/build/
+build/frames/
