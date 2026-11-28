@@ -4,17 +4,21 @@ import 'package:intl/intl.dart';
 
 import 'api.dart';
 import 'astro.dart';
+import 'known.dart';
 
 /// Per-client data cache so moving between sections doesn't refetch.
 class ClientData {
   final String mId;
   ClientData(this.mId);
 
-  static ClientData? _current;
-  static ClientData of(String mId) {
-    if (_current?.mId != mId) _current = ClientData(mId);
-    return _current!;
-  }
+  /// Every client opened in this session keeps its loaded data, so going
+  /// back to an earlier client shows it at once (motion spec: loaded data is
+  /// never unloaded).
+  static final _all = <String, ClientData>{};
+  static ClientData of(String mId) => _all.putIfAbsent(mId, () => ClientData(mId));
+
+  /// Signed out: drop everything loaded for the last user.
+  static void clearAll() => _all.clear();
 
   final _memo = <String, Future<dynamic>>{};
 
@@ -24,12 +28,14 @@ class ClientData {
     final now = DateTime.now();
     final past = DateTime(end.year, end.month, end.day == 1 && body.containsKey('Month') ? DateTime(end.year, end.month + 1, 0).day : end.day)
         .isBefore(DateTime(now.year, now.month, now.day));
-    return past ? Api.postKept(ep, body, owner: 'm$mId') : Api.post(ep, body);
+    // The current month is kept too: it shows at once from the phone and is
+    // refreshed quietly in the background for the next visit.
+    return past ? Api.postKept(ep, body, owner: 'm$mId') : Api.postFresh(ep, body, owner: 'm$mId');
   }
 
   /// Birth data changed (client edited): forget everything kept for them.
   static Future<void> forgetClient(String mId) async {
-    if (_current?.mId == mId) _current = null;
+    _all.remove(mId);
     await DiskCache.drop('m$mId');
   }
 
@@ -37,7 +43,7 @@ class ClientData {
   Future<T> _m<T>(String key, Future<T> Function() f) {
     final hit = _memo[key];
     if (hit != null) return hit as Future<T>;
-    final fut = f();
+    final fut = remember(f());
     _memo[key] = fut;
     fut.then((_) {}, onError: (Object _) {
       if (identical(_memo[key], fut)) _memo.remove(key);
@@ -61,7 +67,7 @@ class ClientData {
       _info = null;
     }
     if (_chart == null) {
-      final f = _chartLoad();
+      final f = remember(_chartLoad());
       _chart = f;
       f.then((_) {}, onError: (Object _) {
         if (identical(_chart, f)) _chart = null;
@@ -89,16 +95,16 @@ class ClientData {
     }();
   }
 
-  Future<List<GrahPos>> planetInfo() => _info ??= () async {
+  Future<List<GrahPos>> planetInfo() => _info ??= remember(() async {
         final r = await Api.postKept(Endpoints.birthPlanetInfo, {'mID': mId}, owner: 'm$mId');
         return GrahPos.listFrom(Api.list(r, ['planets', 'list']));
-      }();
+      }());
 
   /// Shadbal (used for Power and Flavor until their own APIs exist).
   Future<Map<String, double>> shadbal({bool refresh = false}) {
     if (refresh) _shadbal = null;
     if (_shadbal == null) {
-      final f = _shadbalLoad();
+      final f = remember(_shadbalLoad());
       _shadbal = f;
       f.then((_) {}, onError: (Object _) {
         if (identical(_shadbal, f)) _shadbal = null;
@@ -125,7 +131,7 @@ class ClientData {
     if (refresh) _details = null;
     final hit = _details;
     if (hit != null) return hit;
-    final f = Api.postKept(Endpoints.memberDetails, {'mID': mId}, owner: 'm$mId');
+    final f = remember(Api.postKept(Endpoints.memberDetails, {'mID': mId}, owner: 'm$mId'));
     _details = f;
     f.then((_) {}, onError: (Object _) {
       if (identical(_details, f)) _details = null;
@@ -143,8 +149,32 @@ class ClientData {
   }
 
   /// Sentiments for a month (Star_Power_Daily).
-  Future<List<MapEntry<DateTime, double>>> sentiments(DateTime month) =>
-      _m('sent:${DateFormat('yyyy-MM').format(month)}', () => _sentiments(month));
+  Future<List<MapEntry<DateTime, double>>> sentiments(DateTime month, {bool ahead = true}) {
+    final f = _m('sent:${DateFormat('yyyy-MM').format(month)}', () => _sentiments(month));
+    if (ahead) f.then((_) => _ahead('sent', month), onError: (Object _) {});
+    return f;
+  }
+
+  /// Loads the month before and after [month] once it has arrived, so
+  /// stepping between months opens at once (MyAcharyaji loads neighbours
+  /// ahead the same way). Neighbours don't load their own neighbours.
+  void _ahead(String kind, DateTime month) {
+    for (final d in const [-1, 1]) {
+      final n = DateTime(month.year, month.month + d);
+      final f = kind == 'sent' ? sentiments(n, ahead: false) : situations(n, ahead: false);
+      f.then((_) {}, onError: (Object _) {});
+    }
+  }
+
+  /// Called when a client is opened: loads the sections people open first
+  /// in the background, so they show without a skeleton.
+  void warmUp() {
+    final now = DateTime.now();
+    final m = DateTime(now.year, now.month);
+    for (final f in <Future<Object?>>[chart(), shadbal(), sentiments(m), situations(m)]) {
+      f.then((_) {}, onError: (Object _) {});
+    }
+  }
 
   Future<List<MapEntry<DateTime, double>>> _sentiments(DateTime month) async {
     final r = await _monthly(Endpoints.starPowerDaily, {'mID': mId, 'Month': DateFormat('yyyy-MM').format(month)}, month);
@@ -170,12 +200,22 @@ class ClientData {
   }
 
   /// Situations for a month (Cosmo_Power_Daily): {Date: "01 Aug", Value: 62.7}, 0..100.
-  Future<List<MapEntry<DateTime, double>>> situations(DateTime month) =>
-      _m('sit:${DateFormat('yyyy-MM').format(month)}', () => _situations(month));
+  Future<List<MapEntry<DateTime, double>>> situations(DateTime month, {bool ahead = true}) {
+    final f = _m('sit:${DateFormat('yyyy-MM').format(month)}', () => _situations(month));
+    if (ahead) f.then((_) => _ahead('sit', month), onError: (Object _) {});
+    return f;
+  }
 
   /// Daily values from [from] to [to] (inclusive), fetching every month the
   /// window touches. [kind] is 'sent' or 'sit'.
-  Future<List<MapEntry<DateTime, double>>> window(String kind, DateTime from, DateTime to) async {
+  /// The same window asked for again returns the same request, so a card
+  /// that is rebuilt shows its data at once instead of a second skeleton.
+  Future<List<MapEntry<DateTime, double>>> window(String kind, DateTime from, DateTime to) {
+    final f = DateFormat('yyyy-MM-dd');
+    return _m('win:$kind:${f.format(from)}:${f.format(to)}', () => _window(kind, from, to));
+  }
+
+  Future<List<MapEntry<DateTime, double>>> _window(String kind, DateTime from, DateTime to) async {
     final a = DateTime(from.year, from.month, from.day), b = DateTime(to.year, to.month, to.day);
     final months = <DateTime>[];
     for (var m = DateTime(a.year, a.month); !m.isAfter(DateTime(b.year, b.month)); m = DateTime(m.year, m.month + 1)) {

@@ -162,7 +162,7 @@ class _BirthFieldsState extends State<BirthFields> {
           padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
           decoration: BoxDecoration(color: CkColors.field, borderRadius: BorderRadius.circular(10)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(upper(label), maxLines: 1, overflow: TextOverflow.ellipsis, style: CkText.label.copyWith(fontSize: 9)),
+            Text(upper(label), maxLines: 1, overflow: TextOverflow.ellipsis, style: CkText.label),
             const SizedBox(height: 2),
             Text(v.isEmpty ? '—' : (v.length > 8 ? v.substring(0, 8) : v), style: CkText.mono(12.5)),
           ]),
@@ -250,7 +250,7 @@ class _ClientFormPageState extends State<ClientFormPage> {
   Future<void> _save({bool open = false}) async {
     if (_gender == null) {
       setState(() => _personalOpen = true);
-      return toast(context, 'Select gender', error: true);
+      return toast(context, 'Choose a gender', error: true);
     }
     if (!_personalOpen && !_personalDone) setState(() => _personalOpen = true);
     if (!_form.currentState!.validate()) return;
@@ -403,6 +403,7 @@ class _ClientFormPageState extends State<ClientFormPage> {
                 : Form(
                     key: _form,
                     child: ListView(
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
                       children: [
                         AnimatedSize(

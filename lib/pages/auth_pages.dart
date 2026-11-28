@@ -41,11 +41,8 @@ class _SplashPageState extends State<SplashPage> {
   @override
   Widget build(BuildContext context) => CkScaffold(
         body: Center(
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: 1),
-            duration: const Duration(milliseconds: 900),
-            curve: CkMotion.ease,
-            builder: (c, t, child) => Opacity(opacity: t, child: Transform.scale(scale: .94 + .06 * t, child: child)),
+          // the splash arrives like every card (kit entrance)
+          child: FadeSlideIn(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 56),
@@ -73,6 +70,7 @@ class _AuthFrame extends StatelessWidget {
           child: Stack(children: [
             Center(
               child: SingleChildScrollView(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(22, 24, 22, 24),
                 child: Column(children: [
                   Padding(
@@ -132,7 +130,7 @@ class _LoginPageState extends State<LoginPage> {
         toast(context, Api.msg(r, 'Email or password is incorrect'), error: true);
       }
     } catch (_) {
-      if (mounted) toast(context, 'Couldn\'t reach the server. Check your connection.', error: true);
+      if (mounted) toastOffline(context);
     }
     if (mounted) setState(() => _busy = false);
   }
@@ -192,7 +190,7 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ]),
           const SizedBox(height: 18),
-          PrimaryButton('Login', onTap: _login, loading: _busy),
+          PrimaryButton('Sign in', onTap: _login, loading: _busy),
         ],
       );
 }
@@ -219,13 +217,13 @@ class _SignUpPageState extends State<SignUpPage> {
           {'name': _name.text.trim(), 'mobile': _mobile.text.trim(), 'email': _email.text.trim(), 'password': _pass.text});
       if (!mounted) return;
       if (Api.ok(r)) {
-        toast(context, Api.msg(r, 'Account created. Please sign in.'));
+        toast(context, Api.msg(r, 'Account created. Sign in to continue.'));
         Get.back();
       } else {
         toast(context, Api.msg(r), error: true);
       }
     } catch (_) {
-      if (mounted) toast(context, 'Couldn\'t reach the server.', error: true);
+      if (mounted) toastOffline(context);
     }
     if (mounted) setState(() => _busy = false);
   }
@@ -284,7 +282,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         toast(context, Api.msg(r), error: true);
       }
     } catch (_) {
-      if (mounted) toast(context, 'Couldn\'t reach the server.', error: true);
+      if (mounted) toastOffline(context);
     }
     if (mounted) setState(() => _busy = false);
   }
@@ -298,13 +296,13 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       final r = await Api.post(Endpoints.reset, {'email': _email.text.trim(), 'otp': _otp.text.trim(), 'new_password': _pass.text});
       if (!mounted) return;
       if (Api.ok(r)) {
-        toast(context, Api.msg(r, 'Password changed. Please sign in.'));
+        toast(context, Api.msg(r, 'Password changed. Sign in with the new one.'));
         Get.back();
       } else {
         toast(context, Api.msg(r), error: true);
       }
     } catch (_) {
-      if (mounted) toast(context, 'Couldn\'t reach the server.', error: true);
+      if (mounted) toastOffline(context);
     }
     if (mounted) setState(() => _busy = false);
   }

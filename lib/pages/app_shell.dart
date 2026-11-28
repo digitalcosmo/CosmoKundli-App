@@ -104,12 +104,14 @@ class _AppShellState extends State<AppShell> {
       child: Material(
         type: MaterialType.transparency,
         child: Stack(children: [
-        TabFader(index: _index, children: [for (var i = 0; i < 4; i++) RepaintBoundary(child: _page(i))]),
+        // the app's one background is painted under every page (main.dart)
+        TabFader(index: _index, children: [for (var i = 0; i < 4; i++) RepaintBoundary(child: SharedBackdrop(child: _page(i)))]),
         Positioned(
           left: 12,
           right: 12,
           bottom: bottom > 0 ? bottom : 14,
-          child: RepaintBoundary(
+          // the dock stays on its spot while the page moves (push and back)
+          child: StayPut(child: RepaintBoundary(
             child: Glass(
               radius: 20,
               blur: 22,
@@ -162,6 +164,7 @@ class _AppShellState extends State<AppShell> {
                           label: _items[i].$2,
                           child: Pressable(
                             scale: .92,
+                            haptic: true,
                             onTap: () => _go(i),
                             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                               AnimatedSlide(
@@ -188,7 +191,7 @@ class _AppShellState extends State<AppShell> {
                 ]);
               }),
             ),
-          ),
+          )),
         ),
       ]),
       ),
@@ -292,7 +295,7 @@ class _HomePageState extends State<HomePage> {
               FadeSlideIn(
                 child: Pressable(
                   scale: .985,
-                  onTap: () => Get.to(() => const SearchPage(), transition: Transition.fadeIn),
+                  onTap: () => Get.to(() => const SearchPage()),
                   child: Glass(
                     height: 48,
                     padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -322,7 +325,7 @@ class _HomePageState extends State<HomePage> {
         onTap: () => Get.to(() => const SkyNowPage()),
         child: Glass(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
-          child: FutureBuilder<List<GrahPos>?>(
+          child: DataBuilder<List<GrahPos>?>(
             future: _sky,
             builder: (c, s) {
               final l = s.data;
@@ -394,7 +397,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _reportsCard() => Glass(
         padding: const EdgeInsets.all(14),
-        child: FutureBuilder<List<ReportItem>>(
+        child: DataBuilder<List<ReportItem>>(
           future: _reports,
           builder: (c, s) {
             final l = s.data ?? [];
@@ -407,7 +410,7 @@ class _HomePageState extends State<HomePage> {
                     onTap: onTap,
                     behavior: HitTestBehavior.opaque,
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      s.hasData || label == 'Credits' ? Text(v, style: CkText.mono(22, color: col)) : const Skeleton(height: 22, width: 36),
+                      s.hasData || label == 'Credits' ? StatText(v, style: CkText.mono(22, color: col)) : const Skeleton(height: 22, width: 36),
                       const SizedBox(height: 2),
                       Text(label, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
                     ]),
@@ -426,7 +429,7 @@ class _HomePageState extends State<HomePage> {
               Row(children: [
                 stat('$gen', 'Generating', CkColors.cyan, onTap: () => appTabRequest.value = 2),
                 stat('$week', 'Ready this week', const Color(0xFF10B981), onTap: () => appTabRequest.value = 2),
-                FutureBuilder<Map<String, dynamic>>(
+                DataBuilder<Map<String, dynamic>>(
                   future: _credits,
                   builder: (c, cs) {
                     final v = num.tryParse('${cs.data?['Remaining_Credit'] ?? ''}');
@@ -488,7 +491,7 @@ class SkyNowPage extends StatelessWidget {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('Transit', style: CkText.h(19)),
-                    if (Here.name.isNotEmpty) Text(Here.name, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
+                    if (Here.name.isNotEmpty) Text(Here.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
                   ]),
                 ),
               ]),

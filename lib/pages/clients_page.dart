@@ -24,6 +24,19 @@ class ClientsPage extends StatefulWidget {
 Future<List<Client>> fetchClients({bool force = false}) =>
     Api.shared('clients:${Session.uid}', _fetchClients, force: force);
 
+/// Pick a saved client with the shared sheet (kit: showPickSheet).
+Future<Client?> pickClient(BuildContext context, {required String title, String? subtitle, bool markCurrent = false}) async {
+  final r = await showPickSheet<Client>(context,
+      title: title,
+      subtitle: subtitle,
+      load: fetchClients,
+      name: (c) => c.name,
+      sub: (c) => c.subtitle,
+      searchText: (c) => '${c.name} ${c.city} ${c.dobRaw}',
+      isCurrent: markCurrent ? (c) => Session.client.value?.mId == c.mId : null);
+  return r?.item;
+}
+
 Future<List<Client>> _fetchClients() async {
   final r = await Api.post(Endpoints.memberList, {'uID': Session.uid});
   final list = Api.list(r, ['members', 'list']).map(Client.fromJson).where((c) => c.mId.isNotEmpty).toList();
@@ -44,13 +57,13 @@ Future<void> clientMenu(BuildContext context, Client c, {VoidCallback? onChanged
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Center(child: Container(width: 44, height: 5, decoration: BoxDecoration(color: CkColors.glassStroke, borderRadius: BorderRadius.circular(3)))),
+          const SheetGrabber(),
           const SizedBox(height: 12),
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: Text(c.name, style: CkText.h(17))),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: Text(c.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: CkText.h(17))),
           const SizedBox(height: 8),
           ListTile(
-            leading: const Icon(Icons.edit_outlined, color: Color(0xFFFFB27A)),
-            title: const Text('Edit details'),
+            leading: const Icon(Icons.edit_outlined, color: CkColors.cyan),
+            title: const Text('Edit client'),
             onTap: () => Navigator.pop(s, 'edit'),
           ),
           ListTile(
@@ -230,7 +243,7 @@ class _ClientsPageState extends State<ClientsPage> {
       ),
       body: SafeArea(
         bottom: false,
-        child: FutureBuilder<List<Client>>(
+        child: DataBuilder<List<Client>>(
           future: _future,
           builder: (c, s) {
             final all = s.data ?? [];
@@ -274,20 +287,12 @@ class _ClientsPageState extends State<ClientsPage> {
                             ),
                           ]),
                           const SizedBox(height: 16),
-                          TextField(
+                          CkSearchField(
                             controller: _search,
                             onChanged: (v) => setState(() => _q = v),
                             decoration: InputDecoration(
                               hintText: 'Search name, city or date',
                               prefixIcon: const Icon(Icons.search_rounded),
-                              suffixIcon: _q.isEmpty
-                                  ? null
-                                  : IconButton(
-                                      onPressed: () => setState(() {
-                                            _search.clear();
-                                            _q = '';
-                                          }),
-                                      icon: const Icon(Icons.close_rounded)),
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -308,9 +313,19 @@ class _ClientsPageState extends State<ClientsPage> {
                           child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: EmptyBox(
-                            icon: Icons.people_outline_rounded,
-                            title: _q.isEmpty ? 'No clients yet' : 'No match',
-                            body: _q.isEmpty ? 'Add your first client to see their CosmoKundli.' : 'Try another name or city.'),
+                            icon: _q.isEmpty ? Icons.people_outline_rounded : Icons.search_off_rounded,
+                            title: _q.isEmpty ? 'No clients yet' : 'No clients match',
+                            body: _q.isEmpty ? 'Add your first client to see their CosmoKundli.' : 'Try another name, city or birth year.',
+                            action: _q.isEmpty ? 'Add client' : 'Clear search',
+                            onAction: _q.isEmpty
+                                ? () async {
+                                    final r = await Get.to(() => const ClientFormPage());
+                                    if (r != null) _reload();
+                                  }
+                                : () {
+                                    _search.clear();
+                                    setState(() => _q = '');
+                                  }),
                       ))
                     else
                       SliverPadding(
@@ -491,7 +506,7 @@ class _ClientCardState extends State<_ClientCard> {
                       IconButton(
                         tooltip: 'More for ${cl.name}',
                         onPressed: () => clientMenu(context, cl, onChanged: widget.onChanged),
-                        icon: const Icon(Icons.more_vert_rounded, color: CkColors.textSecondary),
+                        icon: const Icon(Icons.more_horiz_rounded, color: CkColors.textSecondary),
                       ),
                     ]),
                   ),

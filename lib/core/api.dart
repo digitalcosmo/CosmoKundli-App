@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../network/network_api_services.dart';
 import '../values/urls.dart';
+import 'known.dart';
 
 /// Thin wrapper over the existing CosmoKundli API (same endpoints and
 /// payloads as the original app). Every call returns a plain map so the UI is
@@ -45,13 +46,29 @@ class Api {
     return r;
   }
 
+  /// For answers that may still change (the current month): a copy kept on
+  /// the phone is returned at once, and a fresh answer is fetched in the
+  /// background and kept for next time. With no copy yet, waits for the
+  /// network like [post].
+  static Future<Map<String, dynamic>> postFresh(String endpoint, Map<String, dynamic> data, {required String owner}) async {
+    final key = '$endpoint|${jsonEncode(data)}';
+    final net = post(endpoint, data).then((r) {
+      if (ok(r) || r.values.any((v) => v is List && v.isNotEmpty)) DiskCache.write(owner, key, r);
+      return r;
+    });
+    final hit = await DiskCache.read(owner, key);
+    if (hit == null) return net;
+    net.then((_) {}, onError: (Object _) {});
+    return hit;
+  }
+
   /// Shares one in-flight/recent answer between screens (client list,
   /// report history, credits) for [ttl]; [force] refetches.
   static final _shared = <String, (DateTime, Future<dynamic>)>{};
   static Future<T> shared<T>(String key, Future<T> Function() load, {Duration ttl = const Duration(seconds: 60), bool force = false}) {
     final hit = _shared[key];
     if (!force && hit != null && DateTime.now().difference(hit.$1) < ttl) return hit.$2 as Future<T>;
-    final f = load();
+    final f = remember(load());
     _shared[key] = (DateTime.now(), f);
     f.then((_) {}, onError: (Object _) {
       if (identical(_shared[key]?.$2, f)) _shared.remove(key);
@@ -76,7 +93,7 @@ class Api {
     return s == true || s == 1 || s == '1' || s.toString().toLowerCase() == 'true';
   }
 
-  static String msg(Map<String, dynamic> m, [String fallback = 'Something went wrong']) {
+  static String msg(Map<String, dynamic> m, [String fallback = 'That didn\'t work. Try again.']) {
     final v = m['msg'] ?? m['message'];
     return (v == null || v.toString().isEmpty) ? fallback : v.toString();
   }

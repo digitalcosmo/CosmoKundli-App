@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../core/astro.dart';
@@ -40,7 +41,7 @@ class _TrajectorySectionState extends State<TrajectorySection> {
             description: 'Today\'s GRAH over the birth chart',
             icon: Icons.track_changes_rounded,
             onTap: () => pushModule(context, const TransitPage()),
-            preview: FutureBuilder<List<GrahPos>>(
+            preview: DataBuilder<List<GrahPos>>(
               future: _now,
               builder: (c, s) {
                 final l = (s.data ?? []).where((p) => ['Sa', 'Ju', 'Ra'].contains(p.id)).toList();
@@ -157,7 +158,7 @@ class TransitBodyState extends State<TransitBody> {
 
   void _load() {
     if (_srcId == null) return;
-    _transit = ClientData(_srcId!).transit(_at)..then((v) => _last = v).catchError((_) => <GrahPos>[]);
+    _transit = ClientData.of(_srcId!).transit(_at)..then((v) => _last = v).catchError((_) => <GrahPos>[]);
   }
 
   void _set(DateTime t, {bool live = false}) => setState(() {
@@ -182,40 +183,136 @@ class TransitBodyState extends State<TransitBody> {
     });
   }
 
+  /// "Today · 18:53", "8 Dec '26 · 18:53".
   String get whenText {
     final now = DateTime.now();
     final same = _at.year == now.year && _at.month == now.month && _at.day == now.day;
-    return '${same ? 'Today' : DateFormat('d MMM yyyy').format(_at)} · ${DateFormat('HH:mm').format(_at)}';
+    return '${same ? 'Today' : DateFormat("d MMM ''yy").format(_at)} · ${DateFormat('HH:mm').format(_at)}';
   }
+
+  /// How far the shown moment is from now: "+3 days", "−2 months".
+  String get _fromNow {
+    if (_live) return 'Now';
+    final m = _at.difference(DateTime.now()).inMinutes;
+    if (m.abs() < 1) return 'Now';
+    final sign = m > 0 ? '+' : '−';
+    final a = m.abs();
+    String u(int n, String w) => '$sign$n $w${n == 1 ? '' : 's'}';
+    if (a < 60) return u(a, 'min');
+    if (a < 60 * 24) return u((a / 60).round(), 'hour');
+    if (a < 60 * 24 * 28) return u((a / 1440).round(), 'day');
+    if (a < 60 * 24 * 365) return u((a / 43200).round(), 'month');
+    return u((a / 525600).round(), 'year');
+  }
+
+  static const _stepName = {_Step.h1: '1 hour', _Step.d1: '1 day', _Step.w1: '1 week', _Step.m1: '1 month', _Step.y1: '1 year', _Step.y10: '10 years'};
+
+  Future<void> _openStep(BuildContext anchor) async {
+    final v = await showCkMenu<String>(
+      anchor,
+      minWidth: 220,
+      selected: _step.name,
+      items: [
+        for (final s in _Step.values) CkMenuItem(s.name, _stepName[s]!, trailing: _stepLabel[s]),
+        const CkMenuItem('pick', 'Pick date and time…', icon: Icons.calendar_today_outlined, divider: true),
+      ],
+    );
+    if (v == null || !mounted) return;
+    if (v == 'pick') return pickTime();
+    setState(() => _step = _Step.values.byName(v));
+  }
+
+  /// One line: ‹  [date · step ▾]  ›  Live. The middle opens the step
+  /// menu (and the date picker); the arrows move by the step and repeat
+  /// while held; Live follows the clock, any move turns it into "Now".
+  Widget _controls(BuildContext context) => Glass(
+        frost: false,
+        radius: 16,
+        padding: const EdgeInsets.all(8),
+        child: Row(children: [
+          _HoldArrow(icon: Icons.chevron_left_rounded, label: 'Back ${_stepName[_step]}', onStep: () => _set(_move(_at, _step, -1))),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Builder(
+              builder: (anchor) => Semantics(
+                button: true,
+                label: 'Time $whenText, step ${_stepName[_step]}. Change step or pick a date',
+                excludeSemantics: true,
+                child: Pressable(
+                  onTap: () => _openStep(anchor),
+                  child: Container(
+                    height: 52,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    decoration: BoxDecoration(color: const Color(0x2E000000), borderRadius: BorderRadius.circular(12), border: Border.all(color: CkColors.panelStroke)),
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      FittedBox(fit: BoxFit.scaleDown, child: Text(whenText.replaceAll(' · ', ' '), maxLines: 1, style: CkText.mono(15, color: CkColors.text))),
+                      const SizedBox(height: 1),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text.rich(
+                          TextSpan(children: [
+                            TextSpan(text: 'Step ${_stepLabel[_step]}', style: const TextStyle(color: CkColors.cyan)),
+                            TextSpan(text: ' · $_fromNow '),
+                            const TextSpan(text: '▾', style: TextStyle(color: CkColors.cyan)),
+                          ]),
+                          maxLines: 1,
+                          style: const TextStyle(fontSize: 11.5, color: CkColors.textSecondary),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          _HoldArrow(icon: Icons.chevron_right_rounded, label: 'Forward ${_stepName[_step]}', onStep: () => _set(_move(_at, _step, 1))),
+          const SizedBox(width: 8),
+          Semantics(
+            button: true,
+            label: _live ? 'Live, following the clock' : 'Back to now',
+            excludeSemantics: true,
+            child: Pressable(
+              onTap: () => _set(DateTime.now(), live: true),
+              child: AnimatedContainer(
+                duration: CkMotion.fast,
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _live ? const Color(0x9910B981) : CkColors.panelStroke),
+                  color: const Color(0x14FFFFFF),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _live ? const Color(0xFF10B981) : CkColors.labelMono,
+                      boxShadow: _live ? const [BoxShadow(color: Color(0xFF10B981), blurRadius: 8)] : null,
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  Text(_live ? 'Live' : 'Now', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _live ? CkColors.text : CkColors.textSecondary)),
+                ]),
+              ),
+            ),
+          ),
+        ]),
+      );
 
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Row(children: [
-        Expanded(
-          child: Text(_cmp == null ? 'Sky now' : 'With ${_cmp!.name}\'s chart',
-              maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, color: CkColors.textSecondary)),
-        ),
-        Pressable(
-          onTap: pickTime,
-          child: Container(
-            height: 36,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(color: CkColors.orangeTint, borderRadius: BorderRadius.circular(10), border: Border.all(color: CkColors.orangeStroke)),
-            child: Row(children: [
-              const Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFFFFD08A)),
-              const SizedBox(width: 6),
-              Text(whenText, style: CkText.mono(12, color: const Color(0xFFFFD08A))),
-            ]),
-          ),
-        ),
-      ]),
-      const SizedBox(height: 10),
-      FutureBuilder<List<dynamic>>(
+      DataBuilder<List<dynamic>>(
         future: Future.wait<List<GrahPos>>([_transit ?? Future.value(<GrahPos>[]), _birth ?? Future.value(<GrahPos>[])]),
         builder: (c, s) {
           if (_srcId == null) {
             return const Padding(padding: EdgeInsets.all(40), child: Center(child: Text('Add a client first to read the sky.', style: CkText.muted)));
+          }
+          if (s.hasError && _last == null) {
+            return ErrorBox(message: 'Couldn\'t load the sky for this moment. Check your connection and try again.', onRetry: () => setState(_load));
           }
           final t = s.hasData ? s.data![0] as List<GrahPos> : _last;
           final birth = s.hasData ? s.data![1] as List<GrahPos> : const <GrahPos>[];
@@ -231,69 +328,7 @@ class TransitBodyState extends State<TransitBody> {
               ),
             ),
             const SizedBox(height: 12),
-            Row(children: [
-              for (final st in _Step.values)
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2.5),
-                    child: Pressable(
-                      onTap: () => setState(() => _step = st),
-                      child: AnimatedContainer(
-                        duration: CkMotion.fast,
-                        height: 38,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: _step == st ? CkColors.orangeTint : Colors.transparent,
-                          borderRadius: BorderRadius.circular(11),
-                          border: Border.all(color: _step == st ? CkColors.orangeStroke : CkColors.panelStroke),
-                        ),
-                        child: Text(_stepLabel[st]!, style: CkText.mono(12.5, color: _step == st ? const Color(0xFFFFD08A) : CkColors.textTertiary)),
-                      ),
-                    ),
-                  ),
-                ),
-            ]),
-            const SizedBox(height: 8),
-            Row(children: [
-              Expanded(
-                child: Pressable(
-                  onTap: () => _set(DateTime.now(), live: true),
-                  child: Glass(
-                    frost: false,
-                    height: 46,
-                    radius: 13,
-                    alignment: Alignment.center,
-                    stroke: _live ? const Color(0x8010B981) : CkColors.panelStroke,
-                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _live ? const Color(0xFF10B981) : CkColors.labelMono,
-                          boxShadow: _live ? const [BoxShadow(color: Color(0xFF10B981), blurRadius: 8)] : null,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text('Real time', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
-                    ]),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Glass(
-                  frost: false,
-                  height: 46,
-                  radius: 13,
-                  child: Row(children: [
-                    IconButton(onPressed: () => _set(_move(_at, _step, -1)), icon: const Icon(Icons.chevron_left_rounded), tooltip: 'Step back'),
-                    Expanded(child: Text('STEP ${_stepLabel[_step]}', textAlign: TextAlign.center, style: CkText.mono(12, color: CkColors.textSecondary))),
-                    IconButton(onPressed: () => _set(_move(_at, _step, 1)), icon: const Icon(Icons.chevron_right_rounded), tooltip: 'Step forward'),
-                  ]),
-                ),
-              ),
-            ]),
+            _controls(context),
             if (!widget.lockClient) ...[
               const SizedBox(height: 10),
               Pressable(
@@ -317,7 +352,7 @@ class TransitBodyState extends State<TransitBody> {
                       Pressable(
                         onTap: () => openClient(_cmp!),
                         child: Container(
-                          height: 34,
+                          height: 40,
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           alignment: Alignment.center,
                           decoration: BoxDecoration(color: CkColors.cyanTint, borderRadius: BorderRadius.circular(10), border: Border.all(color: CkColors.cyanStroke)),
@@ -334,8 +369,8 @@ class TransitBodyState extends State<TransitBody> {
                             _birth = null;
                           }),
                           child: Container(
-                            width: 34,
-                            height: 34,
+                            width: 40,
+                            height: 40,
                             decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: CkColors.panelStroke)),
                             child: const Icon(Icons.close_rounded, size: 17, color: CkColors.textTertiary),
                           ),
@@ -354,81 +389,9 @@ class TransitBodyState extends State<TransitBody> {
   }
 }
 
-/// Bottom sheet listing clients, with search.
-Future<Client?> pickClientSheet(BuildContext context) => showModalBottomSheet<Client>(
-      useRootNavigator: true,
-      context: context,
-      isScrollControlled: true,
-      builder: (s) => const _PickClient(),
-    );
-
-class _PickClient extends StatefulWidget {
-  const _PickClient();
-  @override
-  State<_PickClient> createState() => _PickClientState();
-}
-
-class _PickClientState extends State<_PickClient> {
-  final _f = fetchClients();
-  String _q = '';
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: SafeArea(
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height * .7,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 18, 0),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Compare with a client', style: CkText.h(18)),
-                const SizedBox(height: 12),
-                TextField(
-                  onChanged: (v) => setState(() => _q = v.trim().toLowerCase()),
-                  decoration: const InputDecoration(hintText: 'Search name, year, place', prefixIcon: Icon(Icons.search_rounded)),
-                ),
-                Expanded(
-                  child: FutureBuilder<List<Client>>(
-                    future: _f,
-                    builder: (c, s) {
-                      if (s.hasError) return const Center(child: Text('Couldn\'t load clients', style: CkText.muted));
-                      if (!s.hasData) return Skels.table(10);
-                      final l = s.data!.where((e) => _q.isEmpty || '${e.name} ${e.city} ${e.dobRaw}'.toLowerCase().contains(_q)).toList();
-                      return ListView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, children: [
-                        Padding(padding: const EdgeInsets.only(top: 14, bottom: 4), child: Text('${l.length} CLIENTS', style: CkText.label)),
-                        for (final cl in l)
-                          InkWell(
-                            onTap: () => Navigator.pop(context, cl),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 11),
-                              decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x1F8CBEFF)))),
-                              child: Row(children: [
-                                Container(
-                                  width: 34,
-                                  height: 34,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0x598CBEFF))),
-                                  child: Text(cl.initials, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    Text(cl.name, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
-                                    Text(cl.subtitle, style: CkText.mono(11.5, color: CkColors.textSecondary)),
-                                  ]),
-                                ),
-                              ]),
-                            ),
-                          ),
-                      ]);
-                    },
-                  ),
-                ),
-              ]),
-            ),
-          ),
-        ),
-      );
-}
+/// Compare: the shared client picker (kit).
+Future<Client?> pickClientSheet(BuildContext context) =>
+    pickClient(context, title: 'Compare with a client', subtitle: 'Transits over their birth chart');
 
 class CoordTable extends StatelessWidget {
   final List<GrahPos> birth;
@@ -524,4 +487,74 @@ class CoordTable extends StatelessWidget {
       ]),
     );
   }
+}
+
+/// A 44 px step arrow: one step per tap; held, it keeps stepping, faster
+/// the longer it is held, with a light tick per step.
+class _HoldArrow extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onStep;
+  const _HoldArrow({required this.icon, required this.label, required this.onStep});
+  @override
+  State<_HoldArrow> createState() => _HoldArrowState();
+}
+
+class _HoldArrowState extends State<_HoldArrow> {
+  Timer? _t;
+  int _n = 0;
+  bool _down = false;
+
+  void _go() {
+    widget.onStep();
+    HapticFeedback.selectionClick();
+    _n++;
+    _t = Timer(Duration(milliseconds: (380 - _n * 40).clamp(70, 380)), _go);
+  }
+
+  void _stop() {
+    _t?.cancel();
+    _t = null;
+    if (_down) setState(() => _down = false);
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        label: widget.label,
+        onTap: widget.onStep,
+        excludeSemantics: true,
+        child: Listener(
+          onPointerDown: (_) {
+            setState(() => _down = true);
+            _n = 0;
+            _t?.cancel();
+            widget.onStep();
+            HapticFeedback.selectionClick();
+            _t = Timer(const Duration(milliseconds: 420), _go);
+          },
+          onPointerUp: (_) => _stop(),
+          onPointerCancel: (_) => _stop(),
+          child: AnimatedScale(
+            scale: _down ? .94 : 1,
+            duration: CkMotion.fast,
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: _down ? CkColors.cyanTint : const Color(0x14FFFFFF),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _down ? CkColors.cyanStroke : CkColors.panelStroke),
+              ),
+              child: Icon(widget.icon, size: 22, color: CkColors.text),
+            ),
+          ),
+        ),
+      );
 }

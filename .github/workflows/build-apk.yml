@@ -30,8 +30,22 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Family check (every stat, list and screen from the kit)
+        run: bash tool/check_family.sh
+
       - name: Analyze (errors only)
         run: flutter analyze --no-fatal-infos --no-fatal-warnings lib
+
+      - name: Record frames (stats, skeletons, page motion)
+        continue-on-error: true
+        run: flutter test test/frames
+
+      - name: Upload recorded frames
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CosmoKundli-frames
+          path: build/frames/
 
       - name: Build release APK
         run: |

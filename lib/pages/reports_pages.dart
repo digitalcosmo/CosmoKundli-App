@@ -72,7 +72,7 @@ class _PlannerPageState extends State<PlannerPage> {
       toast(context, Api.msg(r, Api.ok(r) ? 'Report requested. You\'ll find it in Report history.' : 'Couldn\'t generate the report'),
           error: !Api.ok(r));
     } catch (_) {
-      if (mounted) toast(context, 'Couldn\'t reach the server.', error: true);
+      if (mounted) toastOffline(context);
     }
     if (mounted) setState(() => _busy = false);
   }
@@ -465,7 +465,7 @@ class ReportRow extends StatelessWidget {
             label: 'Share',
             child: Pressable(
               onTap: () => _runPdf(context, it, _PdfAction.share),
-              child: const SizedBox(width: 36, height: 38, child: Icon(Icons.ios_share_rounded, size: 18, color: CkColors.textTertiary)),
+              child: const SizedBox(width: 44, height: 44, child: Icon(Icons.ios_share_rounded, size: 18, color: CkColors.textTertiary)),
             ),
           ),
           Semantics(
@@ -473,17 +473,20 @@ class ReportRow extends StatelessWidget {
             label: 'Open',
             child: Pressable(
               onTap: () => _runPdf(context, it, _PdfAction.open),
-              child: Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(color: CkColors.cyan, borderRadius: BorderRadius.circular(11)),
-                child: const Icon(Icons.open_in_new_rounded, size: 18, color: Color(0xFF06204F)),
+              child: Padding(
+                padding: const EdgeInsets.all(3), // 44 px tap area (R)
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(color: CkColors.cyan, borderRadius: BorderRadius.circular(11)),
+                  child: const Icon(Icons.open_in_new_rounded, size: 18, color: Color(0xFF06204F)),
+                ),
               ),
             ),
           ),
         ]),
       ReportState.generating => Row(mainAxisSize: MainAxisSize.min, children: [
-          const _Pulse(),
+          const LiveDot(),
           Text('GENERATING', style: CkText.mono(10, color: CkColors.cyan)),
         ]),
       ReportState.expired => Text('EXPIRED', style: CkText.mono(10, color: CkColors.textMuted)),
@@ -527,32 +530,6 @@ class ReportRow extends StatelessWidget {
         : Glass(margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.fromLTRB(10, 10, 8, 10), child: faded);
     return card;
   }
-}
-
-class _Pulse extends StatefulWidget {
-  const _Pulse();
-  @override
-  State<_Pulse> createState() => _PulseState();
-}
-
-class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..repeat(reverse: true);
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => FadeTransition(
-        opacity: Tween(begin: .25, end: 1.0).animate(_c),
-        child: Container(
-          width: 7,
-          height: 7,
-          margin: const EdgeInsets.only(right: 6),
-          decoration: const BoxDecoration(color: CkColors.cyan, shape: BoxShape.circle),
-        ),
-      );
 }
 
 /// Keeps a history list fresh while anything is generating.
@@ -663,7 +640,7 @@ class _ClientReportsPageState extends State<ClientReportsPage> with _HistoryPoll
           FadeSlideIn(index: i, child: _GroupCard(kReportGroups[i], onTap: () => _openGroup(kReportGroups[i]))),
         const SizedBox(height: 20),
         Text('HISTORY', style: CkText.label),
-        FutureBuilder<List<ReportItem>>(
+        DataBuilder<List<ReportItem>>(
           future: history,
           builder: (ctx, s) {
             if (s.hasError) return ErrorBox(message: 'Couldn\'t load reports.', onRetry: reloadHistory);
@@ -727,7 +704,7 @@ class _SoonTag extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(borderRadius: BorderRadius.circular(5), border: Border.all(color: CkColors.panelStroke)),
-        child: Text(text, style: CkText.mono(9.5, color: CkColors.textSecondary)),
+        child: Text(text, style: CkText.mono(10, color: CkColors.textSecondary)),
       );
 }
 
@@ -808,7 +785,7 @@ class _ReportGroupPageState extends State<ReportGroupPage> {
         ),
         const SizedBox(height: 18),
         Text('2 · REPORT', style: CkText.label),
-        FutureBuilder<PriceBook>(
+        DataBuilder<PriceBook>(
           future: _prices,
           builder: (ctx, s) {
             if (s.hasError) return ErrorBox(message: 'Couldn\'t load prices.', onRetry: () => setState(() => _prices = fetchPrices()));
@@ -952,7 +929,7 @@ class _ConfirmSheetState extends State<_ConfirmSheet> {
         return;
       }
     } catch (_) {
-      if (mounted) toast(context, 'Couldn\'t reach the server.', error: true);
+      if (mounted) toastOffline(context);
     }
     if (mounted) setState(() => _busy = false);
   }
@@ -971,7 +948,7 @@ class _ConfirmSheetState extends State<_ConfirmSheet> {
         border: Border(top: BorderSide(color: Color(0x4DA0C8FF))),
       ),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: const Color(0x4DFFFFFF), borderRadius: BorderRadius.circular(2)))),
+        const SheetGrabber(),
         const SizedBox(height: 16),
         Row(children: [
           _Cover(widget.type.coverAsset, width: 48),
@@ -980,7 +957,7 @@ class _ConfirmSheetState extends State<_ConfirmSheet> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${widget.type.title} · ${widget.months} months', style: CkText.h(18)),
               const SizedBox(height: 2),
-              Text('for ${c?.name ?? ''}', style: const TextStyle(fontSize: 13, color: CkColors.textSecondary)),
+              Text('for ${c?.name ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: CkColors.textSecondary)),
             ]),
           ),
         ]),
@@ -1057,7 +1034,7 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
               reloadHistory();
               setState(() => _credits = Api.post(Endpoints.credits, {'uID': Session.uid}));
             },
-            child: FutureBuilder<List<ReportItem>>(
+            child: DataBuilder<List<ReportItem>>(
               future: history,
               builder: (ctx, s) {
                 final all = s.data ?? const <ReportItem>[];
@@ -1111,7 +1088,7 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
                     const SizedBox(height: 6),
                     Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
                       Expanded(child: Text('Reports', style: CkText.h(26))),
-                      FutureBuilder<Map<String, dynamic>>(
+                      DataBuilder<Map<String, dynamic>>(
                         future: _credits,
                         builder: (_, cs) {
                           final v = num.tryParse('${cs.data?['Remaining_Credit'] ?? ''}');
@@ -1120,7 +1097,7 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
                       ),
                     ]),
                     const SizedBox(height: 14),
-                    TextField(
+                    CkSearchField(
                       onChanged: (v) => setState(() => _q = v.trim().toLowerCase()),
                       decoration: const InputDecoration(hintText: 'Search client or report', prefixIcon: Icon(Icons.search_rounded)),
                     ),
@@ -1175,11 +1152,23 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
                     else if (!s.hasData)
                       Skels.reportRows(6)
                     else if (l.isEmpty)
-                      const Padding(
-                          padding: EdgeInsets.only(top: 14),
-                          child: EmptyBox(icon: Icons.description_outlined, title: 'No reports', body: 'Nothing matches these filters.'))
+                      Padding(
+                          padding: const EdgeInsets.only(top: 14),
+                          child: all.isEmpty
+                              ? const EmptyBox(icon: Icons.description_outlined, title: 'No reports yet', body: 'Reports you generate for any client show here.')
+                              : EmptyBox(
+                                  icon: Icons.search_off_rounded,
+                                  title: 'No reports match',
+                                  body: _state.isEmpty && _type.isEmpty ? 'Try other words.' : 'Nothing matches these filters.',
+                                  action: _state.isEmpty && _type.isEmpty ? null : 'Clear filters',
+                                  onAction: () => setState(() {
+                                        _state = {};
+                                        _type = {};
+                                      })))
                     else if (!grouped)
-                      for (final e in l) ReportRow(e, key: ValueKey(e.key), showClient: true)
+                      // list family: the first rows rise as a wave, like Clients
+                      for (var i = 0; i < l.length; i++)
+                        i < 10 ? FadeSlideIn(key: ValueKey(l[i].key), index: i, child: ReportRow(l[i], showClient: true)) : ReportRow(l[i], key: ValueKey(l[i].key), showClient: true)
                     else
                       for (final g in _sort == 'old' ? const ['Earlier', 'This week', 'Today'] : const ['Today', 'This week', 'Earlier'])
                         if (groups[g] != null) ...[

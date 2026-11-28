@@ -7,6 +7,7 @@ import 'package:mobile_device_identifier/mobile_device_identifier.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../values/sp_keys.dart';
+import 'client_data.dart';
 
 /// A client (member) as returned by MemberList.
 class Client {
@@ -121,6 +122,7 @@ class Session {
       if (v is List) await _p.setStringList(e.key, v.map((x) => '$x').toList());
     }
     client.value = null;
+    ClientData.clearAll();
   }
 
   static Future<void> setLang(String code) async {

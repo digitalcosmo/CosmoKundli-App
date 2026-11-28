@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'core/session.dart';
 import 'pages/auth_pages.dart';
 import 'pages/app_shell.dart';
+import 'pages/labs.dart';
 import 'ui/ck_theme.dart';
 import 'ui/glass.dart';
 import 'ui/widgets.dart';
@@ -23,6 +24,7 @@ Future<void> main() async {
   GoogleFonts.config.allowRuntimeFetching = false;
   await Session.init();
   await LiquidGlass.preload();
+  registerLabs();
   runApp(const CosmoKundliApp());
 }
 
@@ -40,16 +42,22 @@ class CosmoKundliApp extends StatelessWidget {
       theme: CkTheme.dark(),
       darkTheme: CkTheme.dark(),
       themeMode: ThemeMode.dark,
-      defaultTransition: Transition.noTransition,
-      transitionDuration: const Duration(milliseconds: 240),
+      // Every page: content moves, the sky stays (glass.dart
+      // ckPageTransition). cupertinoDialog is the GetX value that hands over
+      // to customTransition.
+      defaultTransition: Transition.cupertinoDialog,
+      customTransition: _CkTransition(),
+      transitionDuration: kPageDuration,
       home: const SplashPage(),
       navigatorObservers: [UnfocusObserver()],
+      scrollBehavior: const _CkScroll(),
       builder: (context, child) => MediaQuery(
         // keep layouts stable on large system font settings
         data: MediaQuery.of(context).copyWith(
           textScaler: MediaQuery.of(context).textScaler.clamp(maxScaleFactor: 1.15),
         ),
-        child: BackdropGroup(child: child!),
+        // the one sky, under every page; pages never paint a background
+        child: CkSky(child: child!),
       ),
     ),
     );
@@ -58,4 +66,21 @@ class CosmoKundliApp extends StatelessWidget {
 
 void goHome() => Get.offAll(() => const AppShell());
 void goLogin() => Get.offAll(() => const LoginPage());
+
+/// One feel for every list (Build 5, T): the same soft bounce at both ends
+/// on every screen, short lists included, and no Android glow.
+class _CkScroll extends MaterialScrollBehavior {
+  const _CkScroll();
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) => const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+  @override
+  Widget buildOverscrollIndicator(BuildContext context, Widget child, ScrollableDetails details) => child;
+}
+
+class _CkTransition extends CustomTransition {
+  @override
+  Widget buildTransition(BuildContext context, Curve? curve, Alignment? alignment, Animation<double> animation,
+          Animation<double> secondaryAnimation, Widget child) =>
+      ckPageTransition(context, animation, secondaryAnimation, child);
+}
 

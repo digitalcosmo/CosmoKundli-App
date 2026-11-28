@@ -307,7 +307,7 @@ class SkyArc extends StatelessWidget {
     final sun = Sky.arcPos(at, (d) => Sky.sunTimes(d, lat, lng));
     final moon = Sky.arcPos(at, (d) => Sky.moonTimes(d, lat, lng));
     final ph = Sky.moonPhase(at);
-    final arc = CustomPaint(
+    final arc = CustomPaint( // family-ok: sun and moon arc is a diagram, not a stat
       size: Size(double.infinity, height),
       painter: _ArcPainter(sun: sun, moon: moon, fraction: ph.$1, waxing: ph.$2 < .5),
     );
@@ -336,7 +336,7 @@ class SkyArc extends StatelessWidget {
               right: 0,
               top: height + 6,
               child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                for (final h in ['00', '06', '12', '18', '24']) Text(h, style: CkText.mono(9.5, color: CkColors.labelMono)),
+                for (final h in ['00', '06', '12', '18', '24']) Text(h, style: CkText.mono(10, color: CkColors.labelMono)),
               ]),
             ),
             Positioned(left: 0, right: 0, top: height + 26, child: Container(height: 2, color: const Color(0x338CBEFF))),
@@ -473,7 +473,7 @@ class _Sheet extends StatelessWidget {
           border: Border(top: BorderSide(color: Color(0x4DA0C8FF))),
         ),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: const Color(0x4DFFFFFF), borderRadius: BorderRadius.circular(2)))),
+          const SheetGrabber(),
           const SizedBox(height: 18),
           ...children,
         ]),
@@ -600,7 +600,7 @@ class _PanchangNowCardState extends State<PanchangNowCard> {
             if (known) ...[
               const Icon(Icons.place_outlined, size: 13, color: CkColors.textSecondary),
               const SizedBox(width: 3),
-              Text(Here.name, style: const TextStyle(fontSize: 11.5, color: CkColors.textSecondary)),
+              Flexible(child: Text(Here.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, color: CkColors.textSecondary))),
             ],
           ]),
           if (!known)
@@ -612,7 +612,7 @@ class _PanchangNowCardState extends State<PanchangNowCard> {
               ]),
             )
           else
-            FutureBuilder<PanchangData>(
+            DataBuilder<PanchangData>(
               future: _f,
               builder: (c, s) {
                 final d = s.data;
@@ -815,7 +815,7 @@ class _PanchangNowPageState extends State<PanchangNowPage> {
                 ]),
               ),
               const SizedBox(height: 12),
-              FutureBuilder<PanchangData>(
+              DataBuilder<PanchangData>(
                 future: _f,
                 builder: (c, s) {
                   if (s.hasError && _last == null) return ErrorBox(message: 'Couldn\'t load Panchang.', onRetry: _load);
@@ -878,6 +878,7 @@ class _SearchPageState extends State<SearchPage> {
   _Kind _k = _Kind.all;
   late final Future<List<Client>> _clients = fetchClients();
   late final Future<List<ReportItem>> _reports = fetchReports();
+  late final Future<List<Object>> _both = Future.wait<Object>([_clients, _reports]);
 
   @override
   void initState() {
@@ -936,7 +937,7 @@ class _SearchPageState extends State<SearchPage> {
             padding: const EdgeInsets.fromLTRB(16, 10, 12, 0),
             child: Row(children: [
               Expanded(
-                child: TextField(
+                child: CkSearchField(
                   controller: _c,
                   focusNode: _focus,
                   onChanged: (v) => setState(() => _q = v.trim().toLowerCase()),
@@ -978,7 +979,7 @@ class _SearchPageState extends State<SearchPage> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
               children: [
                 if (_k == _Kind.all || _k == _Kind.clients)
-                  FutureBuilder<List<Client>>(
+                  DataBuilder<List<Client>>(
                     future: _clients,
                     builder: (c, s) {
                       if (!s.hasData) return _q.isEmpty ? const SizedBox() : const Padding(padding: EdgeInsets.only(top: 18), child: SkeletonList(rows: 2));
@@ -994,7 +995,7 @@ class _SearchPageState extends State<SearchPage> {
                     },
                   ),
                 if (_k == _Kind.all || _k == _Kind.reports)
-                  FutureBuilder<List<ReportItem>>(
+                  DataBuilder<List<ReportItem>>(
                     future: _reports,
                     builder: (c, s) {
                       if (!s.hasData) return const SizedBox();
@@ -1021,9 +1022,10 @@ class _SearchPageState extends State<SearchPage> {
                       () => t.open(context),
                     ),
                 ],
+                if (_q.isNotEmpty) _NoHits(q: _q, both: _both, tools: tools.length, kind: _k.index, hit: _hit),
                 const Padding(
                   padding: EdgeInsets.only(top: 18),
-                  child: Text('Search by name, birth year or place. Tools open directly.', style: TextStyle(fontSize: 12, color: CkColors.textDim)),
+                  child: Text('Search by name, birth year or place. Tools open directly.', style: TextStyle(fontSize: 12, color: CkColors.textSecondary)),
                 ),
               ],
             ),
@@ -1032,6 +1034,29 @@ class _SearchPageState extends State<SearchPage> {
       ),
     );
   }
+}
+
+/// Search found nothing in any group (Build 5, I): say so, instead of a
+/// blank list under the query.
+class _NoHits extends StatelessWidget {
+  final String q;
+  final Future<List<Object>> both;
+  final int tools;
+  final int kind; // 0 all, 1 clients, 2 reports, 3 tools
+  final bool Function(String) hit;
+  const _NoHits({required this.q, required this.both, required this.tools, required this.kind, required this.hit});
+  @override
+  Widget build(BuildContext context) => DataBuilder<List<Object>>(
+        future: both,
+        builder: (c, s) {
+          if (!s.hasData) return const SizedBox();
+          final cl = (s.data![0] as List<Client>).any((e) => hit(e.name) || hit(e.city) || hit(e.dobRaw));
+          final rp = (s.data![1] as List<ReportItem>).any((e) => hit('${e.name} ${e.title}'));
+          final any = switch (kind) { 1 => cl, 2 => rp, 3 => tools > 0, _ => cl || rp || tools > 0 };
+          if (any) return const SizedBox();
+          return EmptyBox(icon: Icons.search_off_rounded, title: 'Nothing found', body: 'No clients, reports or tools match "$q".');
+        },
+      );
 }
 
 /// Small helper so other files can draw the moon phase disk.

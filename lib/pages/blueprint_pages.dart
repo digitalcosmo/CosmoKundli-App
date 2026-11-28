@@ -323,7 +323,7 @@ class _GrahSheetState extends State<_GrahSheet> {
         border: Border(top: BorderSide(color: Color(0x4DA0C8FF))),
       ),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: const Color(0x4DFFFFFF), borderRadius: BorderRadius.circular(2)))),
+        const SheetGrabber(),
         const SizedBox(height: 16),
         Row(children: [
           Container(
@@ -341,7 +341,7 @@ class _GrahSheetState extends State<_GrahSheet> {
               Text('${rashiName(p.rashi)} · ${fmtDegMin(p.degIn)}', style: CkText.mono(12, color: CkColors.textSecondary)),
             ]),
           ),
-          if (pw != null) Text('${pw.round()}%', style: CkText.mono(22, color: p.color)),
+          if (pw != null) StatText('${pw.round()}%', style: CkText.mono(22, color: p.color)),
         ]),
         const SizedBox(height: 16),
         GridView.count(
@@ -387,7 +387,7 @@ Widget _cell(String l, String v) => Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       decoration: BoxDecoration(color: CkColors.field, borderRadius: BorderRadius.circular(11), border: Border.all(color: CkColors.panelStroke)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-        Text(upper(l), style: CkText.label.copyWith(fontSize: 9.5)),
+        Text(upper(l), style: CkText.label),
         const SizedBox(height: 3),
         Text(v, maxLines: 1, overflow: TextOverflow.ellipsis, style: CkText.h(14.5, w: FontWeight.w600)),
       ]),
@@ -535,11 +535,13 @@ class _StrengthPageState extends State<StrengthPage> {
               if (v.isEmpty) {
                 return const EmptyBox(icon: Icons.bar_chart_rounded, title: 'No values yet', body: 'This client has no strength data.');
               }
-              final sorted = [...v]..sort((a, b) => b.value.compareTo(a.value));
+              // every planet keeps its bar and its ranking row; switching
+              // Power and Flavor glides them instead of redrawing
+              final shown = {for (final e in v) e.key: e.value};
               return Column(children: [
                 Glass(
                   padding: const EdgeInsets.fromLTRB(8, 16, 12, 12),
-                  child: GrahBarChart(key: ValueKey(_flavor), values: v, height: 300),
+                  child: GrahBarChart(values: [for (final id in _powerOrder) if (m.containsKey(id)) MapEntry(id, shown[id])], height: 300),
                 ),
                 Glass(
                   margin: const EdgeInsets.only(top: 12),
@@ -547,34 +549,20 @@ class _StrengthPageState extends State<StrengthPage> {
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(_flavor ? 'HIGHEST FIRST' : 'STRONGEST FIRST', style: CkText.label),
                     const SizedBox(height: 4),
-                    for (var i = 0; i < sorted.length; i++)
-                      Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x1F8CBEFF)))),
-                        child: Row(children: [
-                          SizedBox(width: 24, child: Text('${i + 1}', style: CkText.mono(11, color: CkColors.textDim))),
-                          SizedBox(
-                            width: 60,
-                            child: Row(children: [
-                              GrahDot(sorted[i].key),
-                              const SizedBox(width: 6),
-                              Text(sorted[i].key, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
-                            ]),
-                          ),
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(3),
-                              child: LinearProgressIndicator(
-                                value: (sorted[i].value / 100).clamp(0, 1),
-                                minHeight: 6,
-                                color: grahColor(sorted[i].key),
-                                backgroundColor: const Color(0x268CBEFF),
-                              ),
-                            ),
-                          ),
-                          SizedBox(width: 46, child: Text('${sorted[i].value.round()}%', textAlign: TextAlign.right, style: CkText.mono(12.5))),
-                        ]),
-                      ),
+                    RankList(items: [
+                      for (final e in v)
+                        RankItem(
+                          id: e.key,
+                          label: Row(children: [
+                            GrahDot(e.key),
+                            const SizedBox(width: 6),
+                            Text(e.key, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                          ]),
+                          value: e.value,
+                          color: grahColor(e.key),
+                          text: '${e.value.round()}%',
+                        ),
+                    ]),
                   ]),
                 ),
               ]);

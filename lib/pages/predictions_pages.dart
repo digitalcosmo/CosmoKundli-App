@@ -34,7 +34,7 @@ class _PredictionsSectionState extends State<PredictionsSection> {
             description: 'How the client will feel inside, day by day',
             icon: Icons.favorite_border_rounded,
             onTap: () => pushModule(context, const SentimentsPage()),
-            preview: FutureBuilder<List<MapEntry<DateTime, double>>>(
+            preview: DataBuilder<List<MapEntry<DateTime, double>>>(
               future: _f,
               builder: (c, s) {
                 final l = s.data ?? [];
@@ -65,7 +65,7 @@ class _PredictionsSectionState extends State<PredictionsSection> {
                     ),
                   ),
                   if (t.isNotEmpty)
-                    Text('Today ${_pct(t.first.value)}', style: const TextStyle(fontSize: 11.5, color: CkColors.textSecondary)),
+                    StatText('Today ${_pct(t.first.value)}', style: const TextStyle(fontSize: 11.5, color: CkColors.textSecondary)),
                 ]);
               },
             ),
@@ -109,11 +109,13 @@ class _SentimentsPageState extends State<SentimentsPage> {
         title: 'Sentiments',
         children: [
           MonthBar(month: _month, onChanged: _setMonth),
-          LoadView<List<MapEntry<DateTime, double>>>(
+          // Month change keeps this card on screen: bars glide to the new
+          // month (or sink and pulse until it lands), numbers glide too.
+          KeepLoad<List<MapEntry<DateTime, double>>>(
             future: _f,
             skeleton: Skels.daily(),
             onRetry: () => _setMonth(_month),
-            builder: (l) {
+            builder: (l, loading) {
               if (l.isEmpty) {
                 return const EmptyBox(icon: Icons.event_busy_rounded, title: 'No readings', body: 'There are no Sentiments for this month.');
               }
@@ -165,7 +167,7 @@ class _SentimentsPageState extends State<SentimentsPage> {
                     ),
                     DailyBarChart(
                       key: _chart,
-                      days: l.map((e) => DayValue(e.key, e.value)).toList(),
+                      days: _daysOf(_month, l, loading),
                       signed: true,
                       selected: sel,
                       today: todayIdx >= 0 ? todayIdx : null,
@@ -191,7 +193,7 @@ class _SentimentsPageState extends State<SentimentsPage> {
                     child: Row(children: [
                       Text(DateFormat('EEE, d MMM').format(l[sel].key), style: CkText.h(15, w: FontWeight.w600)),
                       const Spacer(),
-                      Text(_pct(l[sel].value),
+                      StatText(_pct(l[sel].value),
                           style: CkText.h(18, color: l[sel].value >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444))),
                       const SizedBox(width: 8),
                       Text(l[sel].value >= 0 ? 'Lighter, more confident' : 'Heavier, more unsettled', style: CkText.muted.copyWith(fontSize: 12)),
@@ -214,16 +216,12 @@ class _SentimentsPageState extends State<SentimentsPage> {
                         shadow: false,
                         padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('WEEK ${i + 1}', style: CkText.label.copyWith(fontSize: 9.5)),
-                          Text(_pct(a), style: CkText.h(19, color: col)),
+                          Text('WEEK ${i + 1}', style: CkText.label),
+                          StatText(_pct(a), index: i, style: CkText.h(19, color: col)),
                           Text('${DateFormat('d MMM').format(w.first.key)} – ${DateFormat('d MMM').format(w.last.key)}',
                               style: const TextStyle(fontSize: 10.5, color: CkColors.textSecondary)),
                           const Spacer(),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(2),
-                            child: LinearProgressIndicator(
-                                value: (a.abs() / 100).clamp(0, 1), minHeight: 4, color: col, backgroundColor: CkColors.glassFillStrong),
-                          ),
+                          Meter(value: a.abs() / 100, color: col, index: i, height: 4, track: CkColors.glassFillStrong),
                         ]),
                       );
                     },
@@ -234,6 +232,13 @@ class _SentimentsPageState extends State<SentimentsPage> {
           ),
         ],
       );
+}
+
+/// Bars for the chart: the month's days, with no values while it loads.
+List<DayValue> _daysOf(DateTime month, List<MapEntry<DateTime, double>> l, bool loading) {
+  if (!loading) return l.map((e) => DayValue(e.key, e.value)).toList();
+  final n = DateTime(month.year, month.month + 1, 0).day;
+  return [for (var d = 1; d <= n; d++) DayValue(DateTime(month.year, month.month, d), null)];
 }
 
 class _Key extends StatelessWidget {
@@ -275,12 +280,12 @@ class _SituationsPageState extends State<SituationsPage> {
         radius: 18,
         padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label.toUpperCase(), style: CkText.label.copyWith(fontSize: 9.5)),
+          Text(label.toUpperCase(), style: CkText.label),
           const SizedBox(height: 3),
           Row(children: [
             ZoneArrows(z, size: 13),
             const SizedBox(width: 4),
-            CountUpText('${v.round()}%', style: CkText.mono(16, color: z.color)),
+            StatText('${v.round()}%', style: CkText.mono(16, color: z.color)),
           ]),
           Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, color: CkColors.textSecondary)),
         ]),
@@ -293,11 +298,13 @@ class _SituationsPageState extends State<SituationsPage> {
         title: 'Situations',
         children: [
           MonthBar(month: _month, onChanged: _setMonth),
-          LoadView<List<MapEntry<DateTime, double>>>(
+          // Month change keeps this card on screen: bars glide to the new
+          // month (or sink and pulse until it lands), numbers glide too.
+          KeepLoad<List<MapEntry<DateTime, double>>>(
             future: _f,
             skeleton: Skels.daily(signed: false),
             onRetry: () => _setMonth(_month),
-            builder: (l) {
+            builder: (l, loading) {
               if (l.isEmpty) {
                 return const EmptyBox(icon: Icons.event_busy_rounded, title: 'No readings', body: 'There are no Situations for this month.');
               }
@@ -345,7 +352,7 @@ class _SituationsPageState extends State<SituationsPage> {
                     RepaintBoundary(
                       child: DailyBarChart(
                         key: _chart,
-                        days: l.map((e) => DayValue(e.key, e.value)).toList(),
+                        days: _daysOf(_month, l, loading),
                         signed: false,
                         selected: sel,
                         today: todayIdx >= 0 ? todayIdx : null,
@@ -375,7 +382,7 @@ class _SituationsPageState extends State<SituationsPage> {
                         Text(z.advice, style: const TextStyle(fontSize: 12.5, color: CkColors.textSecondary)),
                       ]),
                     ),
-                    Text('${d.value.round()}%', style: CkText.mono(30, color: z.color)),
+                    StatText('${d.value.round()}%', style: CkText.mono(30, color: z.color)),
                   ]),
                 ),
                 Glass(
@@ -431,12 +438,12 @@ class _Sentiments5DPageState extends State<Sentiments5DPage> {
           radius: 18,
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label.toUpperCase(), style: CkText.label.copyWith(fontSize: 9.5)),
+            Text(label.toUpperCase(), style: CkText.label),
             const SizedBox(height: 3),
             if (e == null)
               const Skeleton(width: 70, height: 16, radius: 4)
             else
-              CountUpText('${_pct(e.value)} · ${e.key.day}', style: CkText.mono(15, color: fiveDColor(e.value, signed: _signed))),
+              StatText('${_pct(e.value)} · ${e.key.day}', style: CkText.mono(15, color: fiveDColor(e.value, signed: _signed))),
           ]),
         ),
       );
@@ -474,14 +481,11 @@ class _Sentiments5DPageState extends State<Sentiments5DPage> {
                           padding: const EdgeInsets.only(top: 12),
                           child: Row(children: [
                             Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(2),
-                                child: LinearProgressIndicator(
-                                  value: l.total == 0 ? null : l.finished / l.total,
-                                  minHeight: 3,
-                                  color: CkColors.cyan,
-                                  backgroundColor: const Color(0x14FFFFFF),
-                                ),
+                              child: Meter(
+                                value: l.total == 0 ? 0 : l.finished / l.total,
+                                color: CkColors.cyan,
+                                height: 3,
+                                track: const Color(0x14FFFFFF),
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -586,32 +590,12 @@ class _Sentiments5DPageState extends State<Sentiments5DPage> {
                             final col = fiveDColor(v, signed: signed);
                             final frac = signed ? ((v + 100) / 200) : v / 100;
                             return Padding(
-                              key: ValueKey('$sel$d'),
+                              key: ValueKey(d), // same row, new day: the meter glides
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               child: Row(children: [
                                 SizedBox(width: 66, child: Text(d, style: TextStyle(fontSize: 13.5, fontWeight: d == _dim ? FontWeight.w600 : FontWeight.w400))),
-                                Expanded(
-                                  child: Container(
-                                    height: 10,
-                                    decoration: BoxDecoration(color: const Color(0x14FFFFFF), borderRadius: BorderRadius.circular(5)),
-                                    child: GrowIn(
-                                      value: frac.clamp(0.0, 1.0),
-                                      delay: Duration(milliseconds: 90 * i),
-                                      builder: (t) => FractionallySizedBox(
-                                        alignment: Alignment.centerLeft,
-                                        widthFactor: t,
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(5),
-                                            gradient: LinearGradient(colors: [col.withValues(alpha: .6), col]),
-                                            boxShadow: [BoxShadow(color: col.withValues(alpha: .35), blurRadius: 8)],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(width: 48, child: Align(alignment: Alignment.centerRight, child: CountUpText(_pct(v), style: CkText.mono(13)))),
+                                Expanded(child: Meter(value: frac, color: col, index: i, height: 10, track: const Color(0x14FFFFFF))),
+                                SizedBox(width: 48, child: Align(alignment: Alignment.centerRight, child: StatText(_pct(v), index: i, style: CkText.mono(13)))),
                               ]),
                             );
                           }(),
