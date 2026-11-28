@@ -44,6 +44,13 @@ class _ClientShellState extends State<ClientShell> {
     super.initState();
     workspaceEditing.value = false;
     clientTabRequest.addListener(_onRequest);
+    // After the page has slid in, load the client's main sections ahead.
+    final c = Session.client.value;
+    if (c != null) {
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) ClientData.of(c.mId).warmUp();
+      });
+    }
   }
 
   @override

@@ -45,6 +45,22 @@ class Api {
     return r;
   }
 
+  /// For answers that may still change (the current month): a copy kept on
+  /// the phone is returned at once, and a fresh answer is fetched in the
+  /// background and kept for next time. With no copy yet, waits for the
+  /// network like [post].
+  static Future<Map<String, dynamic>> postFresh(String endpoint, Map<String, dynamic> data, {required String owner}) async {
+    final key = '$endpoint|${jsonEncode(data)}';
+    final net = post(endpoint, data).then((r) {
+      if (ok(r) || r.values.any((v) => v is List && v.isNotEmpty)) DiskCache.write(owner, key, r);
+      return r;
+    });
+    final hit = await DiskCache.read(owner, key);
+    if (hit == null) return net;
+    net.then((_) {}, onError: (Object _) {});
+    return hit;
+  }
+
   /// Shares one in-flight/recent answer between screens (client list,
   /// report history, credits) for [ttl]; [force] refetches.
   static final _shared = <String, (DateTime, Future<dynamic>)>{};

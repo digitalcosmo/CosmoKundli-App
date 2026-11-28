@@ -27,7 +27,9 @@ class ClientData {
     final now = DateTime.now();
     final past = DateTime(end.year, end.month, end.day == 1 && body.containsKey('Month') ? DateTime(end.year, end.month + 1, 0).day : end.day)
         .isBefore(DateTime(now.year, now.month, now.day));
-    return past ? Api.postKept(ep, body, owner: 'm$mId') : Api.post(ep, body);
+    // The current month is kept too: it shows at once from the phone and is
+    // refreshed quietly in the background for the next visit.
+    return past ? Api.postKept(ep, body, owner: 'm$mId') : Api.postFresh(ep, body, owner: 'm$mId');
   }
 
   /// Birth data changed (client edited): forget everything kept for them.
@@ -146,8 +148,32 @@ class ClientData {
   }
 
   /// Sentiments for a month (Star_Power_Daily).
-  Future<List<MapEntry<DateTime, double>>> sentiments(DateTime month) =>
-      _m('sent:${DateFormat('yyyy-MM').format(month)}', () => _sentiments(month));
+  Future<List<MapEntry<DateTime, double>>> sentiments(DateTime month, {bool ahead = true}) {
+    final f = _m('sent:${DateFormat('yyyy-MM').format(month)}', () => _sentiments(month));
+    if (ahead) f.then((_) => _ahead('sent', month), onError: (Object _) {});
+    return f;
+  }
+
+  /// Loads the month before and after [month] once it has arrived, so
+  /// stepping between months opens at once (MyAcharyaji loads neighbours
+  /// ahead the same way). Neighbours don't load their own neighbours.
+  void _ahead(String kind, DateTime month) {
+    for (final d in const [-1, 1]) {
+      final n = DateTime(month.year, month.month + d);
+      final f = kind == 'sent' ? sentiments(n, ahead: false) : situations(n, ahead: false);
+      f.then((_) {}, onError: (Object _) {});
+    }
+  }
+
+  /// Called when a client is opened: loads the sections people open first
+  /// in the background, so they show without a skeleton.
+  void warmUp() {
+    final now = DateTime.now();
+    final m = DateTime(now.year, now.month);
+    for (final f in <Future<Object?>>[chart(), shadbal(), sentiments(m), situations(m)]) {
+      f.then((_) {}, onError: (Object _) {});
+    }
+  }
 
   Future<List<MapEntry<DateTime, double>>> _sentiments(DateTime month) async {
     final r = await _monthly(Endpoints.starPowerDaily, {'mID': mId, 'Month': DateFormat('yyyy-MM').format(month)}, month);
@@ -173,8 +199,11 @@ class ClientData {
   }
 
   /// Situations for a month (Cosmo_Power_Daily): {Date: "01 Aug", Value: 62.7}, 0..100.
-  Future<List<MapEntry<DateTime, double>>> situations(DateTime month) =>
-      _m('sit:${DateFormat('yyyy-MM').format(month)}', () => _situations(month));
+  Future<List<MapEntry<DateTime, double>>> situations(DateTime month, {bool ahead = true}) {
+    final f = _m('sit:${DateFormat('yyyy-MM').format(month)}', () => _situations(month));
+    if (ahead) f.then((_) => _ahead('sit', month), onError: (Object _) {});
+    return f;
+  }
 
   /// Daily values from [from] to [to] (inclusive), fetching every month the
   /// window touches. [kind] is 'sent' or 'sit'.
