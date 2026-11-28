@@ -21,6 +21,7 @@ class HostState extends State<_Host> {
 }
 
 Future<void> run(WidgetTester t, String name, Widget Function(int) b, List<(String, int)> phases, {Size size = const Size(390, 300)}) async {
+  tolerateOverflow();
   await t.binding.setSurfaceSize(Size(size.width, size.height));
   final k = GlobalKey<HostState>();
   final s = Sheet(name);

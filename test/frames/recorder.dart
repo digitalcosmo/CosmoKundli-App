@@ -10,6 +10,21 @@ import 'package:flutter_test/flutter_test.dart';
 
 final _key = GlobalKey();
 
+/// Overflow warnings are recorded (the test font is wider than the app's),
+/// not treated as failures; anything else still fails.
+final overflows = <String>[];
+void tolerateOverflow() {
+  final prev = FlutterError.onError;
+  FlutterError.onError = (d) {
+    final m = d.exceptionAsString();
+    if (m.contains('overflowed')) {
+      overflows.add(m);
+      return;
+    }
+    prev?.call(d);
+  };
+}
+
 Widget stage(Widget child, {Size size = const Size(390, 300)}) => MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(),

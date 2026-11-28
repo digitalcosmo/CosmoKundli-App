@@ -21,6 +21,7 @@ Widget cards(String tag, int n) => ListView(padding: const EdgeInsets.all(12), c
 
 void main() {
   testWidgets('page push and back', (t) async {
+    tolerateOverflow();
     await t.binding.setSurfaceSize(const Size(390, 420));
     final nav = GlobalKey<NavigatorState>();
     final s = Sheet('page_push_back');
@@ -36,6 +37,7 @@ void main() {
   });
 
   testWidgets('skeleton then data, then refresh', (t) async {
+    tolerateOverflow();
     await t.binding.setSurfaceSize(const Size(390, 300));
     final s = Sheet('skeleton_data');
     var c = Completer<int>();
