@@ -612,7 +612,7 @@ class _PanchangNowCardState extends State<PanchangNowCard> {
               ]),
             )
           else
-            FutureBuilder<PanchangData>(
+            DataBuilder<PanchangData>(
               future: _f,
               builder: (c, s) {
                 final d = s.data;
@@ -815,7 +815,7 @@ class _PanchangNowPageState extends State<PanchangNowPage> {
                 ]),
               ),
               const SizedBox(height: 12),
-              FutureBuilder<PanchangData>(
+              DataBuilder<PanchangData>(
                 future: _f,
                 builder: (c, s) {
                   if (s.hasError && _last == null) return ErrorBox(message: 'Couldn\'t load Panchang.', onRetry: _load);
@@ -978,7 +978,7 @@ class _SearchPageState extends State<SearchPage> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
               children: [
                 if (_k == _Kind.all || _k == _Kind.clients)
-                  FutureBuilder<List<Client>>(
+                  DataBuilder<List<Client>>(
                     future: _clients,
                     builder: (c, s) {
                       if (!s.hasData) return _q.isEmpty ? const SizedBox() : const Padding(padding: EdgeInsets.only(top: 18), child: SkeletonList(rows: 2));
@@ -994,7 +994,7 @@ class _SearchPageState extends State<SearchPage> {
                     },
                   ),
                 if (_k == _Kind.all || _k == _Kind.reports)
-                  FutureBuilder<List<ReportItem>>(
+                  DataBuilder<List<ReportItem>>(
                     future: _reports,
                     builder: (c, s) {
                       if (!s.hasData) return const SizedBox();

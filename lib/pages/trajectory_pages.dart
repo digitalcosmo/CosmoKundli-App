@@ -40,7 +40,7 @@ class _TrajectorySectionState extends State<TrajectorySection> {
             description: 'Today\'s GRAH over the birth chart',
             icon: Icons.track_changes_rounded,
             onTap: () => pushModule(context, const TransitPage()),
-            preview: FutureBuilder<List<GrahPos>>(
+            preview: DataBuilder<List<GrahPos>>(
               future: _now,
               builder: (c, s) {
                 final l = (s.data ?? []).where((p) => ['Sa', 'Ju', 'Ra'].contains(p.id)).toList();
@@ -211,7 +211,7 @@ class TransitBodyState extends State<TransitBody> {
         ),
       ]),
       const SizedBox(height: 10),
-      FutureBuilder<List<dynamic>>(
+      DataBuilder<List<dynamic>>(
         future: Future.wait<List<GrahPos>>([_transit ?? Future.value(<GrahPos>[]), _birth ?? Future.value(<GrahPos>[])]),
         builder: (c, s) {
           if (_srcId == null) {
@@ -387,7 +387,7 @@ class _PickClientState extends State<_PickClient> {
                   decoration: const InputDecoration(hintText: 'Search name, year, place', prefixIcon: Icon(Icons.search_rounded)),
                 ),
                 Expanded(
-                  child: FutureBuilder<List<Client>>(
+                  child: DataBuilder<List<Client>>(
                     future: _f,
                     builder: (c, s) {
                       if (s.hasError) return const Center(child: Text('Couldn\'t load clients', style: CkText.muted));

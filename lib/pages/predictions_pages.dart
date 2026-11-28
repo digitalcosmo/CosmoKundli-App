@@ -34,7 +34,7 @@ class _PredictionsSectionState extends State<PredictionsSection> {
             description: 'How the client will feel inside, day by day',
             icon: Icons.favorite_border_rounded,
             onTap: () => pushModule(context, const SentimentsPage()),
-            preview: FutureBuilder<List<MapEntry<DateTime, double>>>(
+            preview: DataBuilder<List<MapEntry<DateTime, double>>>(
               future: _f,
               builder: (c, s) {
                 final l = s.data ?? [];

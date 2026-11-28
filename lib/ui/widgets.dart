@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import '../core/known.dart';
 import '../core/astro.dart';
 import '../core/session.dart';
 import 'ck_theme.dart';
@@ -319,25 +320,97 @@ class _Done {
   const _Done(this.data, this.error, this.ok);
 }
 
+/// Drop-in for FutureBuilder that knows finished answers ([knownOf]): data
+/// the data layer already has shows on the first frame, never after a
+/// one-frame flash of the loading state. A new future keeps the last data
+/// until its own answer lands (as FutureBuilder does).
+class DataBuilder<T> extends StatefulWidget {
+  final Future<T>? future;
+  final AsyncWidgetBuilder<T> builder;
+  const DataBuilder({super.key, required this.future, required this.builder});
+  @override
+  State<DataBuilder<T>> createState() => _DataBuilderState<T>();
+}
+
+class _DataBuilderState<T> extends State<DataBuilder<T>> {
+  Object? _sub;
+  late AsyncSnapshot<T> _snap;
+
+  @override
+  void initState() {
+    super.initState();
+    _snap = AsyncSnapshot<T>.nothing();
+    _subscribe();
+  }
+
+  @override
+  void didUpdateWidget(DataBuilder<T> old) {
+    super.didUpdateWidget(old);
+    if (identical(old.future, widget.future)) return;
+    if (_sub != null) {
+      _sub = null;
+      _snap = _snap.inState(ConnectionState.none);
+    }
+    _subscribe();
+  }
+
+  void _subscribe() {
+    final f = widget.future;
+    if (f == null) return;
+    final k = knownOf(f);
+    if (k != null) {
+      _snap = AsyncSnapshot<T>.withData(ConnectionState.done, k.value as T);
+      return;
+    }
+    final me = _sub = Object();
+    f.then((v) {
+      if (mounted && identical(_sub, me)) setState(() => _snap = AsyncSnapshot<T>.withData(ConnectionState.done, v));
+    }, onError: (Object e, StackTrace st) {
+      if (mounted && identical(_sub, me)) setState(() => _snap = AsyncSnapshot<T>.withError(ConnectionState.done, e, st));
+    });
+    _snap = _snap.inState(ConnectionState.waiting);
+  }
+
+  @override
+  void dispose() {
+    _sub = null;
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context, _snap);
+}
+
 /// Like FutureBuilder, but (motion spec, Phase 1a):
 /// - data that is already there shows in the first frame, with no animation;
 /// - otherwise the skeleton shows at once (no blank wait), and data or an
 ///   error then fades in over it (300 ms) inside the card;
 /// - a new future for data that is still loading keeps the same skeleton on
 ///   screen, so it never vanishes and reappears.
+/// The one way a screen shows data that loads (family plan, states
+/// contract). Data that is already here shows on the first frame, with no
+/// placeholder and no fade. A real wait shows [loading] (shaped like the
+/// content) from the second frame, then the data fades in over 350 ms.
+/// When the future changes (a new month, a refresh), the last data stays on
+/// screen until the new data lands, so nothing ever blanks and charts can
+/// glide from their old values. An error shows [error], or a quiet notice
+/// with Try again.
 class FastFuture<T> extends StatefulWidget {
   final Future<T>? future;
   final Widget Function(T data) builder;
-  final Widget loading;
-  final Widget Function() error;
+  final Widget? loading;
+  final Widget Function()? error;
+  final VoidCallback? onRetry;
   final double? minHeight;
-  const FastFuture({super.key, required this.future, required this.builder, required this.loading, required this.error, this.minHeight});
+  const FastFuture(
+      {super.key, required this.future, required this.builder, this.loading, this.error, this.onRetry, this.minHeight});
   @override
   State<FastFuture<T>> createState() => _FastFutureState<T>();
 }
 
 class _FastFutureState<T> extends State<FastFuture<T>> {
   _Done? _r;
+  _Done? _last; // the last data shown, kept while a new future loads
   bool _skel = false; // a skeleton was on screen for this future
 
   @override
@@ -354,14 +427,16 @@ class _FastFutureState<T> extends State<FastFuture<T>> {
 
   void _watch() {
     final f = widget.future;
-    _r = f == null ? null : _done[f];
+    if (_r != null && _r!.ok) _last = _r;
+    final k = knownOf(f);
+    _r = f == null ? null : (_done[f] ?? (k == null ? null : _Done(k.value, null, true)));
     _skel = false;
     if (f == null || _r != null) return;
     // A future that is already done (kept in memory) answers before the
     // next frame: show its data straight away, with no skeleton and no
     // cross-fade. Only a real wait shows the skeleton, from frame two.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && identical(widget.future, f) && _r == null) setState(() => _skel = true);
+      if (mounted && identical(widget.future, f) && _r == null && _last == null) setState(() => _skel = true);
     });
     f.then((v) {
       final d = _Done(v, null, true);
@@ -377,12 +452,19 @@ class _FastFutureState<T> extends State<FastFuture<T>> {
   Widget build(BuildContext context) {
     final r = _r;
     final Widget child;
-    if (r == null) {
+    final last = _last;
+    if (r == null && last != null) {
+      // a new period or a refresh is loading: keep showing the last data
+      child = KeyedSubtree(key: const ValueKey('ok'), child: widget.builder(last.data as T));
+    } else if (r == null) {
       child = widget.future == null || !_skel
           ? SizedBox(key: const ValueKey('none'), height: widget.minHeight)
-          : KeyedSubtree(key: const ValueKey('skel'), child: widget.loading);
+          : KeyedSubtree(key: const ValueKey('skel'), child: widget.loading ?? SizedBox(height: widget.minHeight));
     } else if (!r.ok || (r.data == null && null is! T)) {
-      child = KeyedSubtree(key: const ValueKey('err'), child: widget.error());
+      child = KeyedSubtree(
+          key: const ValueKey('err'),
+          child: widget.error?.call() ??
+              ErrorBox(message: 'Couldn\'t load this. Check your connection and try again.', onRetry: widget.onRetry));
     } else {
       child = KeyedSubtree(key: const ValueKey('ok'), child: widget.builder(r.data as T));
     }

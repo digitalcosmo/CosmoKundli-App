@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../network/network_api_services.dart';
 import '../values/urls.dart';
+import 'known.dart';
 
 /// Thin wrapper over the existing CosmoKundli API (same endpoints and
 /// payloads as the original app). Every call returns a plain map so the UI is
@@ -67,7 +68,7 @@ class Api {
   static Future<T> shared<T>(String key, Future<T> Function() load, {Duration ttl = const Duration(seconds: 60), bool force = false}) {
     final hit = _shared[key];
     if (!force && hit != null && DateTime.now().difference(hit.$1) < ttl) return hit.$2 as Future<T>;
-    final f = load();
+    final f = remember(load());
     _shared[key] = (DateTime.now(), f);
     f.then((_) {}, onError: (Object _) {
       if (identical(_shared[key]?.$2, f)) _shared.remove(key);

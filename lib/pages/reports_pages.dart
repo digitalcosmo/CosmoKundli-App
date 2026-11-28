@@ -663,7 +663,7 @@ class _ClientReportsPageState extends State<ClientReportsPage> with _HistoryPoll
           FadeSlideIn(index: i, child: _GroupCard(kReportGroups[i], onTap: () => _openGroup(kReportGroups[i]))),
         const SizedBox(height: 20),
         Text('HISTORY', style: CkText.label),
-        FutureBuilder<List<ReportItem>>(
+        DataBuilder<List<ReportItem>>(
           future: history,
           builder: (ctx, s) {
             if (s.hasError) return ErrorBox(message: 'Couldn\'t load reports.', onRetry: reloadHistory);
@@ -808,7 +808,7 @@ class _ReportGroupPageState extends State<ReportGroupPage> {
         ),
         const SizedBox(height: 18),
         Text('2 · REPORT', style: CkText.label),
-        FutureBuilder<PriceBook>(
+        DataBuilder<PriceBook>(
           future: _prices,
           builder: (ctx, s) {
             if (s.hasError) return ErrorBox(message: 'Couldn\'t load prices.', onRetry: () => setState(() => _prices = fetchPrices()));
@@ -1057,7 +1057,7 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
               reloadHistory();
               setState(() => _credits = Api.post(Endpoints.credits, {'uID': Session.uid}));
             },
-            child: FutureBuilder<List<ReportItem>>(
+            child: DataBuilder<List<ReportItem>>(
               future: history,
               builder: (ctx, s) {
                 final all = s.data ?? const <ReportItem>[];
@@ -1111,7 +1111,7 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
                     const SizedBox(height: 6),
                     Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
                       Expanded(child: Text('Reports', style: CkText.h(26))),
-                      FutureBuilder<Map<String, dynamic>>(
+                      DataBuilder<Map<String, dynamic>>(
                         future: _credits,
                         builder: (_, cs) {
                           final v = num.tryParse('${cs.data?['Remaining_Credit'] ?? ''}');

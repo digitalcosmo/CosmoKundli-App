@@ -325,7 +325,7 @@ class _HomePageState extends State<HomePage> {
         onTap: () => Get.to(() => const SkyNowPage()),
         child: Glass(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
-          child: FutureBuilder<List<GrahPos>?>(
+          child: DataBuilder<List<GrahPos>?>(
             future: _sky,
             builder: (c, s) {
               final l = s.data;
@@ -397,7 +397,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _reportsCard() => Glass(
         padding: const EdgeInsets.all(14),
-        child: FutureBuilder<List<ReportItem>>(
+        child: DataBuilder<List<ReportItem>>(
           future: _reports,
           builder: (c, s) {
             final l = s.data ?? [];
@@ -429,7 +429,7 @@ class _HomePageState extends State<HomePage> {
               Row(children: [
                 stat('$gen', 'Generating', CkColors.cyan, onTap: () => appTabRequest.value = 2),
                 stat('$week', 'Ready this week', const Color(0xFF10B981), onTap: () => appTabRequest.value = 2),
-                FutureBuilder<Map<String, dynamic>>(
+                DataBuilder<Map<String, dynamic>>(
                   future: _credits,
                   builder: (c, cs) {
                     final v = num.tryParse('${cs.data?['Remaining_Credit'] ?? ''}');

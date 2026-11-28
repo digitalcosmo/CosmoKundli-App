@@ -797,7 +797,7 @@ class _PickListState<T> extends State<_PickList<T>> {
             decoration: const InputDecoration(hintText: 'Search', prefixIcon: Icon(Icons.search_rounded)),
           ),
           Expanded(
-            child: FutureBuilder<List<T>>(
+            child: DataBuilder<List<T>>(
               future: _f,
               builder: (c, s) {
                 if (s.hasError) return const Center(child: Text('Couldn\'t load', style: CkText.muted));

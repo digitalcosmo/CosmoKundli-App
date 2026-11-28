@@ -91,7 +91,7 @@ class _AccountPageState extends State<AccountPage> {
         embedded: widget.embedded,
         title: 'Account',
         children: [
-          FutureBuilder<List<Map<String, dynamic>>>(
+          DataBuilder<List<Map<String, dynamic>>>(
             future: _f,
             builder: (c, s) {
               final p = s.data?[0] ?? {};

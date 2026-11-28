@@ -230,7 +230,7 @@ class _ClientsPageState extends State<ClientsPage> {
       ),
       body: SafeArea(
         bottom: false,
-        child: FutureBuilder<List<Client>>(
+        child: DataBuilder<List<Client>>(
           future: _future,
           builder: (c, s) {
             final all = s.data ?? [];

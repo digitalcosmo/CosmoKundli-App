@@ -397,7 +397,7 @@ class _SwitchSheetState extends State<_SwitchSheet> {
               ),
               const SizedBox(height: 6),
               Expanded(
-                child: FutureBuilder<List<Client>>(
+                child: DataBuilder<List<Client>>(
                   future: _f,
                   builder: (c, s) {
                     if (!s.hasData) return const SkeletonList(rows: 7);
@@ -459,7 +459,7 @@ class _DetailsSheet extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(c.name, style: CkText.h(18)),
                 const SizedBox(height: 3),
-                FutureBuilder<List<GrahPos>>(
+                DataBuilder<List<GrahPos>>(
                   future: data.chart(),
                   builder: (_, s) {
                     if (!s.hasData) return const SizedBox(height: 14);
@@ -473,7 +473,7 @@ class _DetailsSheet extends StatelessWidget {
           const SizedBox(height: 14),
           Glass(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-            child: FutureBuilder<Map<String, dynamic>>(
+            child: DataBuilder<Map<String, dynamic>>(
               future: data.details(),
               builder: (_, s) {
                 final d = s.data ?? const {};

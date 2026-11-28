@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import 'api.dart';
 import 'astro.dart';
+import 'known.dart';
 
 /// Per-client data cache so moving between sections doesn't refetch.
 class ClientData {
@@ -42,7 +43,7 @@ class ClientData {
   Future<T> _m<T>(String key, Future<T> Function() f) {
     final hit = _memo[key];
     if (hit != null) return hit as Future<T>;
-    final fut = f();
+    final fut = remember(f());
     _memo[key] = fut;
     fut.then((_) {}, onError: (Object _) {
       if (identical(_memo[key], fut)) _memo.remove(key);
@@ -66,7 +67,7 @@ class ClientData {
       _info = null;
     }
     if (_chart == null) {
-      final f = _chartLoad();
+      final f = remember(_chartLoad());
       _chart = f;
       f.then((_) {}, onError: (Object _) {
         if (identical(_chart, f)) _chart = null;
@@ -94,16 +95,16 @@ class ClientData {
     }();
   }
 
-  Future<List<GrahPos>> planetInfo() => _info ??= () async {
+  Future<List<GrahPos>> planetInfo() => _info ??= remember(() async {
         final r = await Api.postKept(Endpoints.birthPlanetInfo, {'mID': mId}, owner: 'm$mId');
         return GrahPos.listFrom(Api.list(r, ['planets', 'list']));
-      }();
+      }());
 
   /// Shadbal (used for Power and Flavor until their own APIs exist).
   Future<Map<String, double>> shadbal({bool refresh = false}) {
     if (refresh) _shadbal = null;
     if (_shadbal == null) {
-      final f = _shadbalLoad();
+      final f = remember(_shadbalLoad());
       _shadbal = f;
       f.then((_) {}, onError: (Object _) {
         if (identical(_shadbal, f)) _shadbal = null;
@@ -130,7 +131,7 @@ class ClientData {
     if (refresh) _details = null;
     final hit = _details;
     if (hit != null) return hit;
-    final f = Api.postKept(Endpoints.memberDetails, {'mID': mId}, owner: 'm$mId');
+    final f = remember(Api.postKept(Endpoints.memberDetails, {'mID': mId}, owner: 'm$mId'));
     _details = f;
     f.then((_) {}, onError: (Object _) {
       if (identical(_details, f)) _details = null;
