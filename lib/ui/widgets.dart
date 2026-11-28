@@ -1345,7 +1345,7 @@ class DailyBarChartState extends State<DailyBarChart> {
           // bars rise from the baseline as a wave, numbers count up beside them
           child: GrowIn(
             value: 1,
-            delay: Duration(milliseconds: 40 * (i % 12)),
+            delay: Duration(milliseconds: 60 * (i % 12)),
             builder: (k) {
               final h = full * k;
               return Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [

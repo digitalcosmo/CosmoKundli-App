@@ -216,7 +216,7 @@ class Pressable extends StatefulWidget {
       {super.key,
       required this.child,
       this.onTap,
-      this.scale = .96,
+      this.scale = .97,
       this.haptic = true});
 
   @override
@@ -356,12 +356,12 @@ class _FadeSlideInState extends State<FadeSlideIn>
   Listenable? _visit;
   int _run = 0;
 
-  // the tab shows once the old one has faded out (90 ms)
-  void _onVisit() => _play(90, from: 0);
+  // switching to this tab: the cards rise in again with the tab
+  void _onVisit() => _play(0, from: 0);
 
   void _onCover(AnimationStatus s) {
-    // this page shows again once the page above has faded out (~210 ms)
-    if (s == AnimationStatus.reverse) _play(200, from: 0);
+    // the page above starts sliding away: this page's cards rise in again
+    if (s == AnimationStatus.reverse) _play(0, from: 0);
   }
 
   void _play(int waitMs, {double? from}) {
@@ -587,67 +587,69 @@ class LiquidGlass extends StatelessWidget {
 class CkRoute<T> extends PageRouteBuilder<T> {
   CkRoute({required WidgetBuilder builder, super.settings})
       : super(
-          transitionDuration: const Duration(milliseconds: 300),
-          reverseTransitionDuration: const Duration(milliseconds: 300),
+          transitionDuration: kPageDuration,
+          reverseTransitionDuration: kPageDuration,
           pageBuilder: (c, a, b) => builder(c),
-          transitionsBuilder: (c, a, b, child) => ckFadeThrough(c, a, b, child),
+          transitionsBuilder: (c, a, b, child) => ckPageTransition(c, a, b, child),
         );
 }
 
-/// Page change, as MyAcharyaji feels: the one background never moves; the
-/// current page's content fades out (90 ms), then the new page's content
-/// fades in (210 ms) while its cards rise in one after another. Cards fade
-/// their face only, so their blur is steady. Used by every route.
-Widget ckFadeThrough(BuildContext c, Animation<double> a, Animation<double> b, Widget child) {
-  if (MediaQuery.maybeDisableAnimationsOf(c) ?? false) return child;
-  return _FadeThrough(a: a, b: b, child: child);
+/// Page open/close length (MyAcharyaji: 550 ms, one curve).
+const Duration kPageDuration = Duration(milliseconds: 550);
+
+/// Every page in the app, opening and closing, as in MyAcharyaji:
+/// - each page is one solid piece with its own background (the background
+///   runs on one shared clock, so two pages show the same sky and the seam
+///   never shows);
+/// - the new page slides in from the right; the page under it moves 28% to
+///   the left and dims; back reverses both;
+/// - the cards of the new page rise in one after another while it slides.
+/// Used by GetX routes (main.dart) and by [CkRoute].
+Widget ckPageTransition(BuildContext c, Animation<double> a, Animation<double> b, Widget child) {
+  final page = _SolidPage(child: child);
+  if (MediaQuery.maybeDisableAnimationsOf(c) ?? false) return page;
+  final into = CurvedAnimation(parent: a, curve: kEase, reverseCurve: kEase.flipped);
+  final under = CurvedAnimation(parent: b, curve: kEase, reverseCurve: kEase.flipped);
+  return SlideTransition(
+    position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(into),
+    child: SlideTransition(
+      position: Tween(begin: Offset.zero, end: const Offset(-.28, 0)).animate(under),
+      child: Stack(fit: StackFit.passthrough, children: [
+        page,
+        // dimming the page underneath: a cheap dark veil, not a fade layer
+        // (a fade layer would drop the cards' blur)
+        Positioned.fill(
+          child: IgnorePointer(
+            child: AnimatedBuilder(
+              animation: under,
+              builder: (_, __) => ColoredBox(color: Color.fromRGBO(0, 0, 0, .35 * under.value)),
+            ),
+          ),
+        ),
+      ]),
+    ),
+  );
 }
 
-class _FadeThrough extends StatefulWidget {
-  final Animation<double> a, b;
+/// A page with its own background; pages inside it draw only content.
+class _SolidPage extends StatelessWidget {
   final Widget child;
-  const _FadeThrough({required this.a, required this.b, required this.child});
+  const _SolidPage({required this.child});
   @override
-  State<_FadeThrough> createState() => _FadeThroughState();
-}
-
-class _FadeThroughState extends State<_FadeThrough> {
-  late Animation<double> _t;
-  late Listenable _both;
-
-  void _make() {
-    final into = CurvedAnimation(parent: widget.a, curve: const Interval(.3, 1, curve: kEase));
-    final away = ReverseAnimation(CurvedAnimation(parent: widget.b, curve: const Interval(0, .3, curve: Curves.easeIn)));
-    _t = AnimationMin<double>(into, away);
-    _both = Listenable.merge([widget.a, widget.b]);
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _make();
-  }
-
-  @override
-  void didUpdateWidget(_FadeThrough old) {
-    super.didUpdateWidget(old);
-    if (!identical(old.a, widget.a) || !identical(old.b, widget.b)) _make();
-  }
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-        animation: _both,
-        child: CardFade.tab(t: _t, child: widget.child),
-        // hidden while the other page is still fading (never two at once)
-        builder: (_, k) => Offstage(offstage: widget.a.value < .3 || widget.b.value >= .3, child: k),
+  Widget build(BuildContext context) => ColoredBox(
+        color: CkColors.deepSpace,
+        child: Stack(fit: StackFit.expand, children: [
+          const RepaintBoundary(child: CosmicBackground()),
+          SharedBackdrop(child: BackdropGroup(child: child)),
+        ]),
       );
 }
 
-/// Keeps every tab alive and switches by fade-through (Material): the old
-/// tab fades out in 90 ms, then the new one fades in over 210 ms while it
-/// grows from 92% to full size. The two never show half-visible together.
-/// Cards fade only their face ([CardFade]) so their blur never pops in late.
-/// Hidden tabs are not painted, take no touches and pause their animations.
+/// Keeps every tab alive and switches as in MyAcharyaji: the new tab fades
+/// in over 400 ms while rising 16 px (450 ms), and its cards rise in one
+/// after another; the old tab gets out of the way in 150 ms. Cards fade only
+/// their face ([CardFade]) so their blur never pops in late. Hidden tabs are
+/// not painted, take no touches and pause their animations.
 class TabFader extends StatefulWidget {
   final int index;
   final List<Widget> children;
@@ -673,12 +675,15 @@ class _TabFaderState extends State<TabFader> with SingleTickerProviderStateMixin
     return _visits[i];
   }
 
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 300), value: 1)
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 450), value: 1)
     ..addStatusListener((s) {
       if (s == AnimationStatus.completed && _prev != null && mounted) setState(() => _prev = null);
     });
-  late final Animation<double> _out = ReverseAnimation(CurvedAnimation(parent: _c, curve: const Interval(0, .3, curve: Curves.easeIn)));
-  late final Animation<double> _in = CurvedAnimation(parent: _c, curve: const Interval(.3, 1, curve: kEase));
+  // old tab: gone within the first third (150 ms), ease-in
+  late final Animation<double> _out = ReverseAnimation(CurvedAnimation(parent: _c, curve: const Interval(0, 1 / 3, curve: Curves.easeIn)));
+  // new tab: fade 400 ms, rise 450 ms
+  late final Animation<double> _in = CurvedAnimation(parent: _c, curve: const Interval(0, 400 / 450, curve: kEase));
+  late final Animation<double> _rise = CurvedAnimation(parent: _c, curve: kEase);
   static const _shown = AlwaysStoppedAnimation<double>(1);
   int? _prev;
 
@@ -738,12 +743,12 @@ class _TabFaderState extends State<TabFader> with SingleTickerProviderStateMixin
                 animation: _c,
                 child: _TabVisit(visits: _v(i), child: CardFade.tab(t: _f(i), child: widget.children[i])),
                 builder: (_, c) {
-                  final leaving = i == prev && _c.value < .3;
+                  final leaving = i == prev && _c.value < 1 / 3;
                   final arriving = i == cur && prev != null;
-                  final hidden = !(i == cur || leaving) || (arriving && _c.value < .3);
+                  final hidden = !(i == cur || leaving);
                   return Offstage(
                     offstage: hidden,
-                    child: Transform.scale(scale: arriving ? .92 + .08 * _in.value : 1, child: c),
+                    child: Transform.translate(offset: Offset(0, arriving ? (1 - _rise.value) * 16 : 0), child: c),
                   );
                 },
               ),

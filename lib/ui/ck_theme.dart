@@ -75,11 +75,10 @@ class CkRadius {
 }
 
 class CkMotion {
-  static const Duration fast = Duration(milliseconds: 160);
+  static const Duration fast = Duration(milliseconds: 150);
   static const Duration base = Duration(milliseconds: 280);
   static const Duration slow = Duration(milliseconds: 450);
   static const Curve ease = Cubic(.22, 1, .36, 1);
-  static const Curve spring = Curves.easeOutBack;
 }
 
 class CkTheme {

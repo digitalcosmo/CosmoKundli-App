@@ -40,11 +40,12 @@ class CosmoKundliApp extends StatelessWidget {
       theme: CkTheme.dark(),
       darkTheme: CkTheme.dark(),
       themeMode: ThemeMode.dark,
-      // Every page change: fade-through over the one shared background
-      // (cupertinoDialog is the GetX value that hands over to customTransition).
+      // Every page: slides in from the right as one solid piece (glass.dart
+      // ckPageTransition). cupertinoDialog is the GetX value that hands over
+      // to customTransition.
       defaultTransition: Transition.cupertinoDialog,
       customTransition: _CkTransition(),
-      transitionDuration: const Duration(milliseconds: 300),
+      transitionDuration: kPageDuration,
       home: const SplashPage(),
       navigatorObservers: [UnfocusObserver()],
       builder: (context, child) => MediaQuery(
@@ -52,12 +53,8 @@ class CosmoKundliApp extends StatelessWidget {
         data: MediaQuery.of(context).copyWith(
           textScaler: MediaQuery.of(context).textScaler.clamp(maxScaleFactor: 1.15),
         ),
-        // One background for the whole app: painted once, under every page,
-        // so it never moves or changes when pages change.
-        child: Stack(children: [
-          const Positioned.fill(child: CkBackdrop()),
-          SharedBackdrop(child: BackdropGroup(child: child!)),
-        ]),
+        // each page paints its own background (ckPageTransition)
+        child: child!,
       ),
     ),
     );
@@ -71,6 +68,6 @@ class _CkTransition extends CustomTransition {
   @override
   Widget buildTransition(BuildContext context, Curve? curve, Alignment? alignment, Animation<double> animation,
           Animation<double> secondaryAnimation, Widget child) =>
-      ckFadeThrough(context, animation, secondaryAnimation, child);
+      ckPageTransition(context, animation, secondaryAnimation, child);
 }
 
