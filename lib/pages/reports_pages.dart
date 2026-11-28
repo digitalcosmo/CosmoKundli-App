@@ -1153,7 +1153,9 @@ class _AllReportsPageState extends State<AllReportsPage> with _HistoryPoll {
                           padding: EdgeInsets.only(top: 14),
                           child: EmptyBox(icon: Icons.description_outlined, title: 'No reports', body: 'Nothing matches these filters.'))
                     else if (!grouped)
-                      for (final e in l) ReportRow(e, key: ValueKey(e.key), showClient: true)
+                      // list family: the first rows rise as a wave, like Clients
+                      for (var i = 0; i < l.length; i++)
+                        i < 10 ? FadeSlideIn(key: ValueKey(l[i].key), index: i, child: ReportRow(l[i], showClient: true)) : ReportRow(l[i], key: ValueKey(l[i].key), showClient: true)
                     else
                       for (final g in _sort == 'old' ? const ['Earlier', 'This week', 'Today'] : const ['Today', 'This week', 'Earlier'])
                         if (groups[g] != null) ...[
