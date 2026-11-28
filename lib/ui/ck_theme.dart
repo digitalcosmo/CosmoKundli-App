@@ -24,6 +24,7 @@ class CkColors {
   static const Color retro = Color(0xFFF5D90A);
   static const Color panelTop = Color(0x1EFFFFFF); // frosted glass, more opaque (Build 3)
   static const Color panelBottom = Color(0x16FFFFFF);
+  static const Color cardScrim = Color(0x2E071848); // navy under top-level cards (Build 5, O)
   static const Color panelStroke = Color(0x1FFFFFFF);
   static const Color field = Color(0x8C0A1E50);
   static const Color labelMono = Color(0xFFB3C3E3); // lifted for contrast (Build 4 audit, O)

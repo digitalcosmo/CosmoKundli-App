@@ -145,6 +145,12 @@ class Glass extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = BorderRadius.circular(radius);
+    final bool nested = context.getInheritedWidgetOfExactType<_InGlass>() != null;
+    // Build 5 (contrast, O): a top-level card sits on a light navy scrim
+    // under its white sheen, so secondary text reads at about 4.5:1 even
+    // over the brightest part of the sky. Cards inside cards don't stack it.
+    final top = nested ? CkColors.panelTop : Color.alphaBlend(CkColors.panelTop, CkColors.cardScrim);
+    final bottom = nested ? CkColors.panelBottom : Color.alphaBlend(CkColors.panelBottom, CkColors.cardScrim);
     final face = DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: r,
@@ -153,8 +159,8 @@ class Glass extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color.alphaBlend(tint, CkColors.panelTop),
-            Color.alphaBlend(tint, CkColors.panelBottom),
+            Color.alphaBlend(tint, top),
+            Color.alphaBlend(tint, bottom),
           ],
         ),
       ),
@@ -167,7 +173,6 @@ class Glass extends StatelessWidget {
     // per frame. A card inside a card, and a card outside a page (a sheet),
     // keep the old way. The entrance fades the whole card, frost included.
     final Widget body;
-    final bool nested = context.getInheritedWidgetOfExactType<_InGlass>() != null;
     if (liquid) {
       body = LiquidGlass(radius: radius, blur: blur > 0 ? blur : 20, child: face);
     } else if (!frost || perfOff(4) || nested) {
