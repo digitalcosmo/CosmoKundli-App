@@ -340,17 +340,39 @@ class _FadeSlideInState extends State<FadeSlideIn>
     final nested = _nested = outer != null && outer.nests && outer.t.value < 1;
     if (still || nested || i < 0 || i >= kEntranceCount) {
       _c.value = 1;
-    } else if (i == 0) {
-      _c.forward();
-    } else {
-      Future.delayed(Duration(milliseconds: 70 * i), () {
-        if (mounted) _c.forward();
-      });
+      return;
     }
+    _play(0);
+    // Coming back to this page (the page above is closing): the cards rise
+    // in again, one after another, as in MyAcharyaji.
+    _cover = ModalRoute.of(context)?.secondaryAnimation;
+    _cover?.addStatusListener(_onCover);
+  }
+
+  Animation<double>? _cover;
+  int _run = 0;
+
+  void _onCover(AnimationStatus s) {
+    // this page shows again once the page above has faded out (~210 ms)
+    if (s == AnimationStatus.reverse) _play(200, from: 0);
+  }
+
+  void _play(int waitMs, {double? from}) {
+    final run = ++_run;
+    if (from != null) _c.value = from;
+    final wait = waitMs + 70 * widget.index;
+    if (wait == 0) {
+      _c.forward();
+      return;
+    }
+    Future.delayed(Duration(milliseconds: wait), () {
+      if (mounted && run == _run) _c.forward();
+    });
   }
 
   @override
   void dispose() {
+    _cover?.removeStatusListener(_onCover);
     _c.dispose();
     super.dispose();
   }
