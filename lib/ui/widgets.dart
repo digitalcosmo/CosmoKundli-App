@@ -2345,6 +2345,7 @@ final perfLabs = <(String, void Function(BuildContext))>[];
 void showPerfSheet(BuildContext context) {
   showModalBottomSheet(
     context: context,
+    isScrollControlled: true,
     backgroundColor: const Color(0xF2101634),
     builder: (c) => SafeArea(
       child: ListenableBuilder(
@@ -2353,15 +2354,8 @@ void showPerfSheet(BuildContext context) {
           Widget sw(String t, bool v, void Function(bool) f) =>
               SwitchListTile(title: Text(t), value: v, onChanged: (x) { f(x); WidgetsBinding.instance.reassembleApplication(); });
           void flip(int bit, bool on) => perfFlags.value = on ? perfFlags.value | bit : perfFlags.value & ~bit;
-          return Column(mainAxisSize: MainAxisSize.min, children: [
+          return SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             const Padding(padding: EdgeInsets.all(16), child: Text('Speed test (only for testing)')),
-            sw('Frame graph', perfOverlay.value, (v) => perfOverlay.value = v),
-            sw('Dock refraction OFF', perfOff(1), (v) => flip(1, v)),
-            sw('Background animation OFF', perfOff(2), (v) => flip(2, v)),
-            sw('Card blur OFF', perfOff(4), (v) => flip(4, v)),
-            sw('Glows OFF (bar and dot shadows)', perfOff(8), (v) => flip(8, v)),
-            sw('Dock blur OFF', perfOff(16), (v) => flip(16, v)),
-            sw('Card entrances OFF', perfOff(32), (v) => flip(32, v)),
             for (final l in perfLabs)
               ListTile(
                 title: Text(l.$1),
@@ -2371,8 +2365,15 @@ void showPerfSheet(BuildContext context) {
                   l.$2(context);
                 },
               ),
+            sw('Frame graph', perfOverlay.value, (v) => perfOverlay.value = v),
+            sw('Dock refraction OFF', perfOff(1), (v) => flip(1, v)),
+            sw('Background animation OFF', perfOff(2), (v) => flip(2, v)),
+            sw('Card blur OFF', perfOff(4), (v) => flip(4, v)),
+            sw('Glows OFF (bar and dot shadows)', perfOff(8), (v) => flip(8, v)),
+            sw('Dock blur OFF', perfOff(16), (v) => flip(16, v)),
+            sw('Card entrances OFF', perfOff(32), (v) => flip(32, v)),
             const SizedBox(height: 8),
-          ]);
+          ]));
         },
       ),
     ),
