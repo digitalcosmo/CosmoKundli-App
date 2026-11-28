@@ -335,7 +335,7 @@ class _FadeSlideInState extends State<FadeSlideIn>
     if (_decided) return;
     _decided = true;
     final i = widget.index;
-    final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final still = (MediaQuery.maybeDisableAnimationsOf(context) ?? false) || perfOff(32);
     final outer = context.getInheritedWidgetOfExactType<_InEntrance>();
     final nested = _nested = outer != null && outer.nests && outer.t.value < 1;
     if (still || nested || i < 0 || i >= kEntranceCount) {
@@ -347,10 +347,17 @@ class _FadeSlideInState extends State<FadeSlideIn>
     // in again, one after another, as in MyAcharyaji.
     _cover = ModalRoute.of(context)?.secondaryAnimation;
     _cover?.addStatusListener(_onCover);
+    // Switching to this tab: the cards rise in again too.
+    _visit = context.getInheritedWidgetOfExactType<_TabVisit>()?.visits;
+    _visit?.addListener(_onVisit);
   }
 
   Animation<double>? _cover;
+  Listenable? _visit;
   int _run = 0;
+
+  // the tab shows once the old one has faded out (90 ms)
+  void _onVisit() => _play(90, from: 0);
 
   void _onCover(AnimationStatus s) {
     // this page shows again once the page above has faded out (~210 ms)
@@ -373,6 +380,7 @@ class _FadeSlideInState extends State<FadeSlideIn>
   @override
   void dispose() {
     _cover?.removeStatusListener(_onCover);
+    _visit?.removeListener(_onVisit);
     _c.dispose();
     super.dispose();
   }
@@ -392,7 +400,9 @@ class _FadeSlideInState extends State<FadeSlideIn>
         child: widget.child,
         builder: (_, c) {
           final v = _t.value;
-          if (v >= 1) return c!;
+          // Always the same widget shape: returning the bare child once the
+          // entrance ends would tear the whole card down and build it again
+          // (a heavy frame, and charts inside restarting from zero).
           return Transform.translate(
             offset: Offset(0, (1 - v) * 16),
             child: Transform.scale(scale: .98 + .02 * v, child: c),
@@ -537,6 +547,7 @@ class LiquidGlass extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (perfOff(16)) return ClipRRect(borderRadius: BorderRadius.circular(radius), child: child);
     final blurF = ImageFilter.blur(sigmaX: blur, sigmaY: blur);
     return LayoutBuilder(builder: (context, box) {
       ImageFilter filter = blurF;
@@ -645,7 +656,23 @@ class TabFader extends StatefulWidget {
   State<TabFader> createState() => _TabFaderState();
 }
 
+/// Counts visits to one tab, so the cards in it can rise in again.
+class _TabVisit extends InheritedWidget {
+  final ValueNotifier<int> visits;
+  const _TabVisit({required this.visits, required super.child});
+  @override
+  bool updateShouldNotify(_TabVisit old) => !identical(old.visits, visits);
+}
+
 class _TabFaderState extends State<TabFader> with SingleTickerProviderStateMixin {
+  final _visits = <ValueNotifier<int>>[];
+  ValueNotifier<int> _v(int i) {
+    while (_visits.length <= i) {
+      _visits.add(ValueNotifier<int>(0));
+    }
+    return _visits[i];
+  }
+
   late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 300), value: 1)
     ..addStatusListener((s) {
       if (s == AnimationStatus.completed && _prev != null && mounted) setState(() => _prev = null);
@@ -666,11 +693,15 @@ class _TabFaderState extends State<TabFader> with SingleTickerProviderStateMixin
     }
     _prev = old.index;
     _c.forward(from: 0);
+    _v(widget.index).value++;
   }
 
   @override
   void dispose() {
     _c.dispose();
+    for (final v in _visits) {
+      v.dispose();
+    }
     super.dispose();
   }
 
@@ -705,7 +736,7 @@ class _TabFaderState extends State<TabFader> with SingleTickerProviderStateMixin
               enabled: i == cur || i == prev,
               child: AnimatedBuilder(
                 animation: _c,
-                child: CardFade.tab(t: _f(i), child: widget.children[i]),
+                child: _TabVisit(visits: _v(i), child: CardFade.tab(t: _f(i), child: widget.children[i])),
                 builder: (_, c) {
                   final leaving = i == prev && _c.value < .3;
                   final arriving = i == cur && prev != null;

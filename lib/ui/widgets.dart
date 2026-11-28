@@ -385,11 +385,23 @@ class _FastFutureState<T> extends State<FastFuture<T>> {
     // once instead of cross-fading, so the page never shows both at the
     // same time (the "chart appears twice" look).
     return AnimatedSwitcher(
-      duration: _still(context) ? Duration.zero : const Duration(milliseconds: 300),
-      switchInCurve: Curves.easeOut,
+      duration: _still(context) ? Duration.zero : const Duration(milliseconds: 550),
+      switchInCurve: kEase,
       // Cards fade their face only, so their blur is there from frame one.
-      // Cards inside still play their one-after-another entrance.
-      transitionBuilder: (c, a) => CardFade.tab(t: a, child: c),
+      // Data lands with the card entrance (rise 16 px, 0.98 to 1, fade);
+      // cards inside still play their one-after-another entrance.
+      transitionBuilder: (c, a) => CardFade.tab(
+        t: a,
+        child: AnimatedBuilder(
+          animation: a,
+          child: c,
+          // same widget shape all the way, so the content is never rebuilt
+          builder: (_, k) => Transform.translate(
+            offset: Offset(0, (1 - a.value) * 16),
+            child: Transform.scale(scale: .98 + .02 * a.value, child: k),
+          ),
+        ),
+      ),
       layoutBuilder: (cur, prev) => cur ?? const SizedBox.shrink(),
       child: child,
     );
@@ -1345,7 +1357,7 @@ class DailyBarChartState extends State<DailyBarChart> {
                     decoration: BoxDecoration(
                       gradient: grad,
                       border: sel ? Border.all(color: Colors.white, width: 1.5) : null,
-                      boxShadow: [BoxShadow(color: glow.withValues(alpha: today || sel ? .6 : .3), blurRadius: today || sel ? 14 : 8)],
+                      boxShadow: perfOff(8) ? null : [BoxShadow(color: glow.withValues(alpha: today || sel ? .6 : .3), blurRadius: today || sel ? 14 : 8)],
                       borderRadius: BorderRadius.vertical(
                         top: Radius.circular(signed && !up ? 2 : 6),
                         bottom: Radius.circular(signed && !up ? 6 : 2),
@@ -1436,7 +1448,7 @@ class GrahBarChart extends StatelessWidget {
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
                                 colors: [c, c.withOpacity(.25)]),
-                            boxShadow: [BoxShadow(color: c.withOpacity(.35), blurRadius: 10)],
+                            boxShadow: perfOff(8) ? null : [BoxShadow(color: c.withOpacity(.35), blurRadius: 10)],
                           ),
                         ),
                     ]),
@@ -1481,7 +1493,7 @@ class GrahDot extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(color: c, shape: BoxShape.circle, boxShadow: [BoxShadow(color: c.withOpacity(.6), blurRadius: 8)]),
+      decoration: BoxDecoration(color: c, shape: BoxShape.circle, boxShadow: perfOff(8) ? null : [BoxShadow(color: c.withOpacity(.6), blurRadius: 8)]),
     );
   }
 }
@@ -2129,7 +2141,7 @@ final perfOverlay = ValueNotifier<bool>(false);
 
 /// Test-only switches for measuring what costs frame time (hidden sheet on
 /// long-press of Log out). Bits: 1 dock refraction off, 2 background still,
-/// 4 card blur off. Nothing here is on by default.
+/// 4 card blur off, 8 glows off, 16 dock blur off, 32 entrances off. Nothing here is on by default.
 final perfFlags = ValueNotifier<int>(0);
 bool perfOff(int bit) => perfFlags.value & bit != 0;
 
@@ -2150,6 +2162,9 @@ void showPerfSheet(BuildContext context) {
             sw('Dock refraction OFF', perfOff(1), (v) => flip(1, v)),
             sw('Background animation OFF', perfOff(2), (v) => flip(2, v)),
             sw('Card blur OFF', perfOff(4), (v) => flip(4, v)),
+            sw('Glows OFF (bar and dot shadows)', perfOff(8), (v) => flip(8, v)),
+            sw('Dock blur OFF', perfOff(16), (v) => flip(16, v)),
+            sw('Card entrances OFF', perfOff(32), (v) => flip(32, v)),
             const SizedBox(height: 8),
           ]);
         },
