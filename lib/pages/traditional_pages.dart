@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 
 import 'package:flutter/material.dart';
@@ -493,11 +492,11 @@ class MelapakResultPage extends StatelessWidget {
                     SizedBox(
                       width: 100,
                       height: 100,
-                      child: CustomPaint(
-                        painter: _Ring(total / 36),
+                      child: RingMeter(
+                        value: total / 36,
                         child: Center(
                           child: Column(mainAxisSize: MainAxisSize.min, children: [
-                            Text(total % 1 == 0 ? total.toInt().toString() : total.toStringAsFixed(1), style: CkText.mono(22)),
+                            StatText(total % 1 == 0 ? total.toInt().toString() : total.toStringAsFixed(1), style: CkText.mono(22)),
                             const Text('of 36', style: TextStyle(fontSize: 10, color: CkColors.textSecondary)),
                           ]),
                         ),
@@ -556,10 +555,7 @@ class MelapakResultPage extends StatelessWidget {
                             Text('${pts % 1 == 0 ? pts.toInt() : pts}/${row.$4}', style: CkText.mono(12.5, color: col)),
                           ]),
                           const SizedBox(height: 7),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(3),
-                            child: LinearProgressIndicator(value: (pts / max).clamp(0, 1), minHeight: 5, color: col, backgroundColor: const Color(0x268CBEFF)),
-                          ),
+                          Meter(value: pts / max, color: col, height: 5),
                           const SizedBox(height: 7),
                           Row(children: [
                             Expanded(child: _kv('Var', _s(r, ['Var_${row.$2}']))),
@@ -605,32 +601,6 @@ class MelapakResultPage extends StatelessWidget {
   }
 }
 
-class _Ring extends CustomPainter {
-  final double p;
-  _Ring(this.p);
-  @override
-  void paint(Canvas c, Size s) {
-    final r = s.width / 2 - 6;
-    final o = s.center(Offset.zero);
-    c.drawCircle(o, r, Paint()
-      ..color = Colors.white.withOpacity(.12)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 10);
-    c.drawArc(
-        Rect.fromCircle(center: o, radius: r),
-        -math.pi / 2,
-        2 * math.pi * p.clamp(0, 1),
-        false,
-        Paint()
-          ..color = CkColors.cyan
-          ..style = PaintingStyle.stroke
-          ..strokeCap = StrokeCap.round
-          ..strokeWidth = 10);
-  }
-
-  @override
-  bool shouldRepaint(_Ring old) => old.p != p;
-}
 
 // ───────────────────────── Melapak from Tools (no client open)
 

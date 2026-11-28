@@ -787,7 +787,7 @@ class StatTile extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(upper(label), style: CkText.label.copyWith(fontSize: 9.5)),
             const SizedBox(height: 2),
-            FittedBox(fit: BoxFit.scaleDown, child: CountUpText(value, style: CkText.h(19, color: color))),
+            FittedBox(fit: BoxFit.scaleDown, child: StatText(value, style: CkText.h(19, color: color))),
             Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, color: CkColors.textSecondary)),
           ]),
         ),
@@ -1102,33 +1102,285 @@ class CountUp extends StatelessWidget {
       );
 }
 
-/// Starts at 0 and grows to [value] after [delay] (bars rise as a wave).
-class GrowIn extends StatefulWidget {
-  final double value;
+/// THE stats behaviour of CosmoKundli (family plan: the stats family).
+/// Every stat, whatever its shape (a bar, a ranking meter, a ring, a
+/// percentage, a counted number, a tile like Best day), appears and
+/// changes through this one piece; pages never animate a stat themselves
+/// (the build checks: tool/check_family.sh).
+/// - First appearance: grows from 0 after [index] x [step] ms (the wave).
+/// - The screen appears again (tab visit, page above closed): grows from 0
+///   again with the cards.
+/// - A new value: glides from where it is now to the new value. Never
+///   restarts from 0.
+/// - null (still loading): sinks to 0; the chart shows its pulse.
+/// - Colour: always from the FINAL value, never from the moving [builder]
+///   value, so a stat is its true colour from the first frame.
+class StatValue extends StatefulWidget {
+  final double? value;
+  final int index;
+  final int step;
+  final Duration duration;
   final Duration delay;
   final Widget Function(double v) builder;
-  const GrowIn({super.key, required this.value, this.delay = Duration.zero, required this.builder});
+  const StatValue(
+      {super.key,
+      required this.value,
+      this.index = 0,
+      this.step = 60,
+      this.duration = CkMotion.glide,
+      this.delay = Duration.zero,
+      required this.builder});
+
+  /// Horizontal meters and percentages: 1100 ms, 90 ms apart.
+  const StatValue.meter({super.key, required this.value, this.index = 0, required this.builder})
+      : step = CkMotion.meterStep,
+        duration = CkMotion.meter,
+        delay = Duration.zero;
   @override
-  State<GrowIn> createState() => _GrowInState();
+  State<StatValue> createState() => _StatValueState();
 }
 
-class _GrowInState extends State<GrowIn> {
-  bool _go = false;
+class _StatValueState extends State<StatValue> with SingleTickerProviderStateMixin, ReplayOnShow<StatValue> {
+  late final AnimationController _c = AnimationController(vsync: this, duration: widget.duration);
+  late final CurvedAnimation _t = CurvedAnimation(parent: _c, curve: kEase);
+  double _from = 0, _to = 0;
+  int _run = 0;
+  bool _decided = false;
+
+  double get _now => _from + (_to - _from) * _t.value;
+  double get _target => widget.value ?? 0;
+
   @override
-  void initState() {
-    super.initState();
-    Future.delayed(widget.delay, () {
-      if (mounted) setState(() => _go = true);
-    });
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_decided) return;
+    _decided = true;
+    if (_still(context)) {
+      _from = _to = _target;
+      _c.value = 1;
+      return;
+    }
+    listenForReplay();
+    _grow();
   }
 
-  // Grows from zero once; later value changes glide from the old value.
+  /// From 0, after the wave delay.
+  void _grow() {
+    final run = ++_run;
+    _c.stop();
+    _from = 0;
+    _to = 0;
+    _c.value = 1;
+    final wait = widget.delay.inMilliseconds + widget.step * widget.index;
+    void go() {
+      if (!mounted || run != _run) return;
+      _glide(_target);
+    }
+    wait <= 0 ? go() : Future.delayed(Duration(milliseconds: wait), go);
+  }
+
+  void _glide(double to) {
+    _from = _now;
+    _to = to;
+    _c.forward(from: 0);
+  }
+
   @override
-  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: _go || _still(context) ? widget.value : 0),
-        duration: _still(context) ? Duration.zero : const Duration(milliseconds: 1000),
-        curve: kEase,
-        builder: (_, v, __) => widget.builder(v),
+  void replay() {
+    if (mounted) setState(_grow);
+  }
+
+  @override
+  void didUpdateWidget(StatValue old) {
+    super.didUpdateWidget(old);
+    if (_target == _to) return;
+    if (_still(context)) {
+      _from = _to = _target;
+      _c.value = 1;
+      return;
+    }
+    ++_run; // a pending first growth now goes straight to the new value
+    _glide(_target);
+  }
+
+  @override
+  void dispose() {
+    _t.dispose();
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(animation: _t, builder: (_, __) => widget.builder(_now));
+}
+
+/// A horizontal meter (0..1), the family's only one: grows and glides
+/// through [StatValue.meter]. Used for every progress-like data value.
+class Meter extends StatelessWidget {
+  final double value;
+  final Color color;
+  final int index;
+  final double height;
+  final Color track;
+  const Meter({super.key, required this.value, required this.color, this.index = 0, this.height = 6, this.track = const Color(0x268CBEFF)});
+  @override
+  Widget build(BuildContext context) => Container(
+        height: height,
+        decoration: BoxDecoration(color: track, borderRadius: BorderRadius.circular(height / 2)),
+        child: StatValue.meter(
+          value: value.clamp(0.0, 1.0),
+          index: index,
+          builder: (t) => FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: t.clamp(0.0, 1.0),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(height / 2),
+                gradient: LinearGradient(colors: [color.withValues(alpha: .6), color]),
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+/// A ring meter (0..1): the radial member of the chart family. The arc
+/// sweeps from 0 on first show and glides to new values.
+class RingMeter extends StatelessWidget {
+  final double value;
+  final Color color;
+  final double stroke;
+  final Widget? child;
+  const RingMeter({super.key, required this.value, this.color = CkColors.cyan, this.stroke = 10, this.child});
+  @override
+  Widget build(BuildContext context) => StatValue(
+        value: value.clamp(0.0, 1.0),
+        builder: (t) => CustomPaint(painter: _RingPainter(t, color, stroke), child: child),
+      );
+}
+
+class _RingPainter extends CustomPainter {
+  final double p;
+  final Color color;
+  final double stroke;
+  _RingPainter(this.p, this.color, this.stroke);
+  @override
+  void paint(Canvas c, Size s) {
+    final r = s.shortestSide / 2 - stroke / 2 - 1;
+    final o = s.center(Offset.zero);
+    c.drawCircle(o, r, Paint()
+      ..color = Colors.white.withValues(alpha: .12)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke);
+    c.drawArc(
+        Rect.fromCircle(center: o, radius: r),
+        -math.pi / 2,
+        2 * math.pi * p.clamp(0, 1),
+        false,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = stroke);
+  }
+
+  @override
+  bool shouldRepaint(_RingPainter old) => old.p != p || old.color != color;
+}
+
+/// One row of a [RankList].
+class RankItem {
+  final String id;
+  final Widget label;
+  final double value; // 0..100
+  final Color color;
+  final String text;
+  const RankItem({required this.id, required this.label, required this.value, required this.color, required this.text});
+}
+
+/// A ranking ("strongest first"): highest value on top. When the values
+/// change, each row slides to its new rank (450 ms) and its meter glides,
+/// so you see who rose and who fell; rows that leave fade out.
+class RankList extends StatefulWidget {
+  final List<RankItem> items;
+  final double rowHeight;
+  const RankList({super.key, required this.items, this.rowHeight = 42});
+  @override
+  State<RankList> createState() => _RankListState();
+}
+
+class _RankListState extends State<RankList> {
+  final _seen = <String, RankItem>{};
+  @override
+  Widget build(BuildContext context) {
+    final sorted = [...widget.items]..sort((a, b) => b.value.compareTo(a.value));
+    for (final it in sorted) {
+      _seen[it.id] = it;
+    }
+    final rank = {for (var i = 0; i < sorted.length; i++) sorted[i].id: i};
+    final h = widget.rowHeight;
+    return AnimatedContainer(
+      duration: CkMotion.segment,
+      curve: kEase,
+      height: sorted.length * h,
+      child: Stack(clipBehavior: Clip.hardEdge, children: [
+        for (final e in _seen.entries)
+          () {
+            final r = rank[e.key];
+            final it = widget.items.where((x) => x.id == e.key).firstOrNull ?? e.value;
+            return AnimatedPositioned(
+              key: ValueKey(e.key),
+              duration: CkMotion.segment,
+              curve: kEase,
+              left: 0,
+              right: 0,
+              top: (r ?? sorted.length) * h,
+              height: h,
+              child: AnimatedOpacity(
+                opacity: r == null ? 0 : 1,
+                duration: CkMotion.state,
+                child: Container(
+                  decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x1F8CBEFF)))),
+                  child: Row(children: [
+                    SizedBox(width: 24, child: Text(r == null ? '' : '${r + 1}', style: CkText.mono(11, color: CkColors.textDim))),
+                    SizedBox(width: 60, child: it.label),
+                    Expanded(child: Meter(value: r == null ? 0 : it.value / 100, color: it.color, index: r ?? 0)),
+                    SizedBox(width: 46, child: StatText(it.text, textAlign: TextAlign.right, style: CkText.mono(12.5))),
+                  ]),
+                ),
+              ),
+            );
+          }(),
+      ]),
+    );
+  }
+}
+
+/// A small live dot that breathes (a report that is still generating).
+class LiveDot extends StatefulWidget {
+  final Color color;
+  const LiveDot({super.key, this.color = CkColors.cyan});
+  @override
+  State<LiveDot> createState() => _LiveDotState();
+}
+
+class _LiveDotState extends State<LiveDot> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: CkMotion.pulse)..repeat(reverse: true);
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+        opacity: Tween(begin: .25, end: 1.0).animate(_c),
+        child: Container(
+          width: 7,
+          height: 7,
+          margin: const EdgeInsets.only(right: 6),
+          decoration: BoxDecoration(color: widget.color, shape: BoxShape.circle),
+        ),
       );
 }
 
@@ -1548,22 +1800,25 @@ class DailyBarChartState extends State<DailyBarChart> {
           ),
           // first time: bars rise from the baseline as a wave (60 ms apart);
           // after that every change glides from the current height
-          child: GrowIn(
+          child: StatValue(
             value: v,
             delay: Duration(milliseconds: 60 * (i % 12)),
             builder: (x) {
               final up = x >= 0;
+              // colour is the final value's from the first frame: it never
+              // shifts while the bar grows or glides
+              final end = v ?? x;
+              final zc = signed ? null : zoneOf(end).color;
               final h = signed ? x.abs() / 100 * _ph / 2 : x / 100 * _ph;
-              final zc = signed ? null : zoneOf(x).color;
               // Software: .sps-bar--pos linear-gradient(0deg,#73F4C4,#10B981); .sps-bar--neg linear-gradient(0deg,#EF4444,#F6B8B8)
               final grad = signed
                   ? LinearGradient(
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
-                      colors: up ? const [Color(0xFF73F4C4), Color(0xFF10B981)] : const [Color(0xFFEF4444), Color(0xFFF6B8B8)],
+                      colors: end >= 0 ? const [Color(0xFF73F4C4), Color(0xFF10B981)] : const [Color(0xFFEF4444), Color(0xFFF6B8B8)],
                     )
                   : LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [zc!, zc.withValues(alpha: .35)]);
-              final glow = signed ? (up ? const Color(0xFF10B981) : const Color(0xFFEF4444)) : zc!;
+              final glow = signed ? (end >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444)) : zc!;
               return Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
                 // loading: a soft pulse where the bar will be
                 Positioned(
@@ -1597,7 +1852,7 @@ class DailyBarChartState extends State<DailyBarChart> {
                     child: signed
                         ? Text(label(x), style: CkText.mono(10, color: Colors.white))
                         : Column(mainAxisSize: MainAxisSize.min, children: [
-                            ZoneArrows(zoneOf(x), size: 13),
+                            ZoneArrows(zoneOf(end), size: 13),
                             Text(label(x), style: CkText.mono(10, color: Colors.white)),
                           ]),
                   ),
@@ -1664,17 +1919,34 @@ class _PulseStubState extends State<_PulseStub> with SingleTickerProviderStateMi
 }
 
 /// Planet bars on the software's grid (0,15,35,45,55,65,85,100) with % at the bar end.
+/// Planet bars (Power, Flavor): a stats chart. Each planet keeps its own
+/// bar, keyed by its id, so switching Power to Flavor or to another client
+/// glides every bar from its current height; a planet that is not in the
+/// new view (value null) shrinks away and its slot closes.
 class GrahBarChart extends StatelessWidget {
-  final List<MapEntry<String, double>> values; // grah id → 0..100
+  final List<MapEntry<String, double?>> values; // grah id -> 0..100, null = not shown
   final double height;
   final bool axis;
   const GrahBarChart({super.key, required this.values, this.height = 300, this.axis = true});
   static const _ticks = [0, 15, 35, 45, 55, 65, 85, 100];
+
+  Widget _slot(MapEntry<String, double?> e, Widget Function(double p) child) => TweenAnimationBuilder<double>(
+        key: ValueKey(e.key),
+        tween: Tween(begin: e.value == null ? 0 : 1, end: e.value == null ? 0 : 1),
+        duration: CkMotion.segment,
+        curve: kEase,
+        builder: (_, p, __) => Flexible(flex: math.max(1, (p * 1000).round()), fit: FlexFit.tight, child: child(p)),
+      );
+
   @override
   Widget build(BuildContext context) {
     final axisW = axis ? 34.0 : 0.0;
-    final top = 26.0;
+    const top = 26.0;
     final h = height - top;
+    final order = <String, int>{};
+    for (final e in values) {
+      if (e.value != null) order[e.key] = order.length;
+    }
     return Column(children: [
       SizedBox(
         height: height,
@@ -1698,39 +1970,40 @@ class GrahBarChart extends StatelessWidget {
                   bottom: t / 100 * h,
                   left: 0,
                   right: 0,
-                  child: Container(height: 1, color: Colors.white.withOpacity(t == 0 || t == 100 ? .18 : .09)),
+                  child: Container(height: 1, color: Colors.white.withValues(alpha: t == 0 || t == 100 ? .18 : .09)),
                 ),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
-                children: values.asMap().entries.map((en) {
-                  final e = en.value;
-                  final c = grahColor(e.key);
-                  final v = e.value.clamp(0.0, 100.0);
-                  return Expanded(
-                    child: GrowIn(
-                      value: v,
-                      delay: Duration(milliseconds: 60 * en.key),
-                      builder: (t) => Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-                      FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text('${t.round()}%', style: TextStyle(fontSize: axis ? 11 : 9.5, fontWeight: FontWeight.w600))),
-                      const SizedBox(height: 3),
-                      Container(
-                          height: math.max(3, t / 100 * h),
-                          margin: EdgeInsets.symmetric(horizontal: axis ? 6 : 3),
-                          decoration: BoxDecoration(
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(8), bottom: Radius.circular(2)),
-                            gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [c, c.withOpacity(.25)]),
-                            boxShadow: perfOff(8) ? null : [BoxShadow(color: c.withOpacity(.35), blurRadius: 10)],
-                          ),
+                children: [
+                  for (final e in values)
+                    _slot(e, (p) {
+                      final c = grahColor(e.key);
+                      final i = order[e.key] ?? 0;
+                      return Opacity(
+                        opacity: p.clamp(0.0, 1.0),
+                        child: StatValue(
+                          value: e.value?.clamp(0.0, 100.0),
+                          index: i,
+                          builder: (t) => Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+                            FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text('${t.round()}%', style: TextStyle(fontSize: axis ? 11 : 9.5, fontWeight: FontWeight.w600))),
+                            const SizedBox(height: 3),
+                            Container(
+                              height: math.max(3, t / 100 * h),
+                              margin: EdgeInsets.symmetric(horizontal: axis ? 6 : 3),
+                              decoration: BoxDecoration(
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(8), bottom: Radius.circular(2)),
+                                gradient: LinearGradient(
+                                    begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [c, c.withValues(alpha: .25)]),
+                                boxShadow: perfOff(8) ? null : [BoxShadow(color: c.withValues(alpha: .35), blurRadius: 10)],
+                              ),
+                            ),
+                          ]),
                         ),
-                    ]),
-                    ),
-                  );
-                }).toList(),
+                      );
+                    }),
+                ],
               ),
             ]),
           ),
@@ -1739,10 +2012,17 @@ class GrahBarChart extends StatelessWidget {
       const SizedBox(height: 6),
       Row(children: [
         SizedBox(width: axisW),
-        ...values.map((e) => Expanded(
-            child: Text(e.key,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: axis ? 11.5 : 10, fontWeight: FontWeight.w600, color: Colors.white)))),
+        for (final e in values)
+          _slot(
+              e,
+              (p) => Opacity(
+                    opacity: p.clamp(0.0, 1.0),
+                    child: Text(e.key,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.clip,
+                        style: TextStyle(fontSize: axis ? 11.5 : 10, fontWeight: FontWeight.w600, color: Colors.white)),
+                  )),
       ]),
     ]);
   }
@@ -2341,23 +2621,28 @@ class Skels {
 
 
 /// Text whose first number counts up from 0 (e.g. "+42%", "72% · 31").
-class CountUpText extends StatelessWidget {
+/// A number that is a stat ("75%", "+12", "8.2L"): appears, replays and
+/// glides through [StatValue] like every other stat. Only the first number
+/// in [text] counts; the rest is kept as written.
+class StatText extends StatelessWidget {
   final String text;
   final TextStyle? style;
-  const CountUpText(this.text, {super.key, this.style});
+  final TextAlign? textAlign;
+  final int index;
+  const StatText(this.text, {super.key, this.style, this.textAlign, this.index = 0});
   static final _re = RegExp(r'^(\D*?)([+-]?\d+(?:\.\d+)?)(.*)$', dotAll: true);
   @override
   Widget build(BuildContext context) {
     final m = _re.firstMatch(text);
     final n = m == null ? null : double.tryParse(m.group(2)!);
-    if (m == null || n == null) return Text(text, style: style);
+    if (m == null || n == null) return Text(text, style: style, textAlign: textAlign);
     final dec = m.group(2)!.contains('.') ? m.group(2)!.split('.').last.length : 0;
     final plus = m.group(2)!.startsWith('+');
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: n),
-      duration: _still(context) ? Duration.zero : const Duration(milliseconds: 1100),
-      curve: kEase,
-      builder: (_, v, __) => Text('${m.group(1)}${plus && v > 0 ? '+' : ''}${v.toStringAsFixed(dec)}${m.group(3)}', style: style),
+    return StatValue.meter(
+      value: n,
+      index: index,
+      builder: (v) =>
+          Text('${m.group(1)}${plus && v > 0 ? '+' : ''}${v.toStringAsFixed(dec)}${m.group(3)}', style: style, textAlign: textAlign),
     );
   }
 }

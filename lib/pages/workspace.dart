@@ -526,27 +526,13 @@ class _WorkspacePageState extends State<WorkspacePage> {
             Expanded(
               child: GestureDetector(
                 onLongPress: () => _rename(t),
+                // editing: each pill carries a pencil, and tapping the open
+                // tab renames it
                 child: _Chip(WorkspaceStore.name(t),
                     selected: t == _tab,
-                    dot: !WorkspaceStore.isDefault(t, t == _tab ? _items : WorkspaceStore.load(t)),
-                    onTap: () => _switchTab(t)),
-              ),
-            ),
-          ],
-          if (!_edit) ...[
-            const SizedBox(width: 6),
-            // ✎ edit modules
-            Pressable(
-              scale: .92,
-              onTap: () {
-                HapticFeedback.selectionClick();
-                workspaceEditing.value = true;
-              },
-              child: Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: CkColors.panelStroke)),
-                child: const Icon(Icons.edit_rounded, size: 17, color: CkColors.cyan),
+                    edit: _edit,
+                    dot: !_edit && !WorkspaceStore.isDefault(t, t == _tab ? _items : WorkspaceStore.load(t)),
+                    onTap: () => _edit && t == _tab ? _rename(t) : _switchTab(t)),
               ),
             ),
           ],
@@ -571,6 +557,13 @@ class _WorkspacePageState extends State<WorkspacePage> {
           );
         }
         final rects = {for (final it in _items) it.id: _rect(it)};
+        // card-group family: cards rise in reading order (row by row, left
+        // to right), like the Dashboard
+        final order = [..._items]..sort((a, b) {
+            final ra = rects[a.id]!, rb = rects[b.id]!;
+            return ra.top != rb.top ? ra.top.compareTo(rb.top) : ra.left.compareTo(rb.left);
+          });
+        final wave = {for (var i = 0; i < order.length; i++) order[i].id: i};
         final h = rects.values.map((r) => r.bottom).reduce(math.max);
         final moving = _moving == null ? null : _items.firstWhere((e) => e.id == _moving);
         return SizedBox(
@@ -602,7 +595,7 @@ class _WorkspacePageState extends State<WorkspacePage> {
                 height: rects[it.id]!.height,
                 child: Opacity(
                   opacity: it.id == _moving ? 0 : 1,
-                  child: _tile(it, mId),
+                  child: _edit ? _tile(it, mId) : FadeSlideIn(index: wave[it.id]!, child: _tile(it, mId)),
                 ),
               ),
             if (moving != null)
@@ -945,8 +938,9 @@ class _Chip extends StatelessWidget {
   final bool selected;
   final bool filled;
   final bool dot;
+  final bool edit;
   final VoidCallback onTap;
-  const _Chip(this.text, {this.selected = false, this.filled = false, this.dot = false, required this.onTap});
+  const _Chip(this.text, {this.selected = false, this.filled = false, this.dot = false, this.edit = false, required this.onTap});
   @override
   Widget build(BuildContext context) => Pressable(
         scale: .95,
@@ -975,6 +969,10 @@ class _Chip extends StatelessWidget {
             if (dot) ...[
               const SizedBox(width: 5),
               Container(width: 5, height: 5, decoration: const BoxDecoration(color: CkColors.cyan, shape: BoxShape.circle)),
+            ],
+            if (edit) ...[
+              const SizedBox(width: 6),
+              Icon(Icons.edit_rounded, size: 13, color: selected ? CkColors.cyan : CkColors.textSecondary),
             ],
           ]),
         ),
@@ -1136,10 +1134,13 @@ class _Load<T> extends StatefulWidget {
 }
 
 class _LoadState<T> extends State<_Load<T>> {
-  late Future<T> _f = widget.load();
+  // Every loader here reads the data layer, which hands back the same
+  // request for the same question, so asking on each build is free and a
+  // new question (another day range) is picked up at once: the card keeps
+  // its last data and its stats glide to the new values.
   @override
   Widget build(BuildContext context) => FastFuture<T>(
-        future: _f,
+        future: widget.load(),
         builder: widget.builder,
         loading: widget.skel ?? const _Loading(),
         error: () => Center(
@@ -1147,7 +1148,7 @@ class _LoadState<T> extends State<_Load<T>> {
                 const Text('Couldn\'t load', style: CkText.muted),
                 const SizedBox(height: 6),
                 Pressable(
-                  onTap: () => setState(() => _f = widget.load()),
+                  onTap: () => setState(() {}),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                     decoration: BoxDecoration(color: CkColors.cyanTint, borderRadius: BorderRadius.circular(10), border: Border.all(color: CkColors.cyanStroke)),
@@ -1500,7 +1501,7 @@ class _DailyWState extends State<_DailyW> {
           trailing: _MonthChip(shown: m ?? now, picked: m != null, short: size == WSize.s, onChanged: (v) => setState(() => _month = v))),
       const SizedBox(height: 8),
       Expanded(
-        child: _future<List<MapEntry<DateTime, double>>>(key: ValueKey(from), () => ClientData.of(mId).window(signed ? 'sent' : 'sit', from, to), skel: _skelDaily(to.difference(from).inDays + 1, signed), (l) {
+        child: _future<List<MapEntry<DateTime, double>>>(() => ClientData.of(mId).window(signed ? 'sent' : 'sit', from, to), skel: _skelDaily(to.difference(from).inDays + 1, signed), (l) {
           if (l.isEmpty) return const Center(child: Text('No data for these days', style: CkText.muted));
           final chart = _bars(l, today);
           if (size != WSize.l) return chart;
@@ -1515,7 +1516,7 @@ class _DailyWState extends State<_DailyW> {
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(k.toUpperCase(), style: CkText.label.copyWith(fontSize: 8.5)),
                     const SizedBox(height: 2),
-                    CountUpText(_fmt(v, signed), style: CkText.mono(14, color: signed && k == 'Average' ? Colors.white : col(v))),
+                    StatText(_fmt(v, signed), style: CkText.mono(14, color: signed && k == 'Average' ? Colors.white : col(v))),
                   ]),
                 ),
               );
@@ -1550,10 +1551,12 @@ class _DailyWState extends State<_DailyW> {
             child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               for (var i = 0; i < l.length; i++)
                 Expanded(
-                  child: GrowIn(
-                    value: 1,
-                    delay: Duration(milliseconds: 50 * i),
-                    builder: (k) => _bar(l[i], today, h, maxAbs, topPad, bw, fs, k),
+                  // a stat: rises with the card, glides to new days' values
+                  child: StatValue(
+                    value: l[i].value,
+                    index: i,
+                    // colour comes from the final value, so it never shifts while growing
+                    builder: (x) => _bar(MapEntry(l[i].key, x), today, h, maxAbs, topPad, bw, fs, 1, l[i].value),
                   ),
                 ),
             ]),
@@ -1575,16 +1578,16 @@ class _DailyWState extends State<_DailyW> {
         ]);
       });
 
-  Widget _bar(MapEntry<DateTime, double> e, DateTime today, double h, double maxAbs, double topPad, double bw, double fs, double k) {
+  Widget _bar(MapEntry<DateTime, double> e, DateTime today, double h, double maxAbs, double topPad, double bw, double fs, double k, double end) {
     final isToday = e.key == today;
     final v = e.value * k;
     final Widget inner;
     if (signed) {
       final half = h / 2;
       final bh = (half - topPad) * (v.abs() / maxAbs);
-      final glowC = v >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+      final glowC = end >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444);
       final up = v >= 0;
-      final grad = up
+      final grad = end >= 0
           ? const LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Color(0xFF73F4C4), Color(0xFF10B981)])
           : const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFF6B8B8), Color(0xFFEF4444)]);
       inner = Stack(children: [
@@ -1604,7 +1607,7 @@ class _DailyWState extends State<_DailyW> {
         ),
       ]);
     } else {
-      final z = zoneOf(e.value);
+      final z = zoneOf(end);
       final bh = (h - topPad) * (v.clamp(0, 100) / 100);
       inner = Stack(children: [
         Positioned(
@@ -1778,16 +1781,21 @@ class _FiveDWState extends State<_FiveDW> {
                           decoration: vals[i].key == _today
                               ? BoxDecoration(color: const Color(0x145CE1FF), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0x595CE1FF)))
                               : null,
-                          child: vals[i].value == null
-                              ? (loading ? const Align(alignment: Alignment.bottomCenter, child: Skeleton(width: 10, height: 30, radius: 3)) : const SizedBox())
-                              : GrowIn(
-                                  value: 1,
-                                  delay: Duration(milliseconds: 50 * i),
-                                  builder: (k) {
-                                    final v = vals[i].value!;
+                          // a stat: always mounted, so a day that loads late
+                          // grows from 0 and a new range glides
+                          child: StatValue(
+                                  value: vals[i].value,
+                                  index: i,
+                                  builder: (v) {
+                                    if (vals[i].value == null) {
+                                      return loading
+                                          ? const Align(alignment: Alignment.bottomCenter, child: Skeleton(width: 10, height: 30, radius: 3))
+                                          : const SizedBox();
+                                    }
+                                    const k = 1.0;
                                     final frac = signed ? (v + 100) / 200 : v / 100;
                                     final bh = (h - top - 4) * frac.clamp(0.0, 1.0) * k;
-                                    final col = fiveDColor(v, signed: signed);
+                                    final col = fiveDColor(vals[i].value!, signed: signed); // final value's colour, fixed while it grows
                                     return Stack(children: [
                                       Positioned(
                                         left: 0,
@@ -1844,7 +1852,7 @@ class _FiveDWState extends State<_FiveDW> {
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(k.toUpperCase(), style: CkText.label.copyWith(fontSize: 8.5)),
                       const SizedBox(height: 2),
-                      CountUpText(pct(v), style: CkText.mono(14, color: fiveDColor(v, signed: signed))),
+                      StatText(pct(v), style: CkText.mono(14, color: fiveDColor(v, signed: signed))),
                     ]),
                   ),
                 );
@@ -2013,10 +2021,7 @@ class _MelapakWState extends State<_MelapakW> {
       child: Row(children: [
         SizedBox(width: label, child: Text(k.$1, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: CkColors.textSecondary))),
         Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(3),
-            child: LinearProgressIndicator(value: (pts / k.$3).clamp(0, 1), minHeight: 5, color: col, backgroundColor: const Color(0x268CBEFF)),
-          ),
+          child: Meter(value: pts / k.$3, color: col, height: 5),
         ),
         SizedBox(width: 38, child: Text('${pts % 1 == 0 ? pts.toInt() : pts}/${k.$3}', textAlign: TextAlign.right, style: CkText.mono(10))),
       ]),

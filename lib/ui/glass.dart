@@ -175,7 +175,8 @@ class Glass extends StatelessWidget {
     } else if (context.getInheritedWidgetOfExactType<_OverSky>() != null) {
       body = ClipRRect(
         borderRadius: r,
-        child: Stack(children: [
+        // passthrough: the card sizes exactly as it would without frost
+        child: Stack(fit: StackFit.passthrough, children: [
           const Positioned.fill(child: _FrostView()),
           _InGlass(child: face),
         ]),
@@ -735,6 +736,39 @@ class TabFader extends StatefulWidget {
   const TabFader({super.key, required this.index, required this.children});
   @override
   State<TabFader> createState() => _TabFaderState();
+}
+
+/// Lets a kit piece replay its first appearance whenever its screen appears
+/// again: its tab is switched to, or the page above it closes. Used by the
+/// card entrance and by every chart bar, so they always replay together.
+mixin ReplayOnShow<T extends StatefulWidget> on State<T> {
+  Animation<double>? _rCover;
+  Listenable? _rVisit;
+  bool _rOn = false;
+
+  /// Play the first appearance again.
+  void replay();
+
+  /// Call once from didChangeDependencies.
+  void listenForReplay() {
+    if (_rOn) return;
+    _rOn = true;
+    _rCover = ModalRoute.of(context)?.secondaryAnimation;
+    _rCover?.addStatusListener(_rStatus);
+    _rVisit = context.getInheritedWidgetOfExactType<_TabVisit>()?.visits;
+    _rVisit?.addListener(replay);
+  }
+
+  void _rStatus(AnimationStatus s) {
+    if (s == AnimationStatus.reverse) replay();
+  }
+
+  @override
+  void dispose() {
+    _rCover?.removeStatusListener(_rStatus);
+    _rVisit?.removeListener(replay);
+    super.dispose();
+  }
 }
 
 /// Counts visits to one tab, so the cards in it can rise in again.

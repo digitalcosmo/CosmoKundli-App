@@ -483,7 +483,7 @@ class ReportRow extends StatelessWidget {
           ),
         ]),
       ReportState.generating => Row(mainAxisSize: MainAxisSize.min, children: [
-          const _Pulse(),
+          const LiveDot(),
           Text('GENERATING', style: CkText.mono(10, color: CkColors.cyan)),
         ]),
       ReportState.expired => Text('EXPIRED', style: CkText.mono(10, color: CkColors.textMuted)),
@@ -527,32 +527,6 @@ class ReportRow extends StatelessWidget {
         : Glass(margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.fromLTRB(10, 10, 8, 10), child: faded);
     return card;
   }
-}
-
-class _Pulse extends StatefulWidget {
-  const _Pulse();
-  @override
-  State<_Pulse> createState() => _PulseState();
-}
-
-class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..repeat(reverse: true);
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => FadeTransition(
-        opacity: Tween(begin: .25, end: 1.0).animate(_c),
-        child: Container(
-          width: 7,
-          height: 7,
-          margin: const EdgeInsets.only(right: 6),
-          decoration: const BoxDecoration(color: CkColors.cyan, shape: BoxShape.circle),
-        ),
-      );
 }
 
 /// Keeps a history list fresh while anything is generating.

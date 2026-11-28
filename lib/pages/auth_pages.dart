@@ -41,11 +41,8 @@ class _SplashPageState extends State<SplashPage> {
   @override
   Widget build(BuildContext context) => CkScaffold(
         body: Center(
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: 1),
-            duration: const Duration(milliseconds: 900),
-            curve: CkMotion.ease,
-            builder: (c, t, child) => Opacity(opacity: t, child: Transform.scale(scale: .94 + .06 * t, child: child)),
+          // the splash arrives like every card (kit entrance)
+          child: FadeSlideIn(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 56),

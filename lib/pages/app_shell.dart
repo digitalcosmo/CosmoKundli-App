@@ -410,7 +410,7 @@ class _HomePageState extends State<HomePage> {
                     onTap: onTap,
                     behavior: HitTestBehavior.opaque,
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      s.hasData || label == 'Credits' ? Text(v, style: CkText.mono(22, color: col)) : const Skeleton(height: 22, width: 36),
+                      s.hasData || label == 'Credits' ? StatText(v, style: CkText.mono(22, color: col)) : const Skeleton(height: 22, width: 36),
                       const SizedBox(height: 2),
                       Text(label, style: const TextStyle(fontSize: 12, color: CkColors.textSecondary)),
                     ]),

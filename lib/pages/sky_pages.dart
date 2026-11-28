@@ -307,7 +307,7 @@ class SkyArc extends StatelessWidget {
     final sun = Sky.arcPos(at, (d) => Sky.sunTimes(d, lat, lng));
     final moon = Sky.arcPos(at, (d) => Sky.moonTimes(d, lat, lng));
     final ph = Sky.moonPhase(at);
-    final arc = CustomPaint(
+    final arc = CustomPaint( // family-ok: sun and moon arc is a diagram, not a stat
       size: Size(double.infinity, height),
       painter: _ArcPainter(sun: sun, moon: moon, fraction: ph.$1, waxing: ph.$2 < .5),
     );

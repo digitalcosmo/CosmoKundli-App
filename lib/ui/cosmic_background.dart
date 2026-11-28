@@ -26,7 +26,7 @@ class CosmicBackground extends StatefulWidget {
 class SkyFrost {
   static final image = ValueNotifier<ui.Image?>(null);
   static const double scale = .25;
-  static const double sigma = 14;
+  static const double sigma = 24;
 }
 
 class _SkyTime extends ChangeNotifier {

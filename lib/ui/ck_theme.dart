@@ -22,8 +22,8 @@ class CkColors {
   static const Color cyanTint = Color(0x295CE1FF);
   static const Color cyanStroke = Color(0x735CE1FF);
   static const Color retro = Color(0xFFF5D90A);
-  static const Color panelTop = Color(0x12FFFFFF); // see-through glass (MyAcharyaji ~6%)
-  static const Color panelBottom = Color(0x0BFFFFFF);
+  static const Color panelTop = Color(0x1EFFFFFF); // frosted glass, more opaque (Build 3)
+  static const Color panelBottom = Color(0x16FFFFFF);
   static const Color panelStroke = Color(0x1FFFFFFF);
   static const Color field = Color(0x8C0A1E50);
   static const Color labelMono = Color(0xFF93A8CF);
