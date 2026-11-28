@@ -40,8 +40,10 @@ class CosmoKundliApp extends StatelessWidget {
       theme: CkTheme.dark(),
       darkTheme: CkTheme.dark(),
       themeMode: ThemeMode.dark,
-      // motion spec: pages slide in fully drawn (as CkRoute)
-      defaultTransition: Transition.cupertino,
+      // Every page change: fade-through over the one shared background
+      // (cupertinoDialog is the GetX value that hands over to customTransition).
+      defaultTransition: Transition.cupertinoDialog,
+      customTransition: _CkTransition(),
       transitionDuration: const Duration(milliseconds: 300),
       home: const SplashPage(),
       navigatorObservers: [UnfocusObserver()],
@@ -50,13 +52,25 @@ class CosmoKundliApp extends StatelessWidget {
         data: MediaQuery.of(context).copyWith(
           textScaler: MediaQuery.of(context).textScaler.clamp(maxScaleFactor: 1.15),
         ),
-        child: BackdropGroup(child: child!),
+        // One background for the whole app: painted once, under every page,
+        // so it never moves or changes when pages change.
+        child: Stack(children: [
+          const Positioned.fill(child: CkBackdrop()),
+          SharedBackdrop(child: BackdropGroup(child: child!)),
+        ]),
       ),
     ),
     );
   }
 }
 
-void goHome() => Get.offAll(() => const AppShell(), transition: Transition.fadeIn);
-void goLogin() => Get.offAll(() => const LoginPage(), transition: Transition.fadeIn);
+void goHome() => Get.offAll(() => const AppShell());
+void goLogin() => Get.offAll(() => const LoginPage());
+
+class _CkTransition extends CustomTransition {
+  @override
+  Widget buildTransition(BuildContext context, Curve? curve, Alignment? alignment, Animation<double> animation,
+          Animation<double> secondaryAnimation, Widget child) =>
+      ckFadeThrough(context, animation, secondaryAnimation, child);
+}
 

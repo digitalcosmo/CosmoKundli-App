@@ -1,6 +1,5 @@
 import 'dart:ui';
 
-import 'package:flutter/cupertino.dart' show CupertinoPageTransition;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -258,9 +257,9 @@ class _PressableState extends State<Pressable> {
 /// Fade + rise entrance, staggered by [index] (motion spec, MyAcharyaji:
 /// 550 ms, rise 16 px, scale 98 -> 100%, 70 ms apart, curve kEase).
 ///
-/// One entrance per card: inside another FadeSlideIn it does nothing, so a
-/// card never plays its entrance twice; on a page that is sliding in, the
-/// slide is the entrance and cards show at once. Only the first [kEntranceCount]
+/// One entrance per card: inside another entrance that is still running it
+/// does nothing, so a card never plays two entrances at once; cards that
+/// arrive later (data loaded) play their own. Only the first [kEntranceCount]
 /// items animate (later ones are usually off screen and must not animate
 /// while scrolling). Plays once when it is built; with the phone's
 /// "remove animations" setting it shows at once.
@@ -337,12 +336,9 @@ class _FadeSlideInState extends State<FadeSlideIn>
     _decided = true;
     final i = widget.index;
     final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final nested = _nested = context.getInheritedWidgetOfExactType<_InEntrance>()?.nests ?? false;
-    // A page that is sliding in already has its entrance (the slide), so
-    // its cards show at once. If the phone stalls on the first frames, the
-    // page then still arrives with its content instead of empty.
-    final sliding = ModalRoute.of(context)?.animation?.status == AnimationStatus.forward;
-    if (still || nested || sliding || i < 0 || i >= kEntranceCount) {
+    final outer = context.getInheritedWidgetOfExactType<_InEntrance>();
+    final nested = _nested = outer != null && outer.nests && outer.t.value < 1;
+    if (still || nested || i < 0 || i >= kEntranceCount) {
       _c.value = 1;
     } else if (i == 0) {
       _c.forward();
@@ -561,15 +557,57 @@ class CkRoute<T> extends PageRouteBuilder<T> {
           transitionDuration: const Duration(milliseconds: 300),
           reverseTransitionDuration: const Duration(milliseconds: 300),
           pageBuilder: (c, a, b) => builder(c),
-          transitionsBuilder: (c, a, b, child) => (MediaQuery.maybeDisableAnimationsOf(c) ?? false)
-              ? child
-              : CupertinoPageTransition(
-            primaryRouteAnimation: a,
-            secondaryRouteAnimation: b,
-            linearTransition: false,
-            child: child,
-          ),
+          transitionsBuilder: (c, a, b, child) => ckFadeThrough(c, a, b, child),
         );
+}
+
+/// Page change, as MyAcharyaji feels: the one background never moves; the
+/// current page's content fades out (90 ms), then the new page's content
+/// fades in (210 ms) while its cards rise in one after another. Cards fade
+/// their face only, so their blur is steady. Used by every route.
+Widget ckFadeThrough(BuildContext c, Animation<double> a, Animation<double> b, Widget child) {
+  if (MediaQuery.maybeDisableAnimationsOf(c) ?? false) return child;
+  return _FadeThrough(a: a, b: b, child: child);
+}
+
+class _FadeThrough extends StatefulWidget {
+  final Animation<double> a, b;
+  final Widget child;
+  const _FadeThrough({required this.a, required this.b, required this.child});
+  @override
+  State<_FadeThrough> createState() => _FadeThroughState();
+}
+
+class _FadeThroughState extends State<_FadeThrough> {
+  late Animation<double> _t;
+  late Listenable _both;
+
+  void _make() {
+    final into = CurvedAnimation(parent: widget.a, curve: const Interval(.3, 1, curve: kEase));
+    final away = ReverseAnimation(CurvedAnimation(parent: widget.b, curve: const Interval(0, .3, curve: Curves.easeIn)));
+    _t = AnimationMin<double>(into, away);
+    _both = Listenable.merge([widget.a, widget.b]);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _make();
+  }
+
+  @override
+  void didUpdateWidget(_FadeThrough old) {
+    super.didUpdateWidget(old);
+    if (!identical(old.a, widget.a) || !identical(old.b, widget.b)) _make();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _both,
+        child: CardFade.tab(t: _t, child: widget.child),
+        // hidden while the other page is still fading (never two at once)
+        builder: (_, k) => Offstage(offstage: widget.a.value < .3 || widget.b.value >= .3, child: k),
+      );
 }
 
 /// Keeps every tab alive and switches by fade-through (Material): the old

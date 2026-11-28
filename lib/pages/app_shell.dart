@@ -104,8 +104,7 @@ class _AppShellState extends State<AppShell> {
       child: Material(
         type: MaterialType.transparency,
         child: Stack(children: [
-        // one background behind all tabs; only the tab content cross-fades
-        const Positioned.fill(child: CkBackdrop()),
+        // the app's one background is painted under every page (main.dart)
         TabFader(index: _index, children: [for (var i = 0; i < 4; i++) RepaintBoundary(child: SharedBackdrop(child: _page(i)))]),
         Positioned(
           left: 12,
@@ -294,7 +293,7 @@ class _HomePageState extends State<HomePage> {
               FadeSlideIn(
                 child: Pressable(
                   scale: .985,
-                  onTap: () => Get.to(() => const SearchPage(), transition: Transition.fadeIn),
+                  onTap: () => Get.to(() => const SearchPage()),
                   child: Glass(
                     height: 48,
                     padding: const EdgeInsets.symmetric(horizontal: 14),
