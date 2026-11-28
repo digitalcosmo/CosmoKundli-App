@@ -169,6 +169,12 @@ class Glass extends StatelessWidget {
       ),
       child: Container(alignment: alignment, padding: padding, child: child),
     );
+    // Entrance: fade the face only (see [entranceFade]); a card inside a card
+    // that is already fading does not fade a second time.
+    final fade = entranceFade(context);
+    final shown = fade == null || fade.isCompleted || context.getInheritedWidgetOfExactType<_Faded>() != null
+        ? face
+        : FadeTransition(opacity: fade, child: _Faded(child: face));
     // Real backdrop blur is expensive (one full-screen pass per card), so
     // only surfaces that float over moving content (dock, sheets) ask for
     // it. Cards get the same look from a tinted, pre-blurred background.
@@ -177,15 +183,15 @@ class Glass extends StatelessWidget {
     // surfaces pass `liquid: true` for the refracting lens on top.
     final Widget body;
     if (liquid) {
-      body = LiquidGlass(radius: radius, blur: blur > 0 ? blur : 20, child: face);
+      body = LiquidGlass(radius: radius, blur: blur > 0 ? blur : 20, child: shown);
     } else if (frost && !perfOff(4)) {
       final f = ImageFilter.blur(sigmaX: blur > 0 ? blur : 14, sigmaY: blur > 0 ? blur : 14);
       body = ClipRRect(
         borderRadius: r,
-        child: BackdropGroup.of(context) != null ? BackdropFilter.grouped(filter: f, child: face) : BackdropFilter(filter: f, child: face),
+        child: BackdropGroup.of(context) != null ? BackdropFilter.grouped(filter: f, child: shown) : BackdropFilter(filter: f, child: shown),
       );
     } else {
-      body = face;
+      body = shown;
     }
     return Container(
       width: width,
@@ -270,10 +276,33 @@ class FadeSlideIn extends StatefulWidget {
 const int kEntranceCount = 6;
 
 class _InEntrance extends InheritedWidget {
-  const _InEntrance({required super.child});
+  final Animation<double> t;
+  const _InEntrance({required this.t, required super.child});
   @override
-  bool updateShouldNotify(_InEntrance old) => false;
+  bool updateShouldNotify(_InEntrance old) => !identical(old.t, t);
 }
+
+/// Fades the cards under it in with [t] the way an entrance does: each
+/// [Glass] fades its face and keeps its blur steady. For data swapping in.
+class CardFade extends StatelessWidget {
+  final Animation<double> t;
+  final Widget child;
+  const CardFade({super.key, required this.t, required this.child});
+  @override
+  Widget build(BuildContext context) => _InEntrance(t: t, child: child);
+}
+
+class _Faded extends InheritedWidget {
+  const _Faded({required super.child});
+  @override
+  bool updateShouldNotify(_Faded old) => false;
+}
+
+/// The fade of the card entrance this widget sits in (null outside one).
+/// [Glass] fades only its face with it and keeps the blur steady: a blur
+/// inside a part-transparent layer has nothing behind it to blur, so a
+/// card fading as a whole looks clear first and gets its blur at the end.
+Animation<double>? entranceFade(BuildContext c) => c.getInheritedWidgetOfExactType<_InEntrance>()?.t;
 
 class _FadeSlideInState extends State<FadeSlideIn>
     with SingleTickerProviderStateMixin {
@@ -281,6 +310,7 @@ class _FadeSlideInState extends State<FadeSlideIn>
       vsync: this, duration: const Duration(milliseconds: 550));
   late final Animation<double> _t = CurvedAnimation(parent: _c, curve: kEase);
   bool _decided = false;
+  bool _nested = false;
 
   @override
   void didChangeDependencies() {
@@ -289,7 +319,7 @@ class _FadeSlideInState extends State<FadeSlideIn>
     _decided = true;
     final i = widget.index;
     final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final nested = context.getInheritedWidgetOfExactType<_InEntrance>() != null;
+    final nested = _nested = context.getInheritedWidgetOfExactType<_InEntrance>() != null;
     // A page that is sliding in already has its entrance (the slide), so
     // its cards show at once. If the phone stalls on the first frames, the
     // page then still arrives with its content instead of empty.
@@ -313,21 +343,23 @@ class _FadeSlideInState extends State<FadeSlideIn>
 
   @override
   Widget build(BuildContext context) {
+    // Inside another entrance: the outer one moves and fades this too.
+    if (_nested) return widget.child;
+    // No fade layer around the whole item: cards ([Glass]) fade their own
+    // face through [entranceFade] and keep their blur from the first frame.
     return _InEntrance(
-      child: FadeTransition(
-        opacity: _t,
-        child: AnimatedBuilder(
-          animation: _t,
-          child: widget.child,
-          builder: (_, c) {
-            final v = _t.value;
-            if (v >= 1) return c!;
-            return Transform.translate(
-              offset: Offset(0, (1 - v) * 16),
-              child: Transform.scale(scale: .98 + .02 * v, child: c),
-            );
-          },
-        ),
+      t: _t,
+      child: AnimatedBuilder(
+        animation: _t,
+        child: widget.child,
+        builder: (_, c) {
+          final v = _t.value;
+          if (v >= 1) return c!;
+          return Transform.translate(
+            offset: Offset(0, (1 - v) * 16),
+            child: Transform.scale(scale: .98 + .02 * v, child: c),
+          );
+        },
       ),
     );
   }

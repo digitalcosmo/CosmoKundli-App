@@ -387,6 +387,8 @@ class _FastFutureState<T> extends State<FastFuture<T>> {
     return AnimatedSwitcher(
       duration: _still(context) ? Duration.zero : const Duration(milliseconds: 300),
       switchInCurve: Curves.easeOut,
+      // Cards fade their face only, so their blur is there from frame one.
+      transitionBuilder: (c, a) => CardFade(t: a, child: c),
       layoutBuilder: (cur, prev) => cur ?? const SizedBox.shrink(),
       child: child,
     );
