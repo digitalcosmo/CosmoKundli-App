@@ -1,31 +1,53 @@
+import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'widgets.dart' show perfOff;
 
 /// Deep-space scene behind every page: navy depth, slowly turning orbit
 /// rings, a large blue sphere and a small amber planet drifting, and a
-/// twinkling starfield. One painter, one controller; Flutter mutes the
-/// ticker of routes that are covered, so only the visible page animates.
+/// twinkling starfield. Drawn once for the whole app (glass.dart CkSky).
+///
+/// Speed (Build 2): the scene moves so slowly that 30 updates a second look
+/// the same as 120, so it updates on a 30 per second timer instead of
+/// every screen refresh; between updates nothing is redrawn. On each update
+/// it also makes [SkyFrost]: a small pre-blurred copy of the scene that
+/// frosted cards show instead of blurring the screen live.
 class CosmicBackground extends StatefulWidget {
   const CosmicBackground({super.key});
   @override
   State<CosmicBackground> createState() => _CosmicBackgroundState();
 }
 
-class _CosmicBackgroundState extends State<CosmicBackground> with TickerProviderStateMixin {
-  // Every background runs on one shared clock, so two pages show the scene
-  // in exactly the same position and swapping pages never makes it jump.
+/// The pre-blurred sky that frosted cards show (glass.dart). [scale] is its
+/// size against the screen; it is blurred as a 14 px frost would be.
+class SkyFrost {
+  static final image = ValueNotifier<ui.Image?>(null);
+  static const double scale = .25;
+  static const double sigma = 14;
+}
+
+class _SkyTime extends ChangeNotifier {
+  double v = 0; // 0..1 over 120 s
+  double aura = 0; // 0..1 over 36 s
+  void set(double a, double b) {
+    v = a;
+    aura = b;
+    notifyListeners();
+  }
+}
+
+class _CosmicBackgroundState extends State<CosmicBackground> with WidgetsBindingObserver {
   static final _clock = Stopwatch()..start();
   static double _phase(int periodMs) => (_clock.elapsedMilliseconds % periodMs) / periodMs;
 
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(seconds: 120), value: _phase(120000))..repeat();
-  // Slow breathing auras behind the glass: 18 s out, 18 s back.
-  late final AnimationController _aura =
-      AnimationController(vsync: this, duration: const Duration(seconds: 36), value: _phase(36000))..repeat();
+  final _time = _SkyTime();
   static final List<_Star> _stars = _makeStars();
-  late final _painter = _SpacePainter(_c, _stars, _AuraPainter(_aura), Listenable.merge([_c, _aura]));
+  late final _painter = _SpacePainter(_time, _stars, _AuraPainter(_time));
+  Timer? _timer;
+  Size? _size;
 
   static List<_Star> _makeStars() {
     final r = math.Random(11);
@@ -35,35 +57,76 @@ class _CosmicBackgroundState extends State<CosmicBackground> with TickerProvider
             2 + r.nextInt(5)));
   }
 
-  // Coming back on screen (tab switched back, page above popped): jump to
-  // the shared clock so this page matches the one it replaces.
-  bool _was = true;
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final on = TickerMode.of(context);
-    if (on && !_was) {
-      _c.value = _phase(120000);
-      _aura.value = _phase(36000);
-      _c.repeat();
-      _aura.repeat();
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _time.set(_phase(120000), _phase(36000));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState s) => _sync();
+
+  void _sync() {
+    final still = !mounted || MediaQuery.of(context).disableAnimations || perfOff(2);
+    final awake = SchedulerBinding.instance.lifecycleState == AppLifecycleState.resumed ||
+        SchedulerBinding.instance.lifecycleState == null;
+    if (!still && awake) {
+      _timer ??= Timer.periodic(const Duration(milliseconds: 33), (_) => _step());
+    } else {
+      _timer?.cancel();
+      _timer = null;
     }
-    _was = on;
+  }
+
+  void _step() {
+    _time.set(_phase(120000), _phase(36000));
+    _makeFrost();
+  }
+
+  /// Draws the scene small, blurred, into [SkyFrost.image].
+  void _makeFrost() {
+    final s = _size;
+    if (s == null || s.isEmpty || perfOff(4)) return;
+    const k = SkyFrost.scale;
+    final w = (s.width * k).ceil(), h = (s.height * k).ceil();
+    final rec = ui.PictureRecorder();
+    final c = Canvas(rec);
+    c.saveLayer(
+        Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()),
+        Paint()
+          ..imageFilter = ui.ImageFilter.blur(
+              sigmaX: SkyFrost.sigma * k, sigmaY: SkyFrost.sigma * k, tileMode: TileMode.clamp));
+    c.scale(k);
+    const _StaticSpacePainter().paint(c, s);
+    _painter.paint(c, s);
+    c.restore();
+    final pic = rec.endRecording();
+    final img = pic.toImageSync(w, h);
+    pic.dispose();
+    final old = SkyFrost.image.value;
+    SkyFrost.image.value = img;
+    old?.dispose();
   }
 
   @override
   void dispose() {
-    _c.dispose();
-    _aura.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _timer?.cancel();
+    _time.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final still = MediaQuery.of(context).disableAnimations || perfOff(2);
-    if (!still && TickerMode.of(context) && !_c.isAnimating) { _c.repeat(); _aura.repeat(); }
-    if (still && _c.isAnimating) _c.stop();
-    if (still && _aura.isAnimating) _aura.stop();
+    final size = MediaQuery.sizeOf(context);
+    if (size != _size) {
+      _size = size;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _makeFrost();
+      });
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _sync());
     return Stack(fit: StackFit.expand, children: [
       const RepaintBoundary(child: CustomPaint(painter: _StaticSpacePainter(), size: Size.infinite, isComplex: true, willChange: false)),
       RepaintBoundary(
@@ -111,10 +174,10 @@ class _StaticSpacePainter extends CustomPainter {
 /// The moving parts (rings, bobbing planets, twinkling stars). Paints and
 /// gradients are built once per size and reused every frame.
 class _SpacePainter extends CustomPainter {
-  final Animation<double> t;
+  final _SkyTime t;
   final List<_Star> stars;
   final _AuraPainter aura;
-  _SpacePainter(this.t, this.stars, this.aura, Listenable repaint) : super(repaint: repaint);
+  _SpacePainter(this.t, this.stars, this.aura) : super(repaint: t);
 
   Size? _size;
   late Paint _bigHalo, _big, _smallHalo, _small;
@@ -154,7 +217,7 @@ class _SpacePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size s) {
     _prepare(s);
-    final v = t.value; // 0..1 over 120 s
+    final v = t.v; // 0..1 over 120 s
 
     // orbit rings, slowly turning
     final c = Offset(s.width * .5, s.height * .62);
@@ -203,7 +266,7 @@ class _SpacePainter extends CustomPainter {
 /// see-through cards show behind them. Gradients built once, moved by
 /// translating the canvas.
 class _AuraPainter {
-  final Animation<double> t;
+  final _SkyTime t;
   _AuraPainter(this.t);
   final _p = <Paint>[];
 
@@ -217,7 +280,8 @@ class _AuraPainter {
               .createShader(Rect.fromCircle(center: Offset.zero, radius: r)));
       }
     }
-    final tri = t.value < .5 ? t.value * 2 : 2 - t.value * 2; // there and back
+    final a = t.aura;
+    final tri = a < .5 ? a * 2 : 2 - a * 2; // there and back
     final v = Curves.easeInOut.transform(tri);
     final at = [
       Offset(80 + 40 * v, 110 + 60 * v),

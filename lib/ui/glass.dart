@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import 'ck_theme.dart';
@@ -159,36 +160,32 @@ class Glass extends StatelessWidget {
       ),
       child: Container(alignment: alignment, padding: padding, child: child),
     );
-    // Entrance: the app fades each card as a whole, blur included, as
-    // MyAcharyaji does ([FadeSlideIn]). The motion lab can try two other
-    // ways ([EntranceStyle]): the face fades and the blur stays, or the
-    // face fades and the blur grows with it.
-    final style = EntranceScope.of(context);
-    final fade = style == EntranceStyle.whole ? null : entranceFade(context);
-    final shown = fade == null || context.getInheritedWidgetOfExactType<_Faded>() != null
-        ? face
-        : FadeTransition(opacity: fade, child: _Faded(child: face));
-    // Cards: frosted blur through the page's shared BackdropGroup (one
-    // backdrop read for every card on screen, as in MyAcharyaji). Floating
-    // surfaces pass `liquid: true` for the refracting lens on top.
+    // Frost (Build 2, speed): over the sky, a card shows the pre-blurred
+    // copy of the sky ([SkyFrost]) behind its face instead of blurring the
+    // screen live; it looks the same, because the sky is the only thing
+    // behind a card, and costs one small picture instead of a blur per card
+    // per frame. A card inside a card, and a card outside a page (a sheet),
+    // keep the old way. The entrance fades the whole card, frost included.
     final Widget body;
-    final double sigma = blur > 0 ? blur : 14;
+    final bool nested = context.getInheritedWidgetOfExactType<_InGlass>() != null;
     if (liquid) {
-      body = LiquidGlass(radius: radius, blur: blur > 0 ? blur : 20, child: shown);
-    } else if (frost && !perfOff(4)) {
-      final grouped = BackdropGroup.of(context) != null;
-      Widget filter(double sg) {
-        final f = ImageFilter.blur(sigmaX: sg, sigmaY: sg);
-        return grouped ? BackdropFilter.grouped(filter: f, child: shown) : BackdropFilter(filter: f, child: shown);
-      }
+      body = LiquidGlass(radius: radius, blur: blur > 0 ? blur : 20, child: face);
+    } else if (!frost || perfOff(4) || nested) {
+      body = face;
+    } else if (context.getInheritedWidgetOfExactType<_OverSky>() != null) {
       body = ClipRRect(
         borderRadius: r,
-        child: style == EntranceStyle.blurGrows && fade != null
-            ? AnimatedBuilder(animation: fade, builder: (_, __) => filter(sigma * fade.value.clamp(0.0, 1.0)))
-            : filter(sigma),
+        child: Stack(children: [
+          const Positioned.fill(child: _FrostView()),
+          _InGlass(child: face),
+        ]),
       );
     } else {
-      body = shown;
+      final double sigma = blur > 0 ? blur : 14;
+      body = ClipRRect(
+        borderRadius: r,
+        child: BackdropFilter(filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma), child: _InGlass(child: face)),
+      );
     }
     return Container(
       width: width,
@@ -252,27 +249,6 @@ class _PressableState extends State<Pressable> {
   }
 }
 
-/// How a card's frosted blur arrives with it. The app uses [whole]
-/// (MyAcharyaji exact); the motion lab shows the other two for comparison.
-enum EntranceStyle {
-  /// One fade over the whole card, blur included (MyAcharyaji).
-  whole,
-  /// The face fades and the blur strength grows from 0 with it.
-  blurGrows,
-  /// The face fades; the blur is there from the first frame.
-  faceOnly,
-}
-
-/// Sets the [EntranceStyle] for the cards below it (motion lab).
-class EntranceScope extends InheritedWidget {
-  final EntranceStyle style;
-  const EntranceScope({super.key, required this.style, required super.child});
-  static EntranceStyle of(BuildContext c) =>
-      c.getInheritedWidgetOfExactType<EntranceScope>()?.style ?? EntranceStyle.whole;
-  @override
-  bool updateShouldNotify(EntranceScope old) => old.style != style;
-}
-
 /// Gap between cards in the wave below it: [CkMotion.waveTab] on a tab,
 /// [CkMotion.wavePage] on a pushed page.
 class EntranceWave extends InheritedWidget {
@@ -323,25 +299,93 @@ class _InEntrance extends InheritedWidget {
   bool updateShouldNotify(_InEntrance old) => !identical(old.t, t);
 }
 
-/// Publishes [t] as the fade of the cards under it (motion lab styles).
-class CardFade extends StatelessWidget {
-  final Animation<double> t;
-  final Widget child;
-  final bool entrance;
-  const CardFade({super.key, required this.t, required this.child}) : entrance = true;
-  const CardFade.tab({super.key, required this.t, required this.child}) : entrance = false;
+/// Marks a page whose cards sit over the sky (they can use [SkyFrost]).
+class _OverSky extends InheritedWidget {
+  const _OverSky({required super.child});
   @override
-  Widget build(BuildContext context) => _InEntrance.wrap(context, t, entrance: entrance, child: child);
+  bool updateShouldNotify(_OverSky old) => false;
 }
 
-class _Faded extends InheritedWidget {
-  const _Faded({required super.child});
+/// Marks the inside of a frosted card (a card inside it needs no frost).
+class _InGlass extends InheritedWidget {
+  const _InGlass({required super.child});
   @override
-  bool updateShouldNotify(_Faded old) => false;
+  bool updateShouldNotify(_InGlass old) => false;
 }
 
-/// The fade of the card entrance this widget sits in (null outside one).
-Animation<double>? entranceFade(BuildContext c) => c.getInheritedWidgetOfExactType<_InEntrance>()?.t;
+/// Paints the part of [SkyFrost] that lies behind this box. It repaints on
+/// its own (own layer) when the sky updates or a scroll moves it, so the
+/// card's content is never redrawn for it.
+class _FrostView extends LeafRenderObjectWidget {
+  const _FrostView();
+  List<ScrollPosition> _scrolls(BuildContext c) {
+    final out = <ScrollPosition>[];
+    var s = Scrollable.maybeOf(c);
+    while (s != null && out.length < 3) {
+      out.add(s.position);
+      s = Scrollable.maybeOf(s.context);
+    }
+    return out;
+  }
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderFrost(_scrolls(context));
+  @override
+  void updateRenderObject(BuildContext context, _RenderFrost r) => r.scrolls = _scrolls(context);
+}
+
+class _RenderFrost extends RenderBox {
+  _RenderFrost(this._scrolls);
+  List<ScrollPosition> _scrolls;
+  set scrolls(List<ScrollPosition> v) {
+    if (attached) {
+      for (final p in _scrolls) {
+        p.removeListener(markNeedsPaint);
+      }
+      for (final p in v) {
+        p.addListener(markNeedsPaint);
+      }
+    }
+    _scrolls = v;
+  }
+
+  static final _paint = Paint()..filterQuality = FilterQuality.low;
+
+  @override
+  bool get isRepaintBoundary => true;
+  @override
+  bool get sizedByParent => true;
+  @override
+  Size computeDryLayout(BoxConstraints constraints) => constraints.biggest;
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    SkyFrost.image.addListener(markNeedsPaint);
+    for (final p in _scrolls) {
+      p.addListener(markNeedsPaint);
+    }
+  }
+
+  @override
+  void detach() {
+    SkyFrost.image.removeListener(markNeedsPaint);
+    for (final p in _scrolls) {
+      p.removeListener(markNeedsPaint);
+    }
+    super.detach();
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final img = SkyFrost.image.value;
+    if (img == null || size.isEmpty) return;
+    final g = localToGlobal(Offset.zero);
+    const k = SkyFrost.scale;
+    final src = Rect.fromLTWH(g.dx * k, g.dy * k, size.width * k, size.height * k);
+    context.canvas.drawImageRect(img, src, offset & size, _paint);
+  }
+}
 
 class _FadeSlideInState extends State<FadeSlideIn>
     with SingleTickerProviderStateMixin {
@@ -349,7 +393,6 @@ class _FadeSlideInState extends State<FadeSlideIn>
   late final Animation<double> _t = CurvedAnimation(parent: _c, curve: kEase);
   bool _decided = false;
   bool _nested = false;
-  EntranceStyle _style = EntranceStyle.whole;
   int _step = CkMotion.waveTab;
 
   @override
@@ -358,7 +401,6 @@ class _FadeSlideInState extends State<FadeSlideIn>
     if (_decided) return;
     _decided = true;
     final i = widget.index;
-    _style = EntranceScope.of(context);
     _step = EntranceWave.of(context);
     final still = (MediaQuery.maybeDisableAnimationsOf(context) ?? false) || perfOff(32);
     final outer = context.getInheritedWidgetOfExactType<_InEntrance>();
@@ -429,7 +471,7 @@ class _FadeSlideInState extends State<FadeSlideIn>
       context,
       _t,
       entrance: true,
-      child: _style == EntranceStyle.whole ? FadeTransition(opacity: _t, child: moved) : moved,
+      child: FadeTransition(opacity: _t, child: moved),
     );
   }
 }
@@ -628,7 +670,7 @@ const Duration kPageDuration = CkMotion.push;
 /// [wave] is the card gap for the page (tab roots keep the tab gap).
 Widget ckPageTransition(BuildContext c, Animation<double> a, Animation<double> b, Widget child,
     {int wave = CkMotion.wavePage}) {
-  final page = EntranceWave(stepMs: wave, child: BackdropGroup(child: child));
+  final page = EntranceWave(stepMs: wave, child: _OverSky(child: child));
   if (MediaQuery.maybeDisableAnimationsOf(c) ?? false) return page;
   final into = CurvedAnimation(parent: a, curve: kEase, reverseCurve: kEase.flipped);
   final under = CurvedAnimation(parent: b, curve: kEase, reverseCurve: kEase.flipped);

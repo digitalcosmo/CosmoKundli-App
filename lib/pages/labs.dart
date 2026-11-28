@@ -7,107 +7,15 @@ import 'package:get/get.dart';
 
 import '../core/session.dart';
 import '../ui/ck_theme.dart';
-import '../ui/glass.dart';
 import '../ui/widgets.dart';
 import 'app_shell.dart' show appTabRequest;
 import 'client_shell.dart' show clientTabRequest;
 import 'clients_page.dart' show openClient;
 
-/// Adds the two labs to the hidden speed sheet (long-press "Log out").
+/// Adds the speed lab to the hidden speed sheet (long-press "Log out").
 void registerLabs() {
   if (perfLabs.isNotEmpty) return;
-  perfLabs.add(('Motion lab: how cards arrive', (c) => Get.to(() => const MotionLabPage())));
   perfLabs.add(('Speed lab: measure frames', (c) => runSpeedLab()));
-}
-
-// ───────────────────────── Motion lab
-
-/// Three ways a frosted card can arrive, side by side, for picking on the
-/// phone. Whichever feels like one thing becomes the only entrance.
-class MotionLabPage extends StatefulWidget {
-  const MotionLabPage({super.key});
-  @override
-  State<MotionLabPage> createState() => _MotionLabPageState();
-}
-
-class _MotionLabPageState extends State<MotionLabPage> {
-  int _run = 0;
-
-  static const _ways = [
-    (EntranceStyle.whole, '1. MyAcharyaji exact', 'The whole card fades in, blur included.'),
-    (EntranceStyle.blurGrows, '2. Blur grows with it', 'The card fades in and its blur grows from nothing.'),
-    (EntranceStyle.faceOnly, '3. Blur first', 'The card fades in over a blur that is already there.'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final pad = MediaQuery.of(context).padding;
-    return CkScaffold(
-      body: ListView(
-        padding: EdgeInsets.fromLTRB(20, pad.top + 12, 20, pad.bottom + 32),
-        children: [
-          Row(children: [
-            CircleBtn(Icons.arrow_back_rounded, label: 'Back', onTap: Get.back),
-            const SizedBox(width: 14),
-            Expanded(child: Text('Motion lab', style: CkText.h(22))),
-          ]),
-          const SizedBox(height: 12),
-          const Text('Tap Replay and watch each pair of cards arrive. Pick the one where the card and its frosted glass feel like one thing.',
-              style: CkText.muted),
-          const SizedBox(height: 14),
-          PrimaryButton('Replay', icon: Icons.replay_rounded, onTap: () => setState(() => _run++)),
-          const SizedBox(height: 18),
-          for (final w in _ways) ...[
-            Text(w.$2, style: CkText.h(15)),
-            const SizedBox(height: 2),
-            Text(w.$3, style: CkText.muted),
-            const SizedBox(height: 10),
-            EntranceScope(
-              style: w.$1,
-              child: KeyedSubtree(
-                key: ValueKey('${w.$1}-$_run'),
-                child: Row(children: [
-                  Expanded(child: FadeSlideIn(index: 0, child: _sample('SENTIMENTS', const [.5, .8, .35, .9, .6, .7, .4]))),
-                  const SizedBox(width: 12),
-                  Expanded(child: FadeSlideIn(index: 1, child: _sample('POWER', const [.7, .45, .85, .3, .6, .55, .75]))),
-                ]),
-              ),
-            ),
-            const SizedBox(height: 22),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _sample(String title, List<double> bars) => Glass(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: CkText.label),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 56,
-            child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              for (final b in bars) ...[
-                Expanded(
-                  child: FractionallySizedBox(
-                    heightFactor: b,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: b > .6 ? CkColors.green : (b > .4 ? CkColors.orangeSoft : CkColors.red),
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-              ],
-            ]),
-          ),
-          const SizedBox(height: 8),
-          const Text('Strong month', style: CkText.muted),
-        ]),
-      );
 }
 
 // ───────────────────────── Speed lab
